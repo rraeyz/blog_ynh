@@ -1,20 +1,34 @@
 import Link from 'next/link'
 import { getSettings } from '@/lib/state'
+import { canSubscribe } from '@/lib/newsletter'
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const settings = await getSettings()
-  const subscribeUrl = settings.kunyeUrl.trim()
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <header className="mb-10">
-        <Link href="/" className="text-2xl font-bold">{settings.siteTitle}</Link>
-        <p className="text-stone-500 mt-1">{settings.siteDescription}</p>
-        <nav className="mt-3 flex gap-4 text-sm">
-          <a href="/rss.xml" className="underline">RSS</a>
-          {subscribeUrl && <a href={subscribeUrl} className="underline">Haftalık bültene abone ol</a>}
-        </nav>
+    <div className="min-h-screen flex flex-col">
+      <header className="sticky top-0 z-30 border-b border-zinc-200/70 dark:border-ink-line bg-paper/80 dark:bg-ink/75 backdrop-blur-xl">
+        <div className="mx-auto max-w-5xl px-4 h-16 flex items-center gap-4">
+          <Link href="/" className="flex items-center gap-2.5 font-display font-semibold text-lg min-w-0 truncate">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon.svg" alt="" width={28} height={28} className="rounded-lg" />
+            {settings.siteTitle}
+          </Link>
+          <nav className="ml-auto flex items-center gap-1 text-sm">
+            <Link href="/#yazilar" className="hidden sm:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Yazılar</Link>
+            <a href="/rss.xml" className="hidden sm:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">RSS</a>
+            {canSubscribe(settings) && <Link href="#abone" className="rounded-full bg-violet-600 text-white px-4 py-1.5 font-medium hover:bg-violet-500 transition">Abone ol</Link>}
+          </nav>
+        </div>
       </header>
-      <main>{children}</main>
+      <main className="flex-1">{children}</main>
+      <footer className="border-t border-zinc-200/70 dark:border-ink-line mt-20">
+        <div className="mx-auto max-w-5xl px-4 py-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-500">
+          <span>© {new Date().getFullYear()} {settings.siteTitle}</span>
+          <a href="/rss.xml" className="hover:text-violet-500">RSS</a>
+          {settings.kunyeUrl && <a href={settings.kunyeUrl} className="hover:text-violet-500">{settings.kunyeUrl.replace(/^https?:\/\//, '')}</a>}
+          <span className="ml-auto">Yazılar yapay zekâ yardımıyla hazırlanır; kaynak makaleler her yazıda.</span>
+        </div>
+      </footer>
     </div>
   )
 }

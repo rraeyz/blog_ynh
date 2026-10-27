@@ -9,12 +9,15 @@ export default async function SourcesPage({ searchParams }: { searchParams: { me
     <>
       <Notice message={searchParams.mesaj} />
       <h1 className="text-xl font-bold mb-2">Kaynaklar</h1>
-      <p className="text-sm text-stone-500 mb-4">
-        arXiv&apos;te kategori sayfasını aç ve linkini buraya yapıştır, örn. <code>https://arxiv.org/list/cs.AI/recent</code>.
-        Birden fazla kategori: <code>https://arxiv.org/list/cs.AI+cs.LG/recent</code>. Her gün yeni makaleler çekilir.
-      </p>
+      <div className="text-sm text-stone-500 mb-4 space-y-1">
+        <p>İstediğin kadar kaynak ekleyebilirsin; her gün yeni makaleler çekilir. Kabul edilenler:</p>
+        <ul className="list-disc pl-5">
+          <li>arXiv kategori ya da arşiv sayfası: <code>https://arxiv.org/list/cs.AI/recent</code>, <code>https://arxiv.org/archive/astro-ph</code>, birden fazla: <code>https://arxiv.org/list/cs.AI+cs.LG/recent</code></li>
+          <li>Herhangi bir sitenin RSS/Atom beslemesi (dergiler, bloglar): genelde sitedeki &quot;RSS&quot; ya da &quot;feed&quot; linki</li>
+        </ul>
+      </div>
       <form action={addSourceAction} className="card mb-6 flex flex-col sm:flex-row gap-2">
-        <input name="url" type="url" required placeholder="https://arxiv.org/list/cs.AI/recent" className="input" />
+        <input name="url" type="url" required placeholder="https://arxiv.org/archive/astro-ph ya da https://site.com/feed" className="input" />
         <button className="btn-primary whitespace-nowrap">Kaynak ekle</button>
       </form>
       <ul className="space-y-2">

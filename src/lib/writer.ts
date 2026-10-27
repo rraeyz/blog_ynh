@@ -10,11 +10,18 @@ Bu makaleyi teknik olmayan ama meraklı bir okur için Türkçe anlat.
 Kurallar:
 - Yalnızca verilen metindeki bilgileri kullan. Metinde olmayan sayı, sonuç ya da iddia ekleme; emin olmadığın yerde bunu belirt.
 - Terimleri ilk geçtikleri yerde kısaca açıkla; yaygın İngilizce terimi parantez içinde verebilirsin.
-- Gövde Markdown olsun ve şu bölümleri içersin: kısa bir giriş paragrafı, "## Ne yaptılar?", "## Neden önemli?", "## Sınırlamalar". Toplam 300-600 kelime.
 - Başlık çekici ama abartısız olsun, makalenin İngilizce başlığının çevirisi olmak zorunda değil.
+- "brief": haber dilinde 1-2 cümle; ne bulunduğunu söyle, ayrıntıya girme. Sitenin "Yeni gelişmeler" bölümünde ve bültende tek başına okunur.
+- "highlights": tam 3 kısa madde (her biri en fazla 15 kelime); yazıyı okumayan biri bunlarla ana fikri anlamalı.
+- "body" Markdown ve ekranda rahat okunmalı:
+  - Kısa bir giriş paragrafı, sonra "## Ne yaptılar?", "## Neden önemli?", "## Sınırlamalar" bölümleri. Toplam 300-600 kelime.
+  - Her paragraf en fazla 3 cümle. Uzun açıklamaları paragraflara böl.
+  - Önemli terimleri ve sayıları **kalın** yaz. Sıralanabilen şeyleri "- " ile listele.
+  - En çarpıcı bulguyu "> " ile başlayan tek satırlık bir vurgu olarak "Ne yaptılar?" bölümüne koy.
+  - Her başlıktan önce ve sonra boş satır bırak.
 
 Yanıtı yalnızca şu JSON biçiminde ver, başka hiçbir şey yazma:
-{"title": "...", "excerpt": "en fazla 2 cümlelik özet", "body": "Markdown gövde"}`
+{"title": "...", "brief": "...", "highlights": ["...", "...", "..."], "body": "..."}`
 
 async function uniqueSlug(title: string): Promise<string> {
   const base = slugify(title) || 'yazi'
@@ -32,7 +39,7 @@ export async function writePost(paperId: number, settings: Settings, publish = s
     const user = `Başlık: ${paper.title}\nYazarlar: ${paper.authors || '-'}\nLink: ${paper.url}\n\nMetin:\n${text}`
     const result = await complete(settings, SYSTEM, user)
     await addUsage(result.inputTokens, result.outputTokens)
-    const data = extractJson(result.text) as { title?: unknown; excerpt?: unknown; body?: unknown }
+    const data = extractJson(result.text) as { title?: unknown; brief?: unknown; excerpt?: unknown; highlights?: unknown; body?: unknown }
     if (typeof data.title !== 'string' || typeof data.body !== 'string' || !data.title.trim() || !data.body.trim()) {
       throw new Error('Model beklenen biçimde yanıt vermedi')
     }
@@ -40,7 +47,8 @@ export async function writePost(paperId: number, settings: Settings, publish = s
       data: {
         slug: await uniqueSlug(data.title),
         title: data.title.trim().slice(0, 300),
-        excerpt: typeof data.excerpt === 'string' ? data.excerpt.trim().slice(0, 500) : '',
+        excerpt: String(typeof data.brief === 'string' ? data.brief : typeof data.excerpt === 'string' ? data.excerpt : '').trim().slice(0, 500),
+        highlights: Array.isArray(data.highlights) ? data.highlights.filter((h): h is string => typeof h === 'string').map((h) => h.trim().replace(/\n/g, ' ')).filter(Boolean).slice(0, 5).join('\n') : '',
         body: data.body.trim(),
         status: publish ? 'published' : 'draft',
         publishedAt: publish ? new Date() : null,
@@ -78,13 +86,13 @@ export async function writeDaily(settings: Settings): Promise<{ written: number;
   const candidates = await prisma.paper.findMany({
     where: { status: 'new', createdAt: { gte: new Date(Date.now() - 3 * 24 * 3600_000) } },
     orderBy: { publishedAt: 'desc' },
-    take: 80,
     select: { id: true, title: true },
   })
   const summary = { written: 0, failed: 0, skipped: 0, budget: false }
   if (candidates.length === 0 || settings.postsPerDay <= 0) return summary
   if (await overBudget(settings)) return { ...summary, budget: true }
-  const picked = await selectPapers(candidates, settings, settings.postsPerDay)
+  // Modele en yeni 80 başlık gider (token için); seçilmeyenlerin hepsi atlanır, ertesi güne yığılmaz
+  const picked = await selectPapers(candidates.slice(0, 80), settings, settings.postsPerDay)
   for (const id of picked) {
     if (await overBudget(settings)) {
       summary.budget = true

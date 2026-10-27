@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { clientIp, endSession, recordFailure, requireAdmin, startSession, tooManyFailures } from '@/lib/auth'
 import { getSettings } from '@/lib/state'
 import { parseSourceUrl } from '@/lib/arxiv'
-import { addPaperFromUrl } from '@/lib/papers'
+import { addPaperFromUrl, readSource } from '@/lib/papers'
 import { writePost } from '@/lib/writer'
 import { createWeeklyDigest, digestBody, sendDigest } from '@/lib/newsletter'
 import { dailyTask, isJobRunning, runExclusive, weeklyTask } from '@/lib/jobs'
@@ -132,11 +132,18 @@ export async function saveSettingsAction(form: FormData) {
 export async function addSourceAction(form: FormData) {
   await requireAdmin()
   const url = text(form, 'url')
-  const ref = parseSourceUrl(url)
-  if (ref?.kind !== 'category') back('/admin/kaynaklar', 'arXiv kategori linki gir (örn. https://arxiv.org/list/cs.AI/recent). Tek makale için Makaleler sayfasını kullan.')
+  if (parseSourceUrl(url)?.kind === 'paper') back('/admin/kaynaklar', 'Bu tek bir makalenin linki; onu Makaleler sayfasından ekle')
   if (await prisma.source.findUnique({ where: { url } })) back('/admin/kaynaklar', 'Bu kaynak zaten ekli')
-  await prisma.source.create({ data: { url } })
-  back('/admin/kaynaklar', `Eklendi: ${ref.categories.join(', ')}`)
+  // Eklemeden önce bir kez okunur: çalışmayan adres listeye girmesin
+  let message: string
+  try {
+    const papers = await readSource(url)
+    await prisma.source.create({ data: { url } })
+    message = `Eklendi (şu an ${papers.length} makale görünüyor; ilk taramada alınır)`
+  } catch (error) {
+    message = errorText(error)
+  }
+  back('/admin/kaynaklar', message)
 }
 
 export async function toggleSourceAction(form: FormData) {
@@ -190,7 +197,8 @@ export async function savePostAction(form: FormData) {
   const title = text(form, 'title')
   const body = text(form, 'body')
   if (!title || !body) back(`/admin/yazilar/${postId}`, 'Başlık ve gövde boş olamaz')
-  await prisma.post.update({ where: { id: postId }, data: { title: title.slice(0, 300), excerpt: text(form, 'excerpt').slice(0, 500), body } })
+  const highlights = text(form, 'highlights').split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 5).join('\n')
+  await prisma.post.update({ where: { id: postId }, data: { title: title.slice(0, 300), excerpt: text(form, 'excerpt').slice(0, 500), highlights, body } })
   back(`/admin/yazilar/${postId}`, 'Kaydedildi')
 }
 
