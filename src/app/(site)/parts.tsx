@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { coverOf, readingMinutes, topicHue, topicLabel } from '@/lib/topics'
+import { CATEGORIES, coverOf, periodLabel, readingMinutes, topicHue, topicLabel } from '@/lib/topics'
+import { prisma } from '@/lib/prisma'
 import { canSubscribe } from '@/lib/newsletter'
 import type { Settings } from '@/lib/state'
 import { SubscribeForm } from './SubscribeForm'
@@ -132,3 +133,53 @@ export function SubscribeBox({ settings, compact }: { settings: Settings; compac
     </section>
   )
 }
+
+export const PAGE_SIZE = 24
+
+// Yazı arşivi: zaman dilimlerine ayrılmış liste ("Bu hafta", "Geçen hafta", "Ekim 2026"...) ve sayfalama.
+// posts PAGE_SIZE + 1 kayıtla gelir; fazladan biri varsa "Daha eski" görünür
+export function Archive({ posts, page, href, empty }: { posts: PostItem[]; page: number; href: (page: number) => string; empty: string }) {
+  const groups: Array<[string, PostItem[]]> = []
+  for (const post of posts.slice(0, PAGE_SIZE)) {
+    const label = periodLabel(post.publishedAt ?? post.createdAt)
+    const last = groups[groups.length - 1]
+    if (last?.[0] === label) last[1].push(post)
+    else groups.push([label, [post]])
+  }
+  return (
+    <>
+      {groups.length === 0 && <p className="mt-6 rounded-3xl border border-dashed border-zinc-300 dark:border-ink-line p-10 text-center text-zinc-500">{empty}</p>}
+      {groups.map(([label, items]) => (
+        <div key={label} className="grid md:grid-cols-[160px_1fr] gap-x-8 gap-y-2 py-6 border-t border-zinc-200/70 dark:border-ink-line first:mt-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300 md:sticky md:top-24 self-start pt-3">{label}</h3>
+          <div className="space-y-1">{items.map((post) => <RowPost key={post.id} post={post} />)}</div>
+        </div>
+      ))}
+      <nav className="mt-10 flex justify-between text-sm">
+        {page > 1 ? <Link href={href(page - 1)} className="rounded-full border border-zinc-300 dark:border-ink-line px-4 py-2 hover:border-violet-500">← Daha yeni</Link> : <span />}
+        {posts.length > PAGE_SIZE && <Link href={href(page + 1)} className="rounded-full border border-zinc-300 dark:border-ink-line px-4 py-2 hover:border-violet-500">Daha eski →</Link>}
+      </nav>
+    </>
+  )
+}
+
+// Yazısı olan konular (sabit sırayla); üst menü ve ana sayfadaki konu bağlantıları
+export async function activeTopics(): Promise<Array<[string, (typeof CATEGORIES)[string], number]>> {
+  const counts = await prisma.post.groupBy({ by: ['category'], where: { status: 'published' }, _count: true })
+  return Object.entries(CATEGORIES).flatMap(([key, c]) => {
+    const count = counts.find((row) => row.category === key)?._count ?? 0
+    return count > 0 ? [[key, c, count] as [string, (typeof CATEGORIES)[string], number]] : []
+  })
+}
+
+// Konu bağlantısı: konunun renginde nokta
+export const TopicLink = ({ slug, label, active }: { slug: string; label: string; active?: boolean }) => (
+  <Link
+    href={`/konu/${slug}`}
+    aria-current={active ? 'page' : undefined}
+    className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${active ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'border border-zinc-300 dark:border-ink-line hover:border-violet-500'}`}
+  >
+    <span className="h-2 w-2 rounded-full" style={{ background: `hsl(${topicHue(slug)} 80% 60%)` }} />
+    {label}
+  </Link>
+)
