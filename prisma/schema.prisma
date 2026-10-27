@@ -31,7 +31,7 @@ model Settings {
   kunyeToken        String   @default("") // Künye → Ayarlar → Güvenlik → API anahtarı
   newsletterTag     String   @default("") // boşsa Künye'deki tüm onaylı abonelere
   imageApiKey       String   @default("") // OpenRouter: kaynağın serbest görseli olmayan yazılara temsili kapak (boşsa üretilmez)
-  imageModel        String   @default("openai/gpt-image-2")
+  imageModel        String   @default("black-forest-labs/flux-3-image-klein")
   updatedAt         DateTime @updatedAt
 }
 
