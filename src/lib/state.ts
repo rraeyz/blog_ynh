@@ -36,5 +36,5 @@ export async function overBudget(settings: Settings): Promise<boolean> {
 export async function logJob(line: string): Promise<void> {
   const previous = (await getState('job.log')) ?? ''
   const stamp = new Date().toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' })
-  await setState('job.log', [`${stamp} · ${line}`, ...previous.split('\n').filter(Boolean)].slice(0, 30).join('\n'))
+  await setState('job.log', [`${stamp} · ${line}`, ...previous.split('\n').filter(Boolean)].slice(0, 60).join('\n'))
 }
