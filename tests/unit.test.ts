@@ -4,6 +4,8 @@ import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
 import { extractJson, slugify } from '../src/lib/text.ts'
+import { compressImage } from '../src/lib/compress.ts'
+import sharp from 'sharp'
 import { coverOf, freeImage, periodLabel, readingMinutes, topicHue, topicLabel } from '../src/lib/topics.ts'
 
 test('konu etiketi, rengi, okuma süresi, dönem', () => {
@@ -138,4 +140,11 @@ test('slug ve JSON ayıklama', () => {
   assert.deepEqual(extractJson('Tabii:\n```json\n{"title": "A", "body": "{x}"}\n```'), { title: 'A', body: '{x}' })
   assert.deepEqual(extractJson('[3, 1]'), [3, 1])
   assert.throws(() => extractJson('JSON yok'))
+})
+
+test('kapak görseli küçültülüp WebP olur', async () => {
+  const png = await sharp({ create: { width: 2400, height: 1350, channels: 3, background: '#7c3aed' } }).png().toBuffer()
+  const meta = await sharp(await compressImage(png)).metadata()
+  assert.equal(meta.format, 'webp')
+  assert.equal(meta.width, 1600)
 })

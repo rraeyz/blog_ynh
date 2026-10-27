@@ -44,6 +44,11 @@ COPY --from=builder /app/template.db ./template.db
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
 COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
+# sharp: yapay zekâ kapaklarını WebP'ye çevirir (lib/compress.ts); @img altında Alpine/ARM için hazır derlenmiş libvips
+COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
+COPY --from=builder /app/node_modules/@img ./node_modules/@img
+COPY --from=builder /app/node_modules/detect-libc ./node_modules/detect-libc
+COPY --from=builder /app/node_modules/semver ./node_modules/semver
 
 COPY docker-entrypoint.sh db-migrate.js db-backup.js ./
 RUN chmod +x ./docker-entrypoint.sh && mkdir -p /app/prisma
