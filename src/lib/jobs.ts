@@ -52,7 +52,8 @@ export async function weeklyTask(): Promise<string> {
 
 async function tick() {
   const settings = await getSettings()
-  if (new Date().getHours() < settings.dailyHour) return
+  // Elle başlatılmış bir iş sürüyorsa bir sonraki saate bırak: yoksa günün tarihi yazılıp iş o gün hiç çalışmazdı
+  if (new Date().getHours() < settings.dailyHour || isJobRunning()) return
   if ((await getState('job.dailyDate')) !== today()) {
     await setState('job.dailyDate', today())
     await runExclusive('Günlük iş', dailyTask)

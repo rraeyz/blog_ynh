@@ -9,6 +9,8 @@ export type SubscribeState = { ok: boolean; message: string } | null
 // Ziyaretçi başına sınır (Künye'ye istekler hep bu sunucunun IP'sinden gider, ziyaretçiyi burada sınırlarız)
 const attempts = new Map<string, number[]>()
 function limited(ip: string): boolean {
+  // Bellek sınırsız büyümesin (çok sayıda farklı IP'den gelen bot)
+  if (attempts.size > 10_000) attempts.clear()
   const recent = (attempts.get(ip) ?? []).filter((time) => Date.now() - time < 60 * 60_000)
   attempts.set(ip, [...recent, Date.now()])
   return recent.length >= 5

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
 import { extractJson, markdownLinks, parseLesson, parseSelection, slugify, unlink } from '../src/lib/text.ts'
-import { isPrivateIp } from '../src/lib/net.ts'
+import { isPrivateIp, safeFetch } from '../src/lib/net.ts'
 import { compressImage } from '../src/lib/compress.ts'
 import { complete, RETRY_DELAYS } from '../src/lib/ai.ts'
 import http from 'node:http'
@@ -219,4 +219,27 @@ test('ders çıktısı, linkler ve iç ağ adresleri', () => {
   assert.equal(unlink(body, new Set(['https://x.com/404'])), 'Bak [ESO](https://eso.org/a) ve yok ve tekrar [ESO](https://eso.org/a)')
   for (const ip of ['127.0.0.1', '10.1.2.3', '192.168.1.5', '172.20.0.1', '169.254.169.254', '::1', '::ffff:127.0.0.1', 'fd00::1', '0.0.0.0']) assert.ok(isPrivateIp(ip), ip)
   for (const ip of ['8.8.8.8', '172.32.0.1', '2606:4700::1111']) assert.ok(!isPrivateIp(ip), ip)
+})
+
+test('safeFetch: iç ağ engellenir, yönlendirmeler denetlenir', async () => {
+  const server = http.createServer((req, res) => {
+    if (req.url === '/yonlendir') return res.writeHead(302, { Location: '/hedef' }).end()
+    if (req.url === '/dongu') return res.writeHead(302, { Location: '/dongu' }).end()
+    res.writeHead(200).end('tamam')
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+  try {
+    delete process.env.BLOG_ALLOW_PRIVATE_URLS
+    await assert.rejects(safeFetch(`${base}/hedef`), /iç ağ/, '127.0.0.1 engellenir')
+    await assert.rejects(safeFetch('http://[::1]:1/'), /iç ağ/)
+    await assert.rejects(safeFetch('file:///etc/passwd'), /http/)
+    process.env.BLOG_ALLOW_PRIVATE_URLS = '1'
+    const response = await safeFetch(`${base}/yonlendir`)
+    assert.equal(await response.text(), 'tamam', 'yönlendirme izlenir')
+    await assert.rejects(safeFetch(`${base}/dongu`), /yönlendirme/)
+  } finally {
+    delete process.env.BLOG_ALLOW_PRIVATE_URLS
+    server.close()
+  }
 })

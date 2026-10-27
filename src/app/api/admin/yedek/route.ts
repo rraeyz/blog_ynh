@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     if (!(file instanceof File) || file.size === 0) return back('Yedek dosyası seç')
     if (file.size > MAX_SIZE) return back('Dosya çok büyük (en fazla 50 MB)')
     const counts = await restoreBackup(JSON.parse(await file.text()))
-    return back(`Yedek yüklendi: ${counts.sources} kaynak, ${counts.papers} makale, ${counts.posts} yazı, ${counts.digests} bülten`)
+    return back(`Yedek yüklendi: ${counts.sources} kaynak, ${counts.papers} makale, ${counts.posts} yazı, ${counts.digests} bülten, ${counts.lessons} ders`)
   } catch (error) {
     return back(`Yüklenemedi: ${error instanceof SyntaxError ? 'dosya JSON değil' : String((error as Error).message || error).slice(0, 200)}`)
   }
