@@ -24,6 +24,9 @@ h1, h2, h3 { @apply font-display tracking-tight; }
 .prose-body li::before { content: ''; @apply absolute left-0 top-3 w-2 h-2 rounded-full bg-violet-400; }
 .prose-body strong { @apply text-zinc-900 dark:text-white font-semibold; }
 .prose-body a { @apply text-violet-600 dark:text-violet-300 underline decoration-violet-400/50 underline-offset-4 hover:decoration-violet-400; }
+.prose-body blockquote { @apply my-8 rounded-2xl border-l-4 border-violet-500 bg-violet-500/10 px-6 py-5 font-display text-xl leading-8 text-zinc-900 dark:text-white; }
+.prose-body blockquote::before { content: 'Öne çıkan bulgu'; @apply block mb-1 font-sans text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300; }
+.prose-body h2, .prose-body h3 { scroll-margin-top: 6rem; }
 .prose-body code { @apply bg-violet-500/10 text-violet-700 dark:text-violet-200 rounded px-1.5 py-0.5 text-[0.9em]; }
 
 /* Panel */

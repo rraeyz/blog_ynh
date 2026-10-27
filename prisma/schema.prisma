@@ -64,7 +64,8 @@ model Post {
   id           Int       @id @default(autoincrement())
   slug         String    @unique
   title        String
-  excerpt      String    @default("")
+  excerpt      String    @default("") // Kısa gelişme metni: sitenin başında ve bültende görünür
+  highlights   String    @default("") // "Kısaca" kutusu: satır başına bir madde
   body         String // Markdown (lib/markdown.ts)
   status       String    @default("draft") // draft | published
   publishedAt  DateTime?

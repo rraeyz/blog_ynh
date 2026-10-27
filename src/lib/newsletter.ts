@@ -4,8 +4,10 @@ import type { Settings } from '@/lib/state'
 // Bülten metni Künye'nin e-posta biçiminde: **kalın**, [link](url), satır sonları
 export function digestBody(posts: Array<{ title: string; excerpt: string; slug: string }>, siteUrl: string): string {
   const base = siteUrl.replace(/\/+$/, '')
-  const items = posts.map((post) => `**${post.title}**\n${post.excerpt}\n[Devamını oku →](${base}/yazi/${post.slug})`)
-  return [`Bu hafta okuduğum makalelerden ${posts.length === 1 ? 'biri' : posts.length} var:`, ...items, `Tüm yazılar: ${base}`].join('\n\n')
+  // Kısa gelişme + detay linki: okur hepsine göz gezdirir, merak ettiğine tıklar
+  const items = posts.map((post) => `**${post.title}**\n${post.excerpt}\n[Detaylar →](${base}/yazi/${post.slug})`)
+  const intro = posts.length === 1 ? 'Önemli bir gelişme var:' : `Bu haftanın ${posts.length} gelişmesi; merak ettiğinin detayı bir tık uzakta:`
+  return [intro, ...items, `Tüm gelişmeler: ${base}`].join('\n\n')
 }
 
 // Son 7 günde yayımlanan yazılardan taslak bülten (yazı yoksa null)

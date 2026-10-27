@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
-import { renderMarkdown } from '../src/lib/markdown.ts'
+import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
 import { extractJson, slugify } from '../src/lib/text.ts'
 import { periodLabel, readingMinutes, topicHue, topicLabel } from '../src/lib/topics.ts'
 
@@ -94,8 +94,16 @@ test('HTML metne çevrilir', () => {
 test('Markdown güvenli biçimde HTML olur', () => {
   assert.equal(
     renderMarkdown('Giriş **kalın** ve *italik*\n\n## Ne yaptılar?\n\n- bir\n- iki'),
-    '<p>Giriş <strong>kalın</strong> ve <em>italik</em></p>\n<h2>Ne yaptılar?</h2>\n<ul><li>bir</li><li>iki</li></ul>',
+    '<p>Giriş <strong>kalın</strong> ve <em>italik</em></p>\n<h2 id="ne-yaptilar">Ne yaptılar?</h2>\n<ul><li>bir</li><li>iki</li></ul>',
   )
+  // Modeller başlıktan/listeden sonra boş satır bırakmayabilir (Gemini çıktısındaki hata)
+  assert.equal(
+    renderMarkdown('Giriş.\n## Neden önemli?\nBu çalışma önemli.\n> En önemli bulgu\n- madde\nSon.'),
+    '<p>Giriş.</p>\n<h2 id="neden-onemli">Neden önemli?</h2>\n<p>Bu çalışma önemli.</p>\n<blockquote>En önemli bulgu</blockquote>\n<ul><li>madde</li></ul>\n<p>Son.</p>',
+  )
+  assert.equal(renderMarkdown('> <img src=x onerror=alert(1)>'), '<blockquote>&lt;img src=x onerror=alert(1)&gt;</blockquote>')
+  assert.equal(inline('yaklaşık **1 milyar yıl** <b>'), 'yaklaşık <strong>1 milyar yıl</strong> &lt;b&gt;')
+  assert.deepEqual(headings('Giriş\n## Ne yaptılar?\nmetin\n### alt\n## Sınırlamalar'), [{ id: 'ne-yaptilar', text: 'Ne yaptılar?' }, { id: 'sinirlamalar', text: 'Sınırlamalar' }])
   assert.equal(renderMarkdown('<script>alert(1)</script>'), '<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>')
   assert.equal(renderMarkdown('[a](javascript:alert(1))'), '<p>[a](javascript:alert(1))</p>', 'yalnızca http(s) linkleri')
   assert.equal(

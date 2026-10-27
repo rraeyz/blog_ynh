@@ -197,7 +197,8 @@ export async function savePostAction(form: FormData) {
   const title = text(form, 'title')
   const body = text(form, 'body')
   if (!title || !body) back(`/admin/yazilar/${postId}`, 'Başlık ve gövde boş olamaz')
-  await prisma.post.update({ where: { id: postId }, data: { title: title.slice(0, 300), excerpt: text(form, 'excerpt').slice(0, 500), body } })
+  const highlights = text(form, 'highlights').split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 5).join('\n')
+  await prisma.post.update({ where: { id: postId }, data: { title: title.slice(0, 300), excerpt: text(form, 'excerpt').slice(0, 500), highlights, body } })
   back(`/admin/yazilar/${postId}`, 'Kaydedildi')
 }
 

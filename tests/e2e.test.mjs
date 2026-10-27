@@ -28,7 +28,8 @@ const fake = http.createServer((req, res) => {
     }
     if (req.url === '/v1/chat/completions') {
       aiCalls++
-      const content = JSON.stringify({ title: 'Kediler Neden Çok Uyur?', excerpt: 'Kısa özet.', body: 'Giriş.\n\n## Ne yaptılar?\n\n<script>alert(1)</script> **önemli**' })
+      // Başlıktan sonra boş satır yok (Gemini böyle yazıyordu); vurgu ve "Kısaca" maddeleri
+      const content = JSON.stringify({ title: 'Kediler Neden Çok Uyur?', brief: 'Kediler günde 15 saat uyuyor.', highlights: ['Uyku enerji saklar', 'Avcılık için gerekli'], body: 'Giriş.\n## Ne yaptılar?\n<script>alert(1)</script> **önemli**\n> Büyük bulgu' })
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content: `İşte yazı:\n${content}` } }], usage: { prompt_tokens: 100, completion_tokens: 50 } }))
     }
@@ -183,7 +184,11 @@ test('makale → taslak yazı → yayın', async () => {
   assert.equal(page.status, 200)
   assert.ok(page.html.includes('&lt;script&gt;alert(1)&lt;/script&gt;') && !page.html.includes('<script>alert(1)'), 'model çıktısı kaçışlanmalı')
   assert.match(page.html, /<strong>önemli<\/strong>/)
-  assert.match((await get('/')).html, /Kediler Neden Çok Uyur/)
+  assert.match(page.html, /<h2 id="ne-yaptilar">Ne yaptılar\?<\/h2>/, 'başlık boş satırsız da çalışmalı')
+  assert.match(page.html, /<blockquote>Büyük bulgu<\/blockquote>/)
+  assert.match(page.html, /Kısaca[\s\S]*Uyku enerji saklar[\s\S]*Avcılık için gerekli/)
+  const home = (await get('/')).html
+  assert.match(home, /Yeni gelişmeler[\s\S]*Kediler Neden Çok Uyur\?[\s\S]*Kediler günde 15 saat uyuyor\.[\s\S]*Detaylar/)
   const rss = await get('/rss.xml')
   assert.match(rss.html, /<link>https:\/\/blog\.example\.com\/yazi\/kediler-neden-cok-uyur<\/link>/)
   cookie = savedCookie
@@ -200,7 +205,7 @@ test('yazıyı abonelere gönder (Künye)', async () => {
   const sent = kunyeRequests[0]
   assert.equal(sent.auth, 'Bearer kunye-anahtari')
   assert.equal(sent.body.subject, 'Kediler Neden Çok Uyur?')
-  assert.match(sent.body.message, /\(https:\/\/blog\.example\.com\/yazi\/kediler-neden-cok-uyur\)/)
+  assert.match(sent.body.message, /Kediler günde 15 saat uyuyor\.\n\[Detaylar →\]\(https:\/\/blog\.example\.com\/yazi\/kediler-neden-cok-uyur\)/)
   assert.ok(new Date(sent.body.sendAt).getTime() > Date.now(), 'gelecekte bir zamana planlanmalı')
   assert.match(await submit(digestPath, 'Sil'), /silindi/)
 

@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { isAdmin } from '@/lib/auth'
 import { getSettings } from '@/lib/state'
-import { renderMarkdown } from '@/lib/markdown'
+import { headings, inline, renderMarkdown } from '@/lib/markdown'
 import { readingMinutes } from '@/lib/topics'
 import { CardPost, coverStyle, postDate, SubscribeBox, TopicChip } from '../../parts'
 import { ReadingProgress } from './ReadingProgress'
@@ -39,6 +39,8 @@ export default async function PostPage({ params }: { params: { slug: string } })
     }),
   ])
   const topic = post.paper?.topic ?? ''
+  const highlights = post.highlights.split('\n').filter(Boolean)
+  const toc = headings(post.body)
 
   return (
     <article className="mx-auto max-w-5xl px-4">
@@ -53,8 +55,21 @@ export default async function PostPage({ params }: { params: { slug: string } })
         </div>
       </header>
 
-      <div className="mx-auto max-w-2xl">
-        {post.excerpt && <p className="mt-10 border-l-4 border-violet-500 pl-5 text-lg italic text-zinc-600 dark:text-zinc-400">{post.excerpt}</p>}
+      <div className="mx-auto mt-10 max-w-4xl lg:grid lg:grid-cols-[minmax(0,1fr)_13rem] lg:gap-14">
+      <div className="max-w-2xl">
+        {highlights.length > 0 ? (
+          <section className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/5 p-6">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">Kısaca</h2>
+            <ul className="mt-3 space-y-2.5">
+              {highlights.map((item) => (
+                <li key={item} className="flex gap-3 text-zinc-800 dark:text-zinc-200">
+                  <span aria-hidden className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500 text-[0.7rem] text-white">✓</span>
+                  <span dangerouslySetInnerHTML={{ __html: inline(item) }} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : post.excerpt && <p className="border-l-4 border-violet-500 pl-5 text-lg text-zinc-600 dark:text-zinc-400">{post.excerpt}</p>}
         <div className="prose-body mt-8" dangerouslySetInnerHTML={{ __html: renderMarkdown(post.body) }} />
 
         {post.paper && (
@@ -65,6 +80,18 @@ export default async function PostPage({ params }: { params: { slug: string } })
             <p className="text-xs text-zinc-500 mt-3">Bu yazı yapay zekâ yardımıyla hazırlandı; ayrıntılar ve kesin sonuçlar için kaynak makaleye bakın.</p>
           </aside>
         )}
+      </div>
+      {toc.length > 1 && (
+        <nav aria-label="Bu yazıda" className="hidden lg:block">
+          <div className="sticky top-24 border-l border-zinc-200 dark:border-ink-line pl-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Bu yazıda</p>
+            <ol className="mt-3 space-y-2 text-sm">
+              {toc.map((item) => <li key={item.id}><a href={`#${item.id}`} className="text-zinc-600 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-300">{item.text}</a></li>)}
+            </ol>
+            <a href="#abone" className="mt-6 block text-xs text-violet-600 dark:text-violet-300 hover:underline">Bültene abone ol →</a>
+          </div>
+        </nav>
+      )}
       </div>
 
       <div className="mt-14"><SubscribeBox settings={settings} /></div>

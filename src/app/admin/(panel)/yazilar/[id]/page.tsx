@@ -26,13 +26,19 @@ export default async function EditPostPage({ params, searchParams }: { params: {
           <input id="title" name="title" defaultValue={post.title} className="input" required />
         </div>
         <div>
-          <label className="label" htmlFor="excerpt">Kısa özet</label>
+          <label className="label" htmlFor="excerpt">Kısa gelişme metni</label>
           <textarea id="excerpt" name="excerpt" defaultValue={post.excerpt} rows={2} className="input" />
+          <p className="hint">1-2 cümle, haber dilinde. Sitenin başındaki &quot;Yeni gelişmeler&quot; bölümünde ve bültende görünür.</p>
+        </div>
+        <div>
+          <label className="label" htmlFor="highlights">Kısaca (her satır bir madde)</label>
+          <textarea id="highlights" name="highlights" defaultValue={post.highlights} rows={3} className="input" />
+          <p className="hint">Yazının başındaki özet kutusu. Boş bırakılırsa kutu görünmez.</p>
         </div>
         <div>
           <label className="label" htmlFor="body">Gövde (Markdown)</label>
           <textarea id="body" name="body" defaultValue={post.body} rows={24} className="input font-mono" required />
-          <p className="hint">## başlık, - liste, **kalın**, *italik*, [metin](https://link)</p>
+          <p className="hint">## başlık, - liste, &gt; öne çıkan bulgu, **kalın**, *italik*, [metin](https://link)</p>
         </div>
         <button className="btn-primary">Kaydet</button>
       </form>
