@@ -1,0 +1,31 @@
+[Unit]
+Description=Blog Docker Service
+Requires=docker.service
+After=docker.service network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=__INSTALL_DIR__
+User=root
+Group=root
+
+# Start
+ExecStart=/usr/local/bin/docker-compose up -d
+
+# Stop
+ExecStop=/usr/local/bin/docker-compose down
+
+# Reload
+ExecReload=/usr/local/bin/docker-compose restart
+
+# Security
+PrivateTmp=true
+NoNewPrivileges=true
+
+# Restart
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

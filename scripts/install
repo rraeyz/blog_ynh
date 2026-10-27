@@ -1,0 +1,104 @@
+#!/bin/bash
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+#=================================================
+# INSTALL DEPENDENCIES
+#=================================================
+ynh_script_progression --message="Installing Docker..." --weight=5
+
+# Docker kurulu değilse kur
+if ! command -v docker &> /dev/null; then
+    curl -fsSL https://get.docker.com | bash
+    systemctl enable docker
+    systemctl start docker
+fi
+
+# Docker Compose kurulu değilse kur
+if ! command -v docker-compose &> /dev/null; then
+    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+fi
+
+#=================================================
+# CREATE INSTALL DIRECTORY
+#=================================================
+ynh_script_progression --message="Setting up source files..." --weight=3
+
+# Dizinleri oluştur
+mkdir -p "$install_dir"
+mkdir -p "$data_dir/prisma"
+
+# Kaynak dosyaları GitHub'dan çek (repo adresi scripts/_common.sh içinde)
+ynh_script_progression --message="Cloning from GitHub..." --weight=2
+fetch_app_source
+
+# .env'de tek kullanımlık kurulum anahtarı: ilk şifreyi yalnızca bu anahtarı bilen belirleyebilir
+# (yoksa siteyi ilk açan yönetici olurdu).
+setup_token=$(ynh_string_random --length=32)
+ynh_app_setting_set --app="$app" --key=setup_token --value="$setup_token"
+echo "SETUP_TOKEN=$setup_token" > "$data_dir/.env"
+chmod 600 "$data_dir/.env"
+
+#=================================================
+# CREATE DOCKER COMPOSE FILE
+#=================================================
+ynh_add_config --template="docker-compose.yml" --destination="$install_dir/docker-compose.yml"
+
+#=================================================
+# BUILD AND START DOCKER CONTAINER
+#=================================================
+ynh_script_progression --message="Building and starting Docker container..." --weight=10
+
+cd "$install_dir"
+
+# Docker Compose ile başlat (--no-cache ile temiz build)
+docker-compose build --no-cache
+docker-compose up -d
+
+# Container'ın ayağa kalkmasını bekle
+wait_for_app
+
+#=================================================
+# CONFIGURE NGINX
+#=================================================
+ynh_script_progression --message="Configuring NGINX..." --weight=2
+
+ynh_add_nginx_config
+
+#=================================================
+# CREATE SYSTEMD SERVICE
+#=================================================
+ynh_script_progression --message="Configuring systemd service..." --weight=1
+
+ynh_add_systemd_config
+systemctl enable "$app.service" --quiet
+ynh_systemd_action --service_name="$app" --action="start" --log_path="/var/log/$app/$app.log"
+
+#=================================================
+# SETUP PERMISSIONS
+#=================================================
+ynh_script_progression --message="Setting up permissions..." --weight=1
+
+chown -R "$app:$app" "$install_dir"
+chown -R "$app:$app" "$data_dir"
+
+#=================================================
+# SETUP LOG ROTATION
+#=================================================
+ynh_use_logrotate
+
+#=================================================
+# SETUP BACKUP ROUTINE
+#=================================================
+ynh_script_progression --message="Configuring backup..." --weight=1
+
+setup_backup_cron
+
+#=================================================
+# END OF SCRIPT
+#=================================================
+ynh_print_info --message="Şifreyi belirlemek için açın: https://$domain${path%/}/admin/giris (kurulum anahtarı: $setup_token)"
+
+ynh_script_progression --message="Installation of $app completed" --last
