@@ -1,14 +1,19 @@
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { deletePostAction, featurePostAction, postToDigestAction, publishPostAction, rewritePostAction, savePostAction } from '../../../actions'
+import { coverPostAction, deletePostAction, featurePostAction, postToDigestAction, publishPostAction, rewritePostAction, savePostAction } from '../../../actions'
 import { Notice } from '../../../Notice'
 import { ConfirmButton } from '../../../ConfirmButton'
-import { CATEGORIES } from '@/lib/topics'
+import { CATEGORIES, coverOf } from '@/lib/topics'
 import { FEATURE_SUGGESTION } from '@/lib/writer'
+import { getSettings } from '@/lib/state'
+
 
 export default async function EditPostPage({ params, searchParams }: { params: { id: string }; searchParams: { mesaj?: string } }) {
   const post = await prisma.post.findUnique({ where: { id: Number(params.id) || 0 }, include: { paper: true } })
   if (!post) notFound()
+  const cover = coverOf(post)
+  // Kaynağın serbest görseli varsa çizmeye gerek yok
+  const canDraw = !!(await getSettings()).imageApiKey.trim() && (!cover || cover.ai)
   const published = post.status === 'published'
   return (
     <>
@@ -29,6 +34,19 @@ export default async function EditPostPage({ params, searchParams }: { params: {
           {post.importance >= FEATURE_SUGGESTION && !post.featuredAt && <span className="ml-2 rounded bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 px-2 py-0.5 text-xs">Öne çıkarılması öneriliyor</span>}
         </p>
       )}
+      <div className="card mb-4 flex flex-wrap items-center gap-4">
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cover.src} alt="" referrerPolicy="no-referrer" className="h-24 w-44 rounded-lg object-cover" />
+        ) : (
+          <div className="h-24 w-44 rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-700" />
+        )}
+        <div className="text-sm flex-1 min-w-48">
+          <p className="font-medium">Kapak görseli</p>
+          <p className="text-stone-500">{cover ? cover.credit : 'Görsel yok, renkli kapak gösteriliyor.'}</p>
+        </div>
+        {canDraw && <form action={coverPostAction}><input type="hidden" name="id" value={post.id} /><button className="btn">{post.image ? 'Yeniden çiz (~0,01 $)' : 'Yapay zekâyla çiz (~0,01 $)'}</button></form>}
+      </div>
       <form action={savePostAction} className="space-y-4">
         <input type="hidden" name="id" value={post.id} />
         <div>

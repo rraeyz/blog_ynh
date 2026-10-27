@@ -39,6 +39,30 @@ export function topicHue(topic: string): number {
   return PALETTE[hash % PALETTE.length]
 }
 
+// Görselini gösterdiğimiz kurumlar: görselleri kamu malı (NASA) ya da kaynak gösterilerek serbest (ESA, ESO; CC BY).
+// Diğer sitelerin görselleri çoğunlukla ajans (Getty vb.) fotoğrafı ve telifli; onlarda renkli kapak kalır
+const FREE_IMAGES: Array<[RegExp, string]> = [
+  [/(^|\.)nasa\.gov$/, 'NASA'],
+  [/(^|\.)esa\.int$/, 'ESA'],
+  [/(^|\.)esawebb\.org$/, 'ESA/Webb'],
+  [/(^|\.)esahubble\.org$/, 'ESA/Hubble'],
+  [/(^|\.)eso\.org$/, 'ESO'],
+]
+
+export function freeImage(paper: { url: string; imageUrl: string } | null | undefined): { src: string; credit: string } | null {
+  if (!paper?.imageUrl) return null
+  const host = paper.url.match(/^https?:\/\/([^/?#:]+)/)?.[1] ?? ''
+  const credit = FREE_IMAGES.find(([pattern]) => pattern.test(host))?.[1]
+  return credit ? { src: paper.imageUrl, credit } : null
+}
+
+// Kapak görseli: önce kaynağın serbest lisanslı görseli, yoksa yapay zekânın temsili kapağı, o da yoksa renkli kapak
+export function coverOf(post: { image: string; paper: { url: string; imageUrl: string } | null | undefined }): { src: string; credit: string; ai: boolean } | null {
+  const free = freeImage(post.paper)
+  if (free) return { src: free.src, credit: `Görsel: ${free.credit}`, ai: false }
+  return post.image ? { src: `/gorsel/${post.image}`, credit: 'Temsili görsel, yapay zekâyla üretildi', ai: true } : null
+}
+
 export const readingMinutes = (text: string) => Math.max(1, Math.round(text.split(/\s+/).filter(Boolean).length / 200))
 
 // "Bu hafta", "Geçen hafta", sonra ay adı (Ekim 2026)

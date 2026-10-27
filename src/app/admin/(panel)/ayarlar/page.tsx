@@ -111,6 +111,25 @@ export default async function SettingsPage({ searchParams }: { searchParams: { m
           </div>
         </fieldset>
 
+        <fieldset className="card space-y-4">
+          <legend className="font-semibold px-1">Görseller</legend>
+          <p className="hint">
+            NASA, ESA ve ESO haberlerinde kaynağın kendi görseli kullanılır (ücretsiz, serbest lisanslı). Diğer yazılara, anahtar girilirse
+            yapay zekâ temsili bir kapak çizer; okura &quot;temsili görsel&quot; olduğu yazılır. Görsel başına yaklaşık 0,01 $; harcama
+            OpenRouter bakiyesinden düşer, aylık token sınırına sayılmaz.
+          </p>
+          <div>
+            <label className="label" htmlFor="imageApiKey">OpenRouter API anahtarı</label>
+            <input id="imageApiKey" name="imageApiKey" type="password" autoComplete="off" className="input" placeholder={s.imageApiKey ? 'kayıtlı (değiştirmek için yenisini yaz)' : 'openrouter.ai → Keys; boşsa görsel üretilmez'} />
+            {s.imageApiKey && <label className="hint flex items-center gap-1"><input type="checkbox" name="imageApiKeyClear" /> Kayıtlı anahtarı sil</label>}
+          </div>
+          <div>
+            <label className="label" htmlFor="imageModel">Görsel modeli</label>
+            <input id="imageModel" name="imageModel" defaultValue={s.imageModel} className="input" />
+            <p className="hint">openrouter.ai/models?output_modalities=image adresindeki model adlarından biri.</p>
+          </div>
+        </fieldset>
+
         <button className="btn-primary">Kaydet</button>
       </form>
 
@@ -118,6 +137,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: { m
         <h2 className="font-semibold">Yedekleme</h2>
         <p className="text-sm text-stone-500">
           Tam yedek: ayarlar, kaynaklar, makaleler, yazılar ve bültenler. Yapay zekâ ve Künye API anahtarlarını da içerir; dosyayı güvenli bir yerde sakla, kimseyle paylaşma.
+          Yapay zekâ kapakları bu dosyaya girmez (YunoHost yedeğine girer); başka sunucuya taşırsan yazı sayfasından yeniden üretilebilir.
           Yönetici şifresi yedeğe girmez.
         </p>
         <a href="/api/admin/yedek" className="btn-primary" download>Tam yedeği indir</a>

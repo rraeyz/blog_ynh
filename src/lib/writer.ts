@@ -4,6 +4,7 @@ import { paperText } from '@/lib/papers'
 import { extractJson, slugify } from '@/lib/text'
 import { addUsage, overBudget, type Settings } from '@/lib/state'
 import { CATEGORIES } from '@/lib/topics'
+import { coverIfNeeded } from '@/lib/images'
 
 // Öne çıkanlara alınması önerilen en düşük önem puanı (panelde rozet)
 export const FEATURE_SUGGESTION = 8
@@ -72,6 +73,7 @@ export async function writePost(paperId: number, settings: Settings, publish = s
           },
         })
     await prisma.paper.update({ where: { id: paper.id }, data: { status: 'written', error: '' } })
+    await coverIfNeeded(post.id, settings)
     return post
   } catch (error) {
     // Yeniden yazımda eski yazı yerinde kalır; makale "Hata"ya düşmez

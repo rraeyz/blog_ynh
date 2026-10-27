@@ -10,6 +10,7 @@ import { getSettings } from '@/lib/state'
 import { parseSourceUrl } from '@/lib/arxiv'
 import { addPaperFromUrl, hidePapers, readSource } from '@/lib/papers'
 import { writePost } from '@/lib/writer'
+import { generateCover, removeImage } from '@/lib/images'
 import { createWeeklyDigest, digestBody, sendDigest } from '@/lib/newsletter'
 import { CATEGORIES } from '@/lib/topics'
 import { dailyTask, isJobRunning, runExclusive, weeklyTask } from '@/lib/jobs'
@@ -123,6 +124,8 @@ export async function saveSettingsAction(form: FormData) {
       kunyeUrl,
       kunyeToken: text(form, 'kunyeToken') || (form.get('kunyeTokenClear') ? '' : current.kunyeToken),
       newsletterTag: text(form, 'newsletterTag').slice(0, 50),
+      imageApiKey: text(form, 'imageApiKey') || (form.get('imageApiKeyClear') ? '' : current.imageApiKey),
+      imageModel: text(form, 'imageModel').slice(0, 200) || current.imageModel,
     },
   })
   back('/admin/ayarlar', 'Ayarlar kaydedildi')
@@ -231,6 +234,15 @@ export async function publishPostAction(form: FormData) {
   back(`/admin/yazilar/${post.id}`, publish ? 'Yayımlandı' : 'Yayından kaldırıldı')
 }
 
+// Temsili kapak (OpenRouter); arka planda, sonuç günlükte
+export async function coverPostAction(form: FormData) {
+  await requireAdmin()
+  const postId = id(form)
+  const settings = await getSettings()
+  if (!settings.imageApiKey.trim()) back(`/admin/yazilar/${postId}`, 'Önce Ayarlar → Görseller bölümüne OpenRouter anahtarını gir')
+  inBackground(`/admin/yazilar/${postId}`, 'Görsel üretimi', async () => `Görsel hazır: ${await generateCover(postId, settings)}`, 'Görsel üretiliyor; bir dakika sonra sayfayı yenile')
+}
+
 const MAX_FEATURED = 10
 
 // Öne çıkanlara al ya da çıkar. En fazla 10: yenisi eklenince en eski öne çıkan düşer (yazı yayında kalır)
@@ -263,14 +275,17 @@ export async function rewritePostAction(form: FormData) {
 
 export async function deletePostAction(form: FormData) {
   await requireAdmin()
-  await prisma.post.deleteMany({ where: { id: id(form) } })
+  const post = await prisma.post.findUnique({ where: { id: id(form) }, select: { id: true, image: true } })
+  if (post) await prisma.post.delete({ where: { id: post.id } }).then(() => removeImage(post.image))
   back('/admin/yazilar', 'Yazı silindi')
 }
 
 // Yayındakiler toplu silinmez (okurların linkleri kırılır); onlar tek tek silinir
 export async function deleteDraftsAction() {
   await requireAdmin()
+  const drafts = await prisma.post.findMany({ where: { status: 'draft' }, select: { image: true } })
   const { count } = await prisma.post.deleteMany({ where: { status: 'draft' } })
+  await Promise.all(drafts.map((post) => removeImage(post.image)))
   back('/admin/yazilar', `${count} taslak silindi`)
 }
 

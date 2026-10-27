@@ -5,8 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { isAdmin } from '@/lib/auth'
 import { getSettings } from '@/lib/state'
 import { headings, inline, renderMarkdown } from '@/lib/markdown'
-import { readingMinutes, topicHue } from '@/lib/topics'
-import { CardPost, coverStyle, postDate, SubscribeBox, TopicChip, topicOf } from '../../parts'
+import { coverOf, readingMinutes, topicHue } from '@/lib/topics'
+import { CardPost, CoverImage, coverStyle, PAPER_FIELDS, postDate, SubscribeBox, TopicChip, topicOf } from '../../parts'
 import { ReadingProgress } from './ReadingProgress'
 
 // Taslak yazıyı yalnızca giriş yapmış yönetici görebilir (önizleme)
@@ -19,10 +19,11 @@ async function findPost(slug: string) {
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const post = await findPost(params.slug)
   if (!post) return {}
+  const image = coverOf(post)
   return {
     title: post.title,
     description: post.excerpt,
-    openGraph: { type: 'article', title: post.title, description: post.excerpt, publishedTime: post.publishedAt?.toISOString() },
+    openGraph: { type: 'article', title: post.title, description: post.excerpt, publishedTime: post.publishedAt?.toISOString(), ...(image ? { images: [image.src] } : {}) },
   }
 }
 
@@ -35,10 +36,11 @@ export default async function PostPage({ params }: { params: { slug: string } })
       where: { status: 'published', id: { not: post.id } },
       orderBy: { publishedAt: 'desc' },
       take: 2,
-      include: { paper: { select: { topic: true } } },
+      include: { paper: PAPER_FIELDS },
     }),
   ])
   const topic = topicOf(post)
+  const image = coverOf(post)
   const highlights = post.highlights.split('\n').filter(Boolean)
   const toc = headings(post.body)
   // Yazının rengi konusundan: Kısaca kutusu, bölüm rozetleri, vurgu ve kalın terimler bu tonda
@@ -49,8 +51,12 @@ export default async function PostPage({ params }: { params: { slug: string } })
       <ReadingProgress />
       {post.status !== 'published' && <p className="mt-6 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300 px-4 py-2 text-sm">Taslak önizlemesi: henüz yayımlanmadı.</p>}
 
-      <header className="mt-8 overflow-hidden rounded-3xl p-7 md:p-12 text-white min-h-72 flex flex-col justify-end" style={coverStyle(topic, post.slug)}>
-        <div className="max-w-3xl">
+      <header className="relative mt-8 overflow-hidden rounded-3xl p-7 md:p-12 text-white min-h-72 md:min-h-96 flex flex-col justify-end" style={coverStyle(topic, post.slug)}>
+        <CoverImage post={post} />
+        {/* Görselin üstündeki başlık okunsun diye alttan koyulaşan perde */}
+        {image && <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />}
+        {image && <span className="absolute top-4 right-5 left-5 text-right text-xs text-white/75">{image.credit}</span>}
+        <div className="relative max-w-3xl">
           <TopicChip topic={topic} light />
           <h1 className="mt-4 text-3xl md:text-5xl font-semibold leading-tight drop-shadow-sm">{post.title}</h1>
           <p className="mt-4 text-sm text-white/80">{postDate(post)} · {readingMinutes(post.body)} dk okuma</p>

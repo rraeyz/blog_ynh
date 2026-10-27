@@ -299,6 +299,12 @@ test('tam yedek ve geri yükleme', async () => {
   assert.equal((await get('/admin')).status, 200, 'oturum açık kalmalı')
 })
 
+test('görsel adresi yalnızca üretilen dosyaları verir', async () => {
+  assert.equal((await get('/gorsel/..%2F..%2Fdev.db')).status, 404)
+  assert.equal((await get('/gorsel/1-1.jpg')).status, 404)
+  assert.match((await get(`/admin/yazilar/${postId}`)).html, /Kapak görseli[\s\S]*renkli kapak/)
+})
+
 test('yetkisiz form gönderimi reddedilir', async () => {
   const saved = cookie
   const html = (await get(`/admin/yazilar/${postId}`)).html
