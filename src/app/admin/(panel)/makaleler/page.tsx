@@ -9,7 +9,7 @@ const STATUS: Record<string, string> = { new: 'Bekliyor', failed: 'Hata', skippe
 export default async function PapersPage({ searchParams }: { searchParams: { mesaj?: string; durum?: string } }) {
   const status = STATUS[searchParams.durum ?? ''] ? searchParams.durum! : 'new'
   const [papers, counts] = await Promise.all([
-    prisma.paper.findMany({ where: { status }, orderBy: { publishedAt: 'desc' }, take: 100, include: { post: { select: { id: true, title: true } } } }),
+    prisma.paper.findMany({ where: { status }, orderBy: [{ score: 'desc' }, { publishedAt: 'desc' }], take: 100, include: { post: { select: { id: true, title: true } } } }),
     prisma.paper.groupBy({ by: ['status'], _count: true }),
   ])
   const count = (key: string) => counts.find((row) => row.status === key)?._count ?? 0
@@ -18,7 +18,8 @@ export default async function PapersPage({ searchParams }: { searchParams: { mes
       <Notice message={searchParams.mesaj} />
       <h1 className="text-xl font-bold mb-2">Makaleler</h1>
       <p className="text-sm text-zinc-500 mb-4">
-        Kaynaklardan çekilen ham makaleler. Günlük iş <b>Bekliyor</b> listesinden en önemlileri seçip yazıya dönüştürür. Seçilmeyenler 3 gün
+        Kaynaklardan çekilen ham makaleler. Günlük iş <b>Bekliyor</b> listesinden en önemlileri seçip yazıya dönüştürür; seçerken hepsine
+        başlık ve özetten bir <b>ön puan</b> verir, liste bu puana göre sıralıdır (henüz puanlanmamışlar en sonda). Seçilmeyenler 3 gün
         boyunca sonraki günlerin seçimine yeniden girer, sonra <b>Atlandı</b>&apos;ya geçer. Atlanan, hatalı ve silinen makaleler 30 gün sonra
         kendiliğinden temizlenir; silinen bir makale kaynağında dursa da geri gelmez. İstediğini elle de dönüştürebilir ya da aşağıya tek bir makale linki ekleyebilirsin.
       </p>
@@ -46,7 +47,7 @@ export default async function PapersPage({ searchParams }: { searchParams: { mes
           {papers.map((paper) => (
             <li key={paper.id} className="card text-sm">
               <a href={paper.url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">{paper.title}</a>
-              <p className="text-xs text-stone-500 mt-1">{paper.publishedAt.toLocaleDateString('tr-TR')}{paper.authors && ` · ${paper.authors.slice(0, 120)}`}</p>
+              <p className="text-xs text-stone-500 mt-1">{paper.score > 0 && <span className="mr-1 rounded bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 px-1.5 py-0.5">ön puan {paper.score}/10</span>}{paper.publishedAt.toLocaleDateString('tr-TR')}{paper.authors && ` · ${paper.authors.slice(0, 120)}`}</p>
               {paper.error && <p className="text-xs text-red-600 mt-1">{paper.error}</p>}
               <div className="flex gap-2 mt-2">
                 {paper.post ? (
