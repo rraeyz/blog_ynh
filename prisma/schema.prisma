@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// Tek satırlık ayarlar (id = 1). Panel → Ayarlar
+model Settings {
+  id                Int      @id @default(1)
+  passwordHash      String   @default("")
+  siteTitle         String   @default("Makale Notları")
+  siteDescription   String   @default("Yeni bilimsel makalelerin Türkçe anlatımı")
+  siteUrl           String   @default("") // https://blog.rraeyz.me — bülten linkleri ve RSS için
+  aiProvider        String   @default("anthropic") // lib/ai.ts PROVIDERS anahtarı
+  aiModel           String   @default("")
+  aiApiKey          String   @default("")
+  aiBaseUrl         String   @default("") // yalnızca "custom" sağlayıcı için
+  readMode          String   @default("abstract") // abstract | full (arXiv HTML tam metni)
+  maxInputChars     Int      @default(8000) // makale başına modele gönderilecek en fazla karakter
+  postsPerDay       Int      @default(3)
+  dailyHour         Int      @default(9) // günlük işin çalışacağı saat (sunucu saati)
+  interests         String   @default("") // doluysa makaleler bu ilgi alanlarına göre seçilir
+  monthlyTokenLimit Int      @default(0) // 0 = sınırsız; aşılınca otomatik üretim durur
+  autoPublish       Boolean  @default(false) // kapalıyken yazılar taslak olarak bekler
+  autoNewsletter    Boolean  @default(false) // kapalıyken haftalık bülten taslak olarak bekler
+  digestWeekday     Int      @default(1) // 0 = pazar, 1 = pazartesi ...
+  kunyeUrl          String   @default("") // https://rraeyz.me
+  kunyeToken        String   @default("") // Künye → Ayarlar → Güvenlik → API anahtarı
+  newsletterTag     String   @default("") // boşsa Künye'deki tüm onaylı abonelere
+  updatedAt         DateTime @updatedAt
+}
+
+// Düzenli taranan kaynaklar (arXiv kategori linkleri)
+model Source {
+  id            Int       @id @default(autoincrement())
+  url           String    @unique
+  enabled       Boolean   @default(true)
+  lastFetchedAt DateTime?
+  lastError     String    @default("")
+  createdAt     DateTime  @default(now())
+}
+
+model Paper {
+  id          Int      @id @default(autoincrement())
+  externalId  String   @unique // arxiv:2510.12345 ya da url:https://...
+  title       String
+  authors     String   @default("")
+  abstract    String   @default("")
+  url         String
+  publishedAt DateTime @default(now())
+  status      String   @default("new") // new | skipped | written | failed
+  error       String   @default("")
+  createdAt   DateTime @default(now())
+  post        Post?
+
+  @@index([status, createdAt])
+}
+
+model Post {
+  id           Int       @id @default(autoincrement())
+  slug         String    @unique
+  title        String
+  excerpt      String    @default("")
+  body         String // Markdown (lib/markdown.ts)
+  status       String    @default("draft") // draft | published
+  publishedAt  DateTime?
+  paperId      Int?      @unique
+  paper        Paper?    @relation(fields: [paperId], references: [id], onDelete: SetNull)
+  inputTokens  Int       @default(0)
+  outputTokens Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status, publishedAt])
+}
+
+// Künye üzerinden abonelere giden bültenler
+model Digest {
+  id        Int       @id @default(autoincrement())
+  createdAt DateTime  @default(now())
+  subject   String
+  body      String
+  status    String    @default("draft") // draft | sent | failed
+  sentAt    DateTime?
+  result    String    @default("")
+}
+
+// İç durum: oturum anahtarı, işlerin son çalışma zamanı, aylık token kullanımı
+model AppState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
