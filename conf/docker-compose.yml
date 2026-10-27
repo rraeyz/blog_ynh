@@ -5,21 +5,23 @@ services:
       dockerfile: Dockerfile
     container_name: __APP__
     restart: unless-stopped
-    ports:
-      # Sadece yerel arayüz: nginx 127.0.0.1 üzerinden bağlanır. Tüm arayüzlere açılırsa Docker
-      # YunoHost güvenlik duvarını atlar ve uygulama nginx/HTTPS olmadan doğrudan erişilebilir olur.
-      - "127.0.0.1:__PORT__:3000"
+    # Sunucunun ağı: YunoHost kendi domainlerini (ör. Künye'nin rraeyz.me'si) 127.0.0.1'e çözer. Container
+    # kendi ağında kalırsa 127.0.0.1 container'ın kendisi olur ve Künye'ye (abonelik, bülten) ulaşılamaz.
+    network_mode: host
     env_file:
       - __DATA_DIR__/.env
     environment:
       - NODE_ENV=production
       - DATABASE_URL=file:/app/prisma/dev.db
+      # Yalnızca yerel arayüzde dinler: dışarıdan erişim nginx/HTTPS üzerinden
+      - HOSTNAME=127.0.0.1
+      - PORT=__PORT__
       # Günlük iş saati ve paneldeki tarihler Türkiye saatine göre
       - TZ=Europe/Istanbul
     volumes:
       - __DATA_DIR__/prisma:/app/prisma
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:__PORT__/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
