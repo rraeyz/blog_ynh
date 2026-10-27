@@ -13,6 +13,7 @@ export interface PaperData {
   topic: string
   url: string
   publishedAt: Date
+  imageUrl?: string
 }
 
 const CATEGORY = /^[a-z-]+(\.[A-Za-z-]+)?$/
@@ -108,6 +109,18 @@ export const htmlTitle = (html: string) => clean(tag(html, 'title'))
 
 const unwrap = (text: string) => text.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
 
+// Haberin görseli: görsel türündeki enclosure/media etiketi, yoksa metindeki ilk resim. Yalnızca https (sayfa https)
+export function feedImage(item: string, body: string): string {
+  const media = (item.match(/<(?:media:content|media:thumbnail|enclosure)\b[^>]*>/g) ?? [])
+    .find((t) => /type="image|medium="image|media:thumbnail/.test(t) || (!/type="/.test(t) && /\.(jpe?g|png|webp|gif)\b/i.test(t)))
+  return safeImage(media?.match(/url="([^"]+)"/)?.[1] ?? decodeEntities(body).match(/<img[^>]*src="([^"]+)"/)?.[1] ?? '')
+}
+
+export function safeImage(raw: string): string {
+  const url = decodeEntities(raw).trim()
+  return /^https:\/\/[^\s"'<>]+$/.test(url) ? url.slice(0, 1000) : ''
+}
+
 // Herhangi bir RSS 2.0 / Atom beslemesi → makaleler (bağlantısı olmayan öğeler atlanır)
 export function parseFeed(xml: string): PaperData[] {
   const papers: PaperData[] = []
@@ -127,6 +140,7 @@ export function parseFeed(xml: string): PaperData[] {
       topic: link.match(/^https?:\/\/([^/?#:]+)/)![1].replace(/^www\./, ''),
       url: link,
       publishedAt: Number.isNaN(date.getTime()) ? new Date() : date,
+      imageUrl: feedImage(item, body),
     })
   }
   return papers

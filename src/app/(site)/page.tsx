@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getSettings } from '@/lib/state'
 import { canSubscribe } from '@/lib/newsletter'
 import { CATEGORIES, periodLabel, topicHue } from '@/lib/topics'
-import { CardPost, FeaturedPost, postDate, RowPost, SubscribeBox, TopicChip, topicOf, type PostItem } from './parts'
+import { CardPost, FeaturedPost, PAPER_FIELDS, postDate, RowPost, SubscribeBox, TopicChip, topicOf, type PostItem } from './parts'
 
 const PAGE_SIZE = 24
 
@@ -11,7 +11,7 @@ export default async function HomePage({ searchParams }: { searchParams: { sayfa
   const page = Math.max(1, Number(searchParams.sayfa) || 1)
   const konu = searchParams.konu && CATEGORIES[searchParams.konu] ? searchParams.konu : ''
   const published = { status: 'published' }
-  const include = { paper: { select: { topic: true } } }
+  const include = { paper: PAPER_FIELDS }
   const [settings, posts, latest, picked, counts, weekCount] = await Promise.all([
     getSettings(),
     prisma.post.findMany({

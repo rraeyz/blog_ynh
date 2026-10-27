@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { readingMinutes, topicHue, topicLabel } from '@/lib/topics'
+import { coverOf, readingMinutes, topicHue, topicLabel } from '@/lib/topics'
 import { canSubscribe } from '@/lib/newsletter'
 import type { Settings } from '@/lib/state'
 import { SubscribeForm } from './SubscribeForm'
@@ -13,7 +13,19 @@ export type PostItem = {
   publishedAt: Date | null
   createdAt: Date
   category: string
-  paper: { topic: string } | null
+  image: string
+  paper: { topic: string; url: string; imageUrl: string } | null
+}
+
+// Kartlarda ve yazı sayfasında aynı: makalenin görselini göstermek için gereken alanlar
+export const PAPER_FIELDS = { select: { topic: true, url: true, imageUrl: true } } as const
+
+// Renkli kapağın üstüne serilir; görsel yüklenemezse renkli kapak görünür kalır
+export const CoverImage = ({ post }: { post: Parameters<typeof coverOf>[0] }) => {
+  const cover = coverOf(post)
+  // Dış sitelerin görselleri: next/image optimizasyonu için alan adı listesi gerekirdi, düz img yeterli
+  // eslint-disable-next-line @next/next/no-img-element
+  return cover ? <img src={cover.src} alt="" loading="lazy" referrerPolicy="no-referrer" className="absolute inset-0 h-full w-full object-cover" /> : null
 }
 
 const DAYS = ['pazar', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi']
@@ -59,8 +71,9 @@ export function FeaturedPost({ post, badge }: { post: PostItem; badge: string })
   return (
     <Link href={`/yazi/${post.slug}`} className="group grid md:grid-cols-5 overflow-hidden rounded-3xl bg-white dark:bg-ink-card border border-zinc-200 dark:border-ink-line shadow-sm hover:shadow-xl hover:shadow-violet-500/10 transition">
       <div className="md:col-span-3 min-h-56 md:min-h-80 relative p-6 flex flex-col justify-between" style={coverStyle(topicOf(post), post.slug)}>
-        <span className="self-start rounded-full bg-black/30 backdrop-blur px-3 py-1 text-xs font-semibold text-white">{badge}</span>
-        <div className="self-start"><TopicChip topic={topicOf(post)} light /></div>
+        <CoverImage post={post} />
+        <span className="relative self-start rounded-full bg-black/40 backdrop-blur px-3 py-1 text-xs font-semibold text-white">{badge}</span>
+        <div className="relative flex items-end justify-between gap-2"><TopicChip topic={topicOf(post)} light />{coverOf(post)?.ai && <span className="rounded-full bg-black/40 px-2 py-0.5 text-[11px] text-white/80">Temsili görsel</span>}</div>
       </div>
       <div className="md:col-span-2 p-6 md:p-8 flex flex-col justify-center gap-3">
         <Meta post={post} />
@@ -76,7 +89,7 @@ export function FeaturedPost({ post, badge }: { post: PostItem; badge: string })
 export function CardPost({ post, tall }: { post: PostItem; tall?: boolean }) {
   return (
     <Link href={`/yazi/${post.slug}`} className="group flex flex-col overflow-hidden rounded-3xl bg-white dark:bg-ink-card border border-zinc-200 dark:border-ink-line hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-500/10 transition">
-      <div className={tall ? 'h-40' : 'h-24'} style={coverStyle(topicOf(post), post.slug)} />
+      <div className={`relative ${tall ? 'h-40' : 'h-24'}`} style={coverStyle(topicOf(post), post.slug)}><CoverImage post={post} /></div>
       <div className="p-5 flex flex-col gap-2 flex-1">
         <div className="flex items-center justify-between gap-2"><TopicChip topic={topicOf(post)} /><Meta post={post} /></div>
         <h3 className="text-lg font-semibold leading-snug group-hover:text-violet-600 dark:group-hover:text-violet-300 transition">{post.title}</h3>

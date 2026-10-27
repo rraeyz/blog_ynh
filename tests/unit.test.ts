@@ -1,10 +1,10 @@
 // Saf fonksiyonların testleri. Çalıştırma: npm test (Node 22.18+ TypeScript'i doğrudan çalıştırır)
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { apiUrl, decodeEntities, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
+import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
 import { extractJson, slugify } from '../src/lib/text.ts'
-import { periodLabel, readingMinutes, topicHue, topicLabel } from '../src/lib/topics.ts'
+import { coverOf, freeImage, periodLabel, readingMinutes, topicHue, topicLabel } from '../src/lib/topics.ts'
 
 test('konu etiketi, rengi, okuma süresi, dönem', () => {
   assert.equal(topicLabel('cs.AI'), 'Yapay Zekâ')
@@ -57,7 +57,7 @@ test('RSS ve Atom beslemeleri ayrıştırılır', () => {
   const items = parseFeed(rss)
   assert.equal(items.length, 1)
   assert.deepEqual({ ...items[0], publishedAt: items[0].publishedAt.toISOString() }, {
-    externalId: 'url:https://site.com/a', title: 'Yeni keşif', authors: 'Ada', abstract: 'Özet & ayrıntı', topic: 'site.com', url: 'https://site.com/a', publishedAt: '2026-10-27T10:00:00.000Z',
+    externalId: 'url:https://site.com/a', title: 'Yeni keşif', authors: 'Ada', abstract: 'Özet & ayrıntı', topic: 'site.com', url: 'https://site.com/a', publishedAt: '2026-10-27T10:00:00.000Z', imageUrl: '',
   })
   const atom = `<feed><entry><title>Atom yazısı</title><link rel="alternate" href="https://blog.org/x"/><link rel="self" href="https://blog.org/x.xml"/>
     <summary>Kısa</summary><updated>2026-10-26T08:00:00Z</updated><author><name>Bob</name></author></entry></feed>`
@@ -65,6 +65,23 @@ test('RSS ve Atom beslemeleri ayrıştırılır', () => {
   assert.equal(entry.url, 'https://blog.org/x')
   assert.equal(entry.authors, 'Bob')
   assert.equal(entry.abstract, 'Kısa')
+})
+
+test('beslemedeki görsel ve lisansı', () => {
+  assert.equal(feedImage('<item><enclosure url="https://cdn.eso.org/a.jpg" length="0" type="image/jpeg"/></item>', ''), 'https://cdn.eso.org/a.jpg')
+  assert.equal(feedImage('<item><media:content url="https://x.com/v.mp4" type="video/mp4"/><media:thumbnail url="https://x.com/t.jpg?a=1&amp;b=2"/></item>', ''), 'https://x.com/t.jpg?a=1&b=2', 'video atlanır, &amp; çözülür')
+  assert.equal(feedImage('<item></item>', '&lt;p&gt;&lt;img src="https://www.nasa.gov/r.png"&gt;'), 'https://www.nasa.gov/r.png', 'kaçışlanmış açıklamadaki ilk resim')
+  assert.equal(feedImage('<item><enclosure url="http://x.com/a.jpg" type="image/jpeg"/></item>', ''), '', 'https olmayan alınmaz')
+  assert.equal(feedImage('<item><enclosure url="https://x.com/a.mp3" type="audio/mpeg"/></item>', ''), '')
+  const [item] = parseFeed('<rss><channel><item><title>T</title><link>https://www.eso.org/n/1</link><enclosure url="https://cdn.eso.org/b.jpg" type="image/jpeg"/></item></channel></rss>')
+  assert.equal(item.imageUrl, 'https://cdn.eso.org/b.jpg')
+
+  assert.deepEqual(freeImage({ url: 'https://science.nasa.gov/x', imageUrl: 'https://i.nasa.gov/a.jpg' }), { src: 'https://i.nasa.gov/a.jpg', credit: 'NASA' })
+  assert.equal(freeImage({ url: 'https://www.popsci.com/x', imageUrl: 'https://www.popsci.com/GettyImages-1.jpg' }), null, 'telifli olabilecek görsel gösterilmez')
+  assert.equal(freeImage({ url: 'https://notnasa.gov.evil.com/x', imageUrl: 'https://e.com/a.jpg' }), null)
+  assert.deepEqual(coverOf({ image: '3-1.jpg', paper: { url: 'https://www.popsci.com/x', imageUrl: 'https://p.com/a.jpg' } }), { src: '/gorsel/3-1.jpg', credit: 'Temsili görsel, yapay zekâyla üretildi', ai: true })
+  assert.equal(coverOf({ image: '3-1.jpg', paper: { url: 'https://www.eso.org/x', imageUrl: 'https://cdn.eso.org/a.jpg' } })?.ai, false, 'kaynağın serbest görseli önce gelir')
+  assert.equal(coverOf({ image: '', paper: null }), null)
 })
 
 test('Atom yanıtı ayrıştırılır', () => {

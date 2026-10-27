@@ -30,6 +30,8 @@ model Settings {
   kunyeUrl          String   @default("") // https://rraeyz.me
   kunyeToken        String   @default("") // Künye → Ayarlar → Güvenlik → API anahtarı
   newsletterTag     String   @default("") // boşsa Künye'deki tüm onaylı abonelere
+  imageApiKey       String   @default("") // OpenRouter: kaynağın serbest görseli olmayan yazılara temsili kapak (boşsa üretilmez)
+  imageModel        String   @default("openai/gpt-image-2")
   updatedAt         DateTime @updatedAt
 }
 
@@ -49,6 +51,7 @@ model Paper {
   title       String
   authors     String   @default("")
   abstract    String   @default("")
+  imageUrl    String   @default("") // Beslemedeki görsel; yalnızca serbest lisanslı kurumlarınki gösterilir (lib/topics.ts freeImage)
   topic       String   @default("") // arXiv birincil kategorisi (cs.AI) ya da beslemenin sitesi (lib/topics.ts)
   url         String
   publishedAt DateTime @default(now())
@@ -68,6 +71,7 @@ model Post {
   highlights   String    @default("") // "Kısaca" kutusu: satır başına bir madde
   category     String    @default("") // Konu sekmesi (lib/topics.ts CATEGORIES); yazan model seçer
   importance   Int       @default(0) // Modelin önem puanı (1-10): bülten seçimi ve öne çıkarma önerisi
+  image        String    @default("") // Yapay zekâ kapağının dosya adı (lib/images.ts)
   featuredAt   DateTime? // Öne çıkanlarda (en fazla 10; yenisi eklenince en eskisi düşer)
   body         String // Markdown (lib/markdown.ts)
   status       String    @default("draft") // draft | published

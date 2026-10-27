@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { apiUrl, htmlTitle, htmlToText, parseAtom, parseFeed, parseSourceUrl, type PaperData } from '@/lib/arxiv'
+import { apiUrl, htmlTitle, htmlToText, parseAtom, parseFeed, parseSourceUrl, safeImage, type PaperData } from '@/lib/arxiv'
 
 const USER_AGENT = 'blog_ynh (+https://github.com/rraeyz/blog_ynh)'
 
@@ -34,7 +34,8 @@ export async function addPaperFromUrl(input: string): Promise<{ id: number; titl
   } else {
     const html = await fetchText(ref.url)
     const text = htmlToText(html)
-    paper = { externalId: `url:${ref.url}`, title: htmlTitle(html) || ref.url, authors: '', abstract: text.slice(0, 1500), topic: new URL(ref.url).hostname.replace(/^www\./, ''), url: ref.url, publishedAt: new Date() }
+    const image = safeImage(html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/)?.[1] ?? '')
+    paper = { externalId: `url:${ref.url}`, title: htmlTitle(html) || ref.url, authors: '', abstract: text.slice(0, 1500), topic: new URL(ref.url).hostname.replace(/^www\./, ''), url: ref.url, publishedAt: new Date(), imageUrl: image }
   }
   const existing = await prisma.paper.findUnique({ where: { externalId: paper.externalId } })
   if (existing) {
