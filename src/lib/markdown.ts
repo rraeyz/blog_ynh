@@ -39,22 +39,34 @@ export function headings(source: string): Array<{ id: string; text: string }> {
 }
 
 // Her "##" bölümü <section> içine alınır: sayfada numaralı ve farklı renkte kartlar olarak gösterilir
+// Tablo satırı: "| a | b |" → ['a', 'b']
+const cells = (row: string) => row.replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim())
+
 export function renderMarkdown(source: string, options: Options = {}): string {
   const html: string[] = []
+  const md = (text: string) => inline(text, options)
   let code: { lang: string; lines: string[] } | null = null
   let display: string[] | null = null
   let inSection = false
+  let inSolution = false
   let paragraph: string[] = []
   let list: string[] = []
+  let ordered = false
   let quote: string[] = []
+  let table: string[] = []
   const flush = () => {
-    const md = (text: string) => inline(text, options)
     if (paragraph.length) html.push(`<p>${paragraph.map(md).join('<br>')}</p>`)
-    if (list.length) html.push(`<ul>${list.map((item) => `<li>${md(item)}</li>`).join('')}</ul>`)
+    if (list.length) html.push(`<${ordered ? 'ol' : 'ul'}>${list.map((item) => `<li>${md(item)}</li>`).join('')}</${ordered ? 'ol' : 'ul'}>`)
     if (quote.length) html.push(`<blockquote>${quote.map(md).join('<br>')}</blockquote>`)
+    if (table.length) {
+      const rows = table.filter((row) => !/^\|?\s*:?-{2,}/.test(row)).map(cells)
+      const [head, ...body] = rows
+      html.push(`<div class="table"><table><thead><tr>${head.map((c) => `<th>${md(c)}</th>`).join('')}</tr></thead><tbody>${body.map((r) => `<tr>${r.map((c) => `<td>${md(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`)
+    }
     paragraph = []
     list = []
     quote = []
+    table = []
   }
   for (const raw of source.replace(/\r\n/g, '\n').split('\n')) {
     // Kod bloğunun içi olduğu gibi (girintisiyle) alınır
@@ -87,33 +99,52 @@ export function renderMarkdown(source: string, options: Options = {}): string {
       else display = [rest]
       continue
     }
+    // Derslerde alıştırma çözümleri: ":::cozum" ile ":::" arası tıklayınca açılır
+    if (options.math && /^:::\s*(cozum|çözüm)$/i.test(line)) {
+      flush()
+      if (!inSolution) html.push('<details class="solution"><summary>Çözümü göster</summary>')
+      inSolution = true
+      continue
+    }
+    if (options.math && line === ':::' && inSolution) {
+      flush()
+      html.push('</details>')
+      inSolution = false
+      continue
+    }
     const heading = line.match(/^(#{2,3})\s+(.+)$/)
     const item = line.match(/^[-*]\s+(.+)$/)
+    const numbered = line.match(/^\d+[.)]\s+(.+)$/)
     const quoted = line.match(/^>\s?(.*)$/)
     if (!line) flush()
     else if (heading) {
       flush()
       const level = heading[1].length
-      if (level === 2) {
+      if (level === 2 && !inSolution) {
         if (inSection) html.push('</section>')
         html.push('<section>')
         inSection = true
       }
-      html.push(`<h${level} id="${slugify(heading[2])}">${inline(heading[2])}</h${level}>`)
-    } else if (item) {
-      if (paragraph.length || quote.length) flush()
-      list.push(item[1])
+      html.push(`<h${level} id="${slugify(heading[2])}">${md(heading[2])}</h${level}>`)
+    } else if (line.startsWith('|')) {
+      if (!table.length) flush()
+      table.push(line)
+    } else if (item || numbered) {
+      if (paragraph.length || quote.length || table.length || (list.length && ordered !== !!numbered)) flush()
+      ordered = !!numbered
+      list.push((item ?? numbered)![1])
     } else if (quoted) {
-      if (paragraph.length || list.length) flush()
+      if (paragraph.length || list.length || table.length) flush()
       if (quoted[1]) quote.push(quoted[1])
     } else {
-      if (list.length || quote.length) flush()
+      if (list.length || quote.length || table.length) flush()
       paragraph.push(line)
     }
   }
   flush()
   if (code) html.push(codeBlock(code.lang, code.lines))
   if (display) html.push(`<div class="math">${tex(display.join('\n'), true)}</div>`)
+  if (inSolution) html.push('</details>')
   if (inSection) html.push('</section>')
   return html.join('\n')
 }

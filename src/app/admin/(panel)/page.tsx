@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getSettings, getState, getUsage } from '@/lib/state'
 import { isJobRunning } from '@/lib/jobs'
 import { aiConfig, PROVIDERS } from '@/lib/ai'
-import { runDailyAction, runWeeklyAction } from '../actions'
+import { runAstroDigestAction, runDailyAction, runSkyAction, runWeeklyAction } from '../actions'
 import { Notice } from '../Notice'
 
 const DAYS = ['pazar', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi']
@@ -49,12 +49,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
           <b>Bu ay kullanılan token:</b> {total.toLocaleString('tr-TR')} (giriş {usage.input.toLocaleString('tr-TR')}, çıkış {usage.output.toLocaleString('tr-TR')})
           {settings.monthlyTokenLimit > 0 && ` / sınır ${settings.monthlyTokenLimit.toLocaleString('tr-TR')}`}
         </p>
-        <p><b>Otomatik:</b> her gün {settings.dailyHour}:00&apos;da tarama ve {settings.postsPerDay} yazı ({settings.autoPublish ? 'doğrudan yayımlanır' : 'taslak olarak bekler'}); her {DAYS[settings.digestWeekday]} haftalık bülten ({settings.autoNewsletter ? 'otomatik gönderilir' : 'taslak olarak bekler'}).</p>
+        <p><b>Otomatik:</b> her gün {settings.dailyHour}:00&apos;da tarama ve {settings.postsPerDay} yazı ({settings.autoPublish ? 'doğrudan yayımlanır' : 'taslak olarak bekler'}{settings.autoFeature && ', 8+ puanlılar öne çıkar'}); her {DAYS[settings.digestWeekday]} haftalık bülten
+          {settings.astroDigest && `, her ${DAYS[settings.astroDigestWeekday]} astronomi özeti`} ({settings.autoNewsletter ? 'otomatik gönderilir' : 'taslak olarak bekler'}){settings.skyEnabled && '; haftada bir gökyüzü takvimi'}.</p>
       </section>
 
       <section className="flex flex-wrap gap-2 mb-6">
         <form action={runDailyAction}><button className="btn-primary" disabled={isJobRunning()}>Şimdi tara ve yazı üret</button></form>
         <form action={runWeeklyAction}><button className="btn" disabled={isJobRunning()}>Haftalık bülteni şimdi hazırla</button></form>
+        <form action={runAstroDigestAction}><button className="btn" disabled={isJobRunning()}>Astronomi özetini şimdi hazırla</button></form>
+        {settings.skyEnabled && <form action={runSkyAction}><button className="btn" disabled={isJobRunning()}>Gökyüzü takvimini güncelle</button></form>}
         {isJobRunning() && <span className="text-sm text-stone-500 self-center">Bir iş çalışıyor… sayfayı yenile.</span>}
       </section>
 

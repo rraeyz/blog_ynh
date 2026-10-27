@@ -1,7 +1,8 @@
 import { cleanupPapers, fetchSources } from '@/lib/papers'
 import { writeDaily } from '@/lib/writer'
 import { lessonTask } from '@/lib/lessons'
-import { createWeeklyDigest, sendDigest } from '@/lib/newsletter'
+import { createAstroDigest, createWeeklyDigest, sendDigest } from '@/lib/newsletter'
+import { skyTask } from '@/lib/sky'
 import { getSettings, getState, logJob, setState } from '@/lib/state'
 
 // Saatte bir bakılır. Günlük iş ayarlanan saatte günde bir kez çalışır (tarama + yazı üretimi);
@@ -34,7 +35,7 @@ export async function dailyTask(): Promise<string> {
   const result = await writeDaily(settings)
   const parts = [`${added} yeni makale`, `${result.written} yazı ${settings.autoPublish ? 'yayımlandı' : 'taslak'}`]
   if (result.failed) parts.push(`${result.failed} hata`)
-  if (result.skipped) parts.push(`${result.skipped} makale 3 gün seçilmeyip atlandı`)
+  if (result.skipped) parts.push(`${result.skipped} makale atlandı (düşük ön puan ya da 3 gün seçilmedi)`)
   if (result.budget) parts.push('aylık token sınırına ulaşıldı')
   const cleaned = await cleanupPapers()
   if (cleaned) parts.push(`${cleaned} eski makale temizlendi`)
@@ -50,6 +51,17 @@ export async function weeklyTask(): Promise<string> {
   return 'bülten Künye üzerinden abonelere planlandı'
 }
 
+export async function astroDigestTask(): Promise<string> {
+  const settings = await getSettings()
+  const digest = await createAstroDigest(settings)
+  if (!digest) return 'son 7 günde astronomi yazısı, ders ya da gökyüzü olayı yok, özet hazırlanmadı'
+  if (!settings.autoNewsletter) return 'taslak özet hazır (Bültenler)'
+  await sendDigest(digest.id, settings)
+  return 'özet Künye üzerinden abonelere planlandı'
+}
+
+const daysSince = (date: string | null) => (date ? (Date.parse(today()) - Date.parse(date)) / 86_400_000 : Infinity)
+
 async function tick() {
   const settings = await getSettings()
   // Elle başlatılmış bir iş sürüyorsa bir sonraki saate bırak: yoksa günün tarihi yazılıp iş o gün hiç çalışmazdı
@@ -57,6 +69,13 @@ async function tick() {
   if ((await getState('job.dailyDate')) !== today()) {
     await setState('job.dailyDate', today())
     await runExclusive('Günlük iş', dailyTask)
+  }
+  // Gökyüzü takvimi bülten gününde tazelenir (bülten önümüzdeki haftayı göstersin); bülten yoksa haftada bir
+  const skyDay = settings.astroDigest ? settings.astroDigestWeekday : settings.digestWeekday
+  const skyDate = await getState('job.skyDate')
+  if (settings.skyEnabled && settings.imageApiKey.trim() && skyDate !== today() && (new Date().getDay() === skyDay || daysSince(skyDate) >= 7)) {
+    await setState('job.skyDate', today())
+    await runExclusive('Gökyüzü takvimi', () => skyTask(settings))
   }
   // Ders günlerinde günlük işten sonra (aynı anda iki yapay zekâ işi çalışmasın diye sırayla)
   const lessonDays = settings.lessonWeekdays.split(',').map((d) => d.trim())
@@ -67,6 +86,10 @@ async function tick() {
   if (new Date().getDay() === settings.digestWeekday && (await getState('job.weeklyDate')) !== today()) {
     await setState('job.weeklyDate', today())
     await runExclusive('Haftalık bülten', weeklyTask)
+  }
+  if (settings.astroDigest && new Date().getDay() === settings.astroDigestWeekday && (await getState('job.astroDate')) !== today()) {
+    await setState('job.astroDate', today())
+    await runExclusive('Astronomi özeti', astroDigestTask)
   }
 }
 

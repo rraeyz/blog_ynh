@@ -5,24 +5,35 @@ Bilim haberlerini ve makaleleri (RSS/arXiv) çeker, yapay zekâyla Türkçe anla
 ## Nasıl çalışır
 
 1. **Kaynaklar:** İstediğin kadar kaynak: herhangi bir sitenin RSS/Atom beslemesi ya da arXiv kategori/arşiv linki (`https://arxiv.org/list/astro-ph.EP/new`). Her gün ayarlanan saatte (Türkiye saati) yeni haberler çekilir; daha önce görülenler tekrar eklenmez.
-2. **Seçim:** Model bekleyen haberlerin başlık ve özetine bakıp en önemlilerini seçer ve hepsine 1-10 **ön puan** verir (Makaleler → Bekliyor bu puana göre sıralı). İlgi alanları öncelik verir; "en az kaçı astronomi/uzay" ayarı kodla garanti edilir. Seçilmeyenler 3 gün boyunca sonraki seçimlere yeniden girer, sonra "Atlandı" olur; atlanan, hatalı ve silinen kayıtlar 30 gün sonra temizlenir.
-3. **Yazı:** Model her haber için Türkçe bir yazı, konu (Uzay, Fizik, Teknoloji...) ve önem puanı üretir. Ana sayfada **Yeni gelişmeler** (en yeni 5), **Öne çıkanlar** (elle, en fazla 10; 8+ puanlılar önerilir), konu sekmeleri ve `/konu/...` sayfaları var.
+2. **Seçim:** Model bekleyen haberlerin başlık ve özetine bakıp en önemlilerini seçer ve hepsine 1-10 **ön puan** verir (Makaleler → Bekliyor bu puana göre sıralı). İlgi alanları öncelik verir; "en az kaçı astronomi/uzay" ayarı kodla garanti edilir. Ön puanı 3 ve altı olan seçilmeyenler hemen "Atlandı" olur; ötekiler 3 gün boyunca sonraki seçimlere yeniden girer. Atlanan, hatalı ve silinen kayıtlar 30 gün sonra temizlenir.
+3. **Yazı:** Model her haber için Türkçe bir yazı, konu (Uzay, Fizik, Teknoloji...) ve önem puanı üretir. Ana sayfada **Yeni gelişmeler** (en yeni 5), **Öne çıkanlar** (en fazla 10; önem puanı 8+ olanlar yayımlanınca kendiliğinden girer, ayardan kapatılabilir), konu sekmeleri ve `/konu/...` sayfaları var.
 4. **Görseller:** NASA, ESA, ESO, NOIRLab ve ALMA haberlerinde kaynağın serbest lisanslı görseli; diğerlerinde OpenRouter anahtarı girilmişse yapay zekâyla temsili kapak (WebP'ye küçültülür, "Temsili görsel" yazar).
-5. **Eğitim (`/egitim`):** Müfredattaki ders serileri. Seçili günlerde sıradaki ders web'de araştırılarak (OpenRouter web araması) yazılır; en az 3 doğrulanmış kaynak şart, açılmayan linkler silinir, formüller KaTeX, kodlar renkli. Dersler **taslak** gelir, onaylayınca yayımlanır. Yapay zekâ konu seçmez: önce istekler, sonra müfredat sırası; müfredat bitince çakışmayan yeni seri önerir.
-6. **Bülten:** Seçilen günde son 7 günün en önemli 7 yazısı (öne çıkanlar ve puan önce) ve o haftanın dersleri; Künye üzerinden blogun adıyla gönderilir. Önemli bir yazı "Abonelere gönder" ile hemen gönderilebilir.
-7. **Abonelik kutusu:** Ana sayfada ve her yazının altında. Kayıt ve onay e-postası Künye'de; blogdan gelen aboneler bülten etiketiyle (boşsa "Blog") işaretlenir.
-8. **Yedekleme:** Ayarlar → Yedekleme: tam yedek (API anahtarları dahil, şifre hariç; yapay zekâ kapakları hariç) indirilir ve geri yüklenir. YunoHost yedeği her şeyi içerir.
+5. **Eğitim (`/egitim`):** Uzman seviyesinde, uzunluk sınırı olmayan ders serileri (tanım, tarihçe, mantık, matematik, adım adım kullanım, çözülmüş örnek, sık hatalar, çözümlü alıştırmalar). Seçili günlerde sıradaki ders üç aşamada hazırlanır: **araştırma** (OpenRouter web araması; en az 3 doğrulanmış kaynak şart), notlardan **yazım**, notlarla karşılaştırmalı **denetim**. Denetim ciddi sorun bulmazsa ders kendiliğinden yayımlanır (ayardan kapatılabilir), bulursa bulgularıyla taslak kalır. Dersler "Başlamadan önce" önkoşul dersleri gösterir. Konu sırası: önce istekler, sonra müfredat; müfredatta hep en az 2 sıradaki seri tutulur, azalınca yapay zekâ alan dengesine, seviyeye ve son haftaların önemli haberlerine bakarak yeni seri ekler.
+6. **Gökyüzü takvimi (`/gokyuzu`):** Haftada bir, önümüzdeki 7 günde Türkiye'den gözlenebilecek olaylar (web araştırmasıyla, kaynaklı); ana sayfada kutu, bültende kısa bölüm.
+7. **Arama (`/ara`):** Yazılarda ve derslerde; Türkçe harf duyarsız ("gokyuzu" = "Gökyüzü").
+8. **Bülten:** Seçilen günde son 7 günün en önemli 7 yazısı (öne çıkanlar ve puan önce), o haftanın dersleri ve gökyüzü; Künye üzerinden blogun adıyla gönderilir. İsteğe bağlı ikinci bülten **Haftanın astronomi özeti**: yalnızca uzay ve fizik yazıları, dersler ve gökyüzü (ör. pazar, pazartesi dersinden önce). Önemli bir yazı "Abonelere gönder" ile hemen gönderilebilir.
+9. **Abonelik kutusu:** Ana sayfada ve her yazının altında. Kayıt ve onay e-postası Künye'de; blogdan gelen aboneler bülten etiketiyle (boşsa "Blog") işaretlenir.
+10. **Yedekleme:** Ayarlar → Yedek ve şifre: tam yedek (API anahtarları ve yapay zekâ kapakları dahil, şifre hariç; en fazla 200 MB) indirilir ve geri yüklenir. YunoHost yedeği her şeyi içerir.
+
+## Maliyet (OpenRouter)
+
+| İş | Sıklık | Yaklaşık |
+|---|---|---|
+| Haber yazıları (ör. Claude Haiku) | günde 5 | ayda 1-2 $ |
+| Ders (araştırma + yazım + denetim, ör. Claude Sonnet) | haftada 3 | ders başına 0,35-0,50 $ |
+| Gökyüzü takvimi | haftada 1 | 0,05-0,10 $ |
+| Kapak görseli | serbest görseli olmayan yazı başına | 0,01 $ |
 
 ## Yapay zekâ
 
 Claude (Anthropic), OpenAI, Google Gemini, DeepSeek, OpenRouter ya da OpenAI uyumlu herhangi bir adres (OpenCode, Ollama...). Ayarlar → Yapay zekâ.
 
-Maliyet için: **Okuma ve bütçe** bölümünde yalnızca özet / tam metin, makale başına karakter sınırı ve aylık token sınırı var. Genel sayfasında bu ayki token kullanımı görünür; dene, karşılaştır, ayarla.
+Haberleri yazan model Ayarlar → Yapay zekâ'da. Dersler, gökyüzü takvimi ve kapaklar aynı sekmedeki OpenRouter anahtarını kullanır (ders modeli Ayarlar → Eğitim'de). Maliyet için: Ayarlar → Haberler'de yalnızca özet / tam metin ve haber başına karakter sınırı, Yapay zekâ'da aylık token sınırı var. Genel sayfasında bu ayki token kullanımı görünür; dene, karşılaştır, ayarla.
 
 ## Künye bağlantısı
 
 1. Künye → Ayarlar → Güvenlik → **API anahtarı oluştur**.
-2. Blog → Ayarlar → Künye: Künye'nin adresi (`https://rraeyz.me`) ve bu anahtar.
+2. Blog → Ayarlar → Bülten: Künye'nin adresi (`https://rraeyz.me`) ve bu anahtar.
 3. Blog sitesindeki "Haftalık bültene abone ol" linki Künye'ye gider.
 
 ## Geliştirme

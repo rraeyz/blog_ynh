@@ -82,12 +82,15 @@ export function parseSelection(text: string, count: number, n: number, minSpace 
 
 export const monthKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
-// Ders çıktısı: "Özet: ..." satırı ve ilk "## " başlığından başlayan gövde (öncesindeki "araştırdım…" gibi sözler atılır)
-export function parseLesson(text: string): { excerpt: string; body: string } | null {
-  const excerpt = text.match(/^\s*\**Özet:?\**:?\s*(.+)$/m)?.[1].trim() ?? ''
+// Ders çıktısı: "Özet: ..." ve "Önkoşul: 3, 7" satırları ile ilk "## " başlığından başlayan gövde
+// (öncesindeki "araştırdım…" gibi sözler atılır). Önkoşul numaraları modele verilen ders listesindeki sıradır
+export function parseLesson(text: string): { excerpt: string; body: string; prerequisites: number[] } | null {
   const start = text.search(/^##\s/m)
   if (start < 0) return null
-  return { excerpt: excerpt.slice(0, 500), body: text.slice(start).trim() }
+  const head = text.slice(0, start)
+  const excerpt = head.match(/^\s*\**Özet:?\**:?\s*(.+)$/m)?.[1].trim() ?? ''
+  const prerequisites = (head.match(/^\s*\**Önkoşul(?:lar)?:?\**:?\s*(.+)$/m)?.[1] ?? '').match(/\d+/g)?.map(Number) ?? []
+  return { excerpt: excerpt.slice(0, 500), body: text.slice(start).trim(), prerequisites }
 }
 
 // Gövdedeki [metin](https://...) linkleri
@@ -96,3 +99,36 @@ export const markdownLinks = (body: string) => Array.from(new Set(Array.from(bod
 // Açılmayan linkler metne döner: okur ölü linke tıklamasın
 export const unlink = (body: string, dead: Set<string>) =>
   body.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (all, label: string, url: string) => (dead.has(url) ? label : all))
+
+export type SkyEvent = { date: string; time: string; title: string; detail: string }
+
+// Gökyüzü takvimi yanıtı: yalnızca istenen aralıktaki, tarihi geçerli olaylar; tarih ve saate göre sıralı
+export function parseSkyEvents(text: string, from: string, to: string): SkyEvent[] {
+  const data = extractJson(text) as { events?: Array<Record<string, unknown>> }
+  return (Array.isArray(data.events) ? data.events : [])
+    .map((e) => ({
+      date: String(e.date ?? ''),
+      time: /^\d{2}:\d{2}$/.test(String(e.time ?? '')) ? String(e.time) : '',
+      title: String(e.title ?? '').trim().slice(0, 150),
+      detail: String(e.detail ?? '').trim().slice(0, 400),
+    }))
+    .filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date) && e.date >= from && e.date <= to && e.title)
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+    .slice(0, 20)
+}
+
+// Arama için: küçük harf, Türkçe harfler ASCII karşılığına (okur "gokyuzu" da yazsa "Gökyüzü" bulunsun)
+const fold = (text: string) => text.toLocaleLowerCase('tr').replace(/[çğıöşü]/g, (c) => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' })[c] ?? c)
+
+// Her kelime başlıkta ya da metinde geçmeli; başlıkta geçen kelime daha değerli. Eşleşmezse 0
+export function searchScore(query: string, title: string, text: string): number {
+  const words = fold(query).split(/\s+/).filter(Boolean)
+  const [t, r] = [fold(title), fold(text)]
+  let score = 0
+  for (const word of words) {
+    if (t.includes(word)) score += 3
+    else if (r.includes(word)) score += 1
+    else return 0
+  }
+  return score
+}

@@ -34,13 +34,14 @@ export function aiConfig(settings: Settings) {
 }
 
 // extra: OpenAI uyumlu istek gövdesine eklenen alanlar (ör. OpenRouter web_search aracı, max_tokens)
-export async function complete(settings: Settings, system: string, user: string, extra: Record<string, unknown> = {}): Promise<Completion> {
+// timeoutMs: uzun ders yazımı gibi işler için (varsayılan 5 dakika)
+export async function complete(settings: Settings, system: string, user: string, extra: Record<string, unknown> = {}, timeoutMs = TIMEOUT): Promise<Completion> {
   const { provider, model, baseUrl, apiKey } = aiConfig(settings)
   if (!model) throw new Error('Ayarlar → Yapay zekâ bölümünde model adı girilmemiş')
   if (!apiKey && provider !== 'custom') throw new Error('Ayarlar → Yapay zekâ bölümünde API anahtarı girilmemiş')
 
   if (provider === 'anthropic') {
-    const client = new Anthropic({ apiKey, timeout: TIMEOUT })
+    const client = new Anthropic({ apiKey, timeout: timeoutMs })
     const response = await client.messages.create({
       model,
       max_tokens: 16000,
@@ -58,7 +59,7 @@ export async function complete(settings: Settings, system: string, user: string,
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
       body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], ...extra }),
-      signal: AbortSignal.timeout(TIMEOUT),
+      signal: AbortSignal.timeout(timeoutMs),
     })
     const data = await response.json().catch(() => null)
     if (!response.ok && RETRY_STATUS.has(response.status) && attempt < RETRY_DELAYS.length) {

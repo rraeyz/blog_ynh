@@ -4,7 +4,8 @@ import { createBackup, restoreBackup } from '@/lib/backup'
 
 export const dynamic = 'force-dynamic'
 
-const MAX_SIZE = 50 * 1024 * 1024
+// Kapak görselleri de yedekte (base64)
+const MAX_SIZE = 200 * 1024 * 1024
 
 // GET: tam yedek indirilir
 export async function GET() {
@@ -21,7 +22,7 @@ export async function GET() {
 
 // POST: Ayarlar sayfasındaki formdan yedek dosyası yüklenir, sonuç mesajıyla Ayarlar'a dönülür
 export async function POST(request: NextRequest) {
-  const back = (message: string) => NextResponse.redirect(new URL(`/admin/ayarlar?mesaj=${encodeURIComponent(message)}`, request.url), 303)
+  const back = (message: string) => NextResponse.redirect(new URL(`/admin/ayarlar?bolum=guvenlik&mesaj=${encodeURIComponent(message)}`, request.url), 303)
   if (!(await isAdmin())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   // Başka siteden gönderilen form reddedilir (çerez zaten SameSite=Lax; ikinci kat)
   const origin = request.headers.get('origin')
@@ -30,9 +31,9 @@ export async function POST(request: NextRequest) {
   try {
     const file = (await request.formData()).get('file')
     if (!(file instanceof File) || file.size === 0) return back('Yedek dosyası seç')
-    if (file.size > MAX_SIZE) return back('Dosya çok büyük (en fazla 50 MB)')
+    if (file.size > MAX_SIZE) return back('Dosya çok büyük (en fazla 200 MB)')
     const counts = await restoreBackup(JSON.parse(await file.text()))
-    return back(`Yedek yüklendi: ${counts.sources} kaynak, ${counts.papers} makale, ${counts.posts} yazı, ${counts.digests} bülten, ${counts.lessons} ders`)
+    return back(`Yedek yüklendi: ${counts.sources} kaynak, ${counts.papers} makale, ${counts.posts} yazı, ${counts.digests} bülten, ${counts.lessons} ders, ${counts.images} görsel`)
   } catch (error) {
     return back(`Yüklenemedi: ${error instanceof SyntaxError ? 'dosya JSON değil' : String((error as Error).message || error).slice(0, 200)}`)
   }

@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { extractJson, markdownLinks, parseLesson, parseSelection, slugify, unlink } from '../src/lib/text.ts'
+import { extractJson, markdownLinks, parseLesson, parseSelection, parseSkyEvents, searchScore, slugify, unlink } from '../src/lib/text.ts'
 import { isPrivateIp, safeFetch } from '../src/lib/net.ts'
 import { compressImage } from '../src/lib/compress.ts'
 import { complete, RETRY_DELAYS } from '../src/lib/ai.ts'
@@ -211,8 +211,31 @@ test('ders: kod bloğu ve formüller', () => {
   assert.doesNotMatch(renderMarkdown('$<img src=x onerror=alert(1)>$', { math: true }), /<img/, 'formül içi HTML çalışmaz')
 })
 
+test('ders: numaralı liste, tablo, açılır çözüm', () => {
+  const html = renderMarkdown('1. Bias çıkar\n2. Flat ile böl\n\n| Filtre | λ (nm) |\n|---|---|\n| V | **551** |\n\n## Alıştırmalar\nSoru\n:::cozum\nCevap $x=2$\n:::\nSonra', { math: true })
+  assert.match(html, /<ol><li>Bias çıkar<\/li><li>Flat ile böl<\/li><\/ol>/)
+  assert.match(html, /<div class="table"><table><thead><tr><th>Filtre<\/th><th>λ \(nm\)<\/th><\/tr><\/thead><tbody><tr><td>V<\/td><td><strong>551<\/strong><\/td><\/tr><\/tbody><\/table><\/div>/)
+  assert.match(html, /<details class="solution"><summary>Çözümü göster<\/summary>\s*<p>Cevap <span class="katex">[\s\S]*<\/p>\s*<\/details>\s*<p>Sonra/)
+  assert.doesNotMatch(renderMarkdown(':::cozum\nA\n:::'), /<details/, 'haberlerde çözüm bloğu yok')
+  assert.doesNotMatch(renderMarkdown('| <b>x</b> |\n|---|\n| y |'), /<b>/, 'tablo hücresi kaçışlanır')
+})
+
+test('gökyüzü takvimi ve arama', () => {
+  const text = '{"events": [{"date": "2026-10-30", "time": "21:00", "title": "Ay ve Satürn", "detail": "Güneydoğu"}, {"date": "2026-10-28", "time": "gece", "title": "Orionid", "detail": ""}, {"date": "2026-11-20", "title": "Aralık dışı"}, {"date": "30 Ekim", "title": "Bozuk tarih"}, {"date": "2026-10-29", "title": ""}]}'
+  assert.deepEqual(parseSkyEvents(text, '2026-10-27', '2026-11-02'), [
+    { date: '2026-10-28', time: '', title: 'Orionid', detail: '' },
+    { date: '2026-10-30', time: '21:00', title: 'Ay ve Satürn', detail: 'Güneydoğu' },
+  ])
+  assert.ok(searchScore('gokyuzu', 'Bu hafta Gökyüzünde', '') > 0, 'Türkçe harfsiz yazılan bulunur')
+  assert.ok(searchScore('IRAF', '', 'iraf ile fotometri') > 0, 'büyük I ile i aynı')
+  assert.ok(searchScore('ışık eğrisi', 'Işık Eğrisi Modelleme', '') > searchScore('ışık eğrisi', 'Modelleme', 'ışık eğrisi'), 'başlıkta geçen önde')
+  assert.equal(searchScore('koronagraf spektrum', 'Koronagraf', 'yok'), 0, 'her kelime geçmeli')
+  assert.equal(searchScore('   ', 'A', 'B'), 0)
+})
+
 test('ders çıktısı, linkler ve iç ağ adresleri', () => {
-  assert.deepEqual(parseLesson('Araştırdım.\nÖzet: Airy diski kırınımdır.\n\n## Nedir?\nMetin'), { excerpt: 'Airy diski kırınımdır.', body: '## Nedir?\nMetin' })
+  assert.deepEqual(parseLesson('Araştırdım.\nÖzet: Airy diski kırınımdır.\nÖnkoşul: 3, 7\n\n## Nedir?\nMetin'), { excerpt: 'Airy diski kırınımdır.', body: '## Nedir?\nMetin', prerequisites: [3, 7] })
+  assert.deepEqual(parseLesson('Özet: X\nÖnkoşul: yok\n## Nedir?\nA')?.prerequisites, [])
   assert.equal(parseLesson('Başlıksız metin'), null)
   const body = 'Bak [ESO](https://eso.org/a) ve [yok](https://x.com/404) ve tekrar [ESO](https://eso.org/a)'
   assert.deepEqual(markdownLinks(body), ['https://eso.org/a', 'https://x.com/404'])

@@ -20,12 +20,15 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
       <Notice message={searchParams.mesaj} />
       <h1 className="text-xl font-bold mb-2">Eğitim</h1>
       <p className="text-sm text-zinc-500 mb-4">
-        Müfredattaki sıradaki ders {days ? `her ${days}` : 'hiçbir gün (Ayarlar → Eğitim)'} günlük işten sonra web&apos;de araştırılıp yazılır ve
-        <b> taslak</b> olarak burada bekler; okuyup yayımlarsın. Yapay zekâ konu seçmez: önce istekleri, sonra müfredatı sırayla yazar; bir seri sırası
-        gelince derslere bölünür, müfredat bitince çakışmayan yeni bir seri önerilir. En az 3 doğrulanmış kaynak bulamazsa dersi yazmaz.
+        Müfredattaki sıradaki ders {days ? `her ${days}` : 'hiçbir gün (Ayarlar → Eğitim)'} günlük işten sonra üç aşamada hazırlanır: web&apos;de
+        araştırılır (en az 3 doğrulanmış kaynak yoksa yazılmaz), notlardan uzman seviyesinde yazılır, sonra notlarla karşılaştırılarak denetlenir.
+        Denetim ciddi sorun bulmazsa {settings.lessonAutoPublish ? <b>kendiliğinden yayımlanır</b> : <>burada <b>taslak</b> olarak bekler</>}; bulursa
+        bulgularıyla taslak kalır. Önce istekler, sonra müfredat sırayla yazılır; sırada hep en az 2 seri tutulur, azalınca yapay zekâ alan dengesine,
+        seviyeye ve son haftaların önemli haberlerine bakarak yeni seri önerir (istemediğini silebilirsin).
       </p>
       <div className="card mb-6 text-sm space-y-1">
-        <p><b>Model:</b> {settings.lessonModel} · <b>OpenRouter anahtarı:</b> {settings.imageApiKey ? 'girilmiş' : 'yok (Ayarlar → Görseller)'}</p>
+        <p><b>Model:</b> {settings.lessonModel} · <b>OpenRouter anahtarı:</b> {settings.imageApiKey ? 'girilmiş' : 'yok (Ayarlar → Yapay zekâ)'}</p>
+        <p className="text-zinc-500">Bir ders üç model çağrısı ve 10&apos;a kadar web araması kullanır; Sonnet ile yaklaşık 0,35–0,50 $.</p>
       </div>
       <div className="flex flex-wrap gap-2 mb-8">
         <form action={runLessonAction}><button className="btn-primary">Sıradaki dersi şimdi yaz</button></form>
@@ -82,7 +85,10 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
             {series.map((s) => (
               <li key={s.id} className="card flex items-center gap-3 text-sm">
                 <span className="w-8 text-zinc-500">{s.position}</span>
-                <Link href={`/admin/egitim/seri/${s.id}`} className="flex-1 font-medium hover:underline">{s.title}</Link>
+                <Link href={`/admin/egitim/seri/${s.id}`} className="flex-1 font-medium hover:underline">
+                  {s.title}
+                  {(s.track || s.level) && <span className="block text-xs font-normal text-zinc-500">{[s.track, s.level].filter(Boolean).join(' · ')}</span>}
+                </Link>
                 <span className="text-xs text-zinc-500">
                   {s.planned ? `${count(s.lessons, 'published')} yayında · ${count(s.lessons, 'draft')} taslak · ${count(s.lessons, 'planned')} sırada` : 'sırası gelince derslere bölünecek'}
                 </span>

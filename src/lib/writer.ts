@@ -6,8 +6,24 @@ import { addUsage, logJob, overBudget, type Settings } from '@/lib/state'
 import { CATEGORIES } from '@/lib/topics'
 import { coverIfNeeded } from '@/lib/images'
 
-// Öne çıkanlara alınması önerilen en düşük önem puanı (panelde rozet)
+// Öne çıkanlara alınması önerilen en düşük önem puanı (panelde rozet; ayar açıksa kendiliğinden öne çıkar)
 export const FEATURE_SUGGESTION = 8
+// Ön puanı bu ve altı olan haberler seçimden hemen sonra atlanır. 4 bırakılır: sıradan ama geçerli ve astronomi kotasını doldurabilir
+export const MIN_PRESCORE = 3
+const MAX_FEATURED = 10
+
+// Öne çıkanlara alır; en fazla 10, yenisi eklenince en eski düşer. Düşen yazının başlığını döner
+export async function featurePost(postId: number): Promise<string | null> {
+  await prisma.post.update({ where: { id: postId }, data: { featuredAt: new Date() } })
+  const dropped = await prisma.post.findMany({ where: { featuredAt: { not: null } }, orderBy: { featuredAt: 'desc' }, skip: MAX_FEATURED, select: { id: true, title: true } })
+  await prisma.post.updateMany({ where: { id: { in: dropped.map((p) => p.id) } }, data: { featuredAt: null } })
+  return dropped[0]?.title ?? null
+}
+
+// Ayar açıksa yayımlanan yüksek puanlı yazı kendiliğinden öne çıkar
+export async function autoFeature(post: { id: number; importance: number }, settings: Settings) {
+  if (settings.autoFeature && post.importance >= FEATURE_SUGGESTION) await featurePost(post.id)
+}
 
 const SYSTEM = `Sen Türkçe yazan bir bilim iletişimcisisin. Sana bir makalenin bilgileri ve metni verilecek.
 Bu makaleyi teknik olmayan ama meraklı bir okur için Türkçe anlat.
@@ -73,6 +89,7 @@ export async function writePost(paperId: number, settings: Settings, publish = s
           },
         })
     await prisma.paper.update({ where: { id: paper.id }, data: { status: 'written', error: '' } })
+    if (!replacePostId && post.status === 'published') await autoFeature(post, settings)
     await coverIfNeeded(post.id, settings)
     return post
   } catch (error) {
@@ -126,7 +143,13 @@ export async function writeDaily(settings: Settings): Promise<{ written: number;
   // Bekleyenlerin hepsi modele gider (makale başına ~70 token; 400 makale ~28 bin). Sınır yalnızca olağan dışı yığılmaya karşı
   const pool = candidates.slice(0, 400)
   const picked = await selectPapers(pool, settings, settings.postsPerDay)
-  await logJob(`Günlük iş: ${pool.length} makaleden ${picked.length} tanesi seçildi, yazılıyor…`)
+  // Ön puanı çok düşük olanlar ikinci şansı beklemeden atlanır (Bekliyor listesi dolmasın)
+  const low = await prisma.paper.updateMany({
+    where: { id: { in: pool.map((p) => p.id), notIn: picked }, status: 'new', score: { gte: 1, lte: MIN_PRESCORE } },
+    data: { status: 'skipped' },
+  })
+  summary.skipped += low.count
+  await logJob(`Günlük iş: ${pool.length} makaleden ${picked.length} tanesi seçildi${low.count ? `, ön puanı ${MIN_PRESCORE} ve altı olan ${low.count} tanesi atlandı` : ''}; yazılıyor…`)
   for (let index = 0; index < picked.length; index++) {
     const id = picked[index]
     if (await overBudget(settings)) {

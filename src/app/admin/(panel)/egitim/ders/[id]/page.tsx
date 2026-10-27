@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
+import { renderMarkdown } from '@/lib/markdown'
 import { Notice } from '../../../../Notice'
 import { ConfirmButton } from '../../../../ConfirmButton'
 import { deleteLessonAction, publishLessonAction, rewriteLessonAction, saveLessonAction } from '../../../../actions'
@@ -23,7 +24,13 @@ export default async function LessonAdminPage({ params, searchParams }: { params
         <form action={deleteLessonAction}><input type="hidden" name="id" value={lesson.id} /><ConfirmButton question="Ders silinsin mi?" className="btn-danger">Sil</ConfirmButton></form>
       </div>
       {lesson.error && <p className="text-sm text-red-600 mb-4">Son deneme: {lesson.error}</p>}
-      {written && <p className="text-sm text-zinc-500 mb-4">{lesson.inputTokens + lesson.outputTokens} token · {sources.length} kaynak. Yayımlamadan önce formülleri, kodu ve kaynakları kontrol et.</p>}
+      {written && <p className="text-sm text-zinc-500 mb-4">{lesson.inputTokens + lesson.outputTokens} token · {sources.length} kaynak{lesson.prerequisites && ` · önkoşul ders no: ${lesson.prerequisites}`}</p>}
+      {written && (
+        <section className="card mb-4 text-sm">
+          <p className="font-medium mb-2">Denetim bulguları</p>
+          {lesson.review ? <div className="prose-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.review) }} /> : <p className="text-zinc-500">Denetim sorun bulmadı.</p>}
+        </section>
+      )}
       <form action={saveLessonAction} className="space-y-4">
         <input type="hidden" name="id" value={lesson.id} />
         <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
@@ -45,6 +52,12 @@ export default async function LessonAdminPage({ params, searchParams }: { params
           <p className="font-medium mb-2">Yazarken kullanılan kaynaklar</p>
           <ol className="list-decimal pl-5 space-y-1">{sources.map(([title, url]) => <li key={url}><a href={url} className="underline break-words" target="_blank" rel="noopener noreferrer">{title}</a></li>)}</ol>
         </section>
+      )}
+      {lesson.research && (
+        <details className="card mt-6 text-sm">
+          <summary className="font-medium cursor-pointer">Araştırma notları (dersin dayandığı)</summary>
+          <div className="prose-body mt-3" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.research, { math: true }) }} />
+        </details>
       )}
     </>
   )

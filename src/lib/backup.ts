@@ -1,6 +1,10 @@
+import path from 'node:path'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { prisma } from '@/lib/prisma'
+import { IMAGE_DIR, IMAGE_NAME } from '@/lib/images'
 
-// Tam yedek: ayarlar (API anahtarları dahil, yönetici şifresi hariç), kaynaklar, makaleler, yazılar, bültenler.
+// Tam yedek: ayarlar (API anahtarları dahil, yönetici şifresi hariç), kaynaklar, makaleler, yazılar, bültenler, dersler
+// ve yapay zekâ kapakları (base64; yeniden üretmek para tutar).
 // Geri yükleme hepsini yedektekiyle değiştirir; mevcut şifre ve oturum aynen kalır.
 
 export const BACKUP_FORMAT = 'blog-backup'
@@ -8,13 +12,13 @@ const VERSION = 1
 
 // Geri yüklemede yalnızca bu alanlar alınır (yedek dosyası güvenilmeyen girdidir)
 const FIELDS = {
-  settings: ['siteTitle', 'siteDescription', 'siteUrl', 'aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'readMode', 'maxInputChars', 'postsPerDay', 'spacePerDay', 'dailyHour', 'interests', 'monthlyTokenLimit', 'autoPublish', 'autoNewsletter', 'digestWeekday', 'kunyeUrl', 'kunyeToken', 'newsletterTag', 'imageApiKey', 'imageModel', 'lessonModel', 'lessonWeekdays'],
+  settings: ['siteTitle', 'siteDescription', 'siteUrl', 'aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'readMode', 'maxInputChars', 'postsPerDay', 'spacePerDay', 'dailyHour', 'interests', 'monthlyTokenLimit', 'autoPublish', 'autoNewsletter', 'digestWeekday', 'kunyeUrl', 'kunyeToken', 'newsletterTag', 'imageApiKey', 'imageModel', 'lessonModel', 'lessonWeekdays', 'lessonAutoPublish', 'autoFeature', 'skyEnabled', 'astroDigest', 'astroDigestWeekday'],
   sources: ['id', 'url', 'enabled', 'lastFetchedAt', 'lastError', 'createdAt'],
   papers: ['id', 'externalId', 'title', 'authors', 'abstract', 'score', 'imageUrl', 'topic', 'url', 'publishedAt', 'status', 'error', 'createdAt'],
   posts: ['id', 'slug', 'title', 'excerpt', 'highlights', 'category', 'importance', 'image', 'featuredAt', 'body', 'status', 'publishedAt', 'paperId', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
   digests: ['id', 'createdAt', 'subject', 'body', 'status', 'sentAt', 'result'],
-  series: ['id', 'slug', 'title', 'summary', 'position', 'planned', 'createdAt'],
-  lessons: ['id', 'seriesId', 'position', 'slug', 'title', 'scope', 'sourceUrls', 'excerpt', 'body', 'sources', 'status', 'error', 'publishedAt', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
+  series: ['id', 'slug', 'title', 'summary', 'track', 'level', 'position', 'planned', 'createdAt'],
+  lessons: ['id', 'seriesId', 'position', 'slug', 'title', 'scope', 'sourceUrls', 'excerpt', 'body', 'sources', 'research', 'review', 'prerequisites', 'status', 'error', 'publishedAt', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
 } as const
 
 type Row = Record<string, unknown>
@@ -37,6 +41,12 @@ export async function createBackup() {
     prisma.series.findMany({ orderBy: { id: 'asc' } }),
     prisma.lesson.findMany({ orderBy: { id: 'asc' } }),
   ])
+  const images: Record<string, string> = {}
+  for (const post of posts) {
+    if (!IMAGE_NAME.test(post.image)) continue
+    const file = await readFile(path.join(IMAGE_DIR, post.image)).catch(() => null)
+    if (file) images[post.image] = file.toString('base64')
+  }
   return {
     format: BACKUP_FORMAT,
     formatVersion: VERSION,
@@ -48,6 +58,7 @@ export async function createBackup() {
     digests,
     series,
     lessons,
+    images,
   }
 }
 
@@ -63,6 +74,10 @@ export async function restoreBackup(data: unknown) {
   // Eğitim bölümünden önceki yedeklerde bu alanlar yok
   const series = rows(backup.series ?? [], FIELDS.series)
   const lessons = rows(backup.lessons ?? [], FIELDS.lessons)
+  // Dosya adı denetlenir: yedekten gelen ad klasör dışına yazamasın
+  const images = Object.entries((backup.images ?? {}) as Record<string, unknown>).filter(
+    (entry): entry is [string, string] => IMAGE_NAME.test(entry[0]) && typeof entry[1] === 'string',
+  )
 
   // Hepsi ya da hiçbiri: hata olursa veritabanı değişmeden kalır
   await prisma.$transaction(async (tx) => {
@@ -80,5 +95,7 @@ export async function restoreBackup(data: unknown) {
     if (series.length) await tx.series.createMany({ data: series as never })
     if (lessons.length) await tx.lesson.createMany({ data: lessons as never })
   })
-  return { sources: sources.length, papers: papers.length, posts: posts.length, digests: digests.length, lessons: lessons.length }
+  if (images.length) await mkdir(IMAGE_DIR, { recursive: true })
+  for (const [name, data] of images) await writeFile(path.join(IMAGE_DIR, name), Buffer.from(data, 'base64'))
+  return { sources: sources.length, papers: papers.length, posts: posts.length, digests: digests.length, lessons: lessons.length, images: images.length }
 }

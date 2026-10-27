@@ -38,6 +38,16 @@ h1, h2, h3 { @apply font-display tracking-tight; }
 .prose-body ul { @apply my-5 space-y-2.5 pl-1; }
 .prose-body li { @apply relative pl-7; }
 .prose-body li::before { content: ''; background: hsl(var(--h) 80% 60%); @apply absolute left-1 top-[0.7rem] h-2.5 w-2.5 rotate-45 rounded-[3px]; }
+.prose-body ol { counter-reset: step; @apply my-5 space-y-2.5 pl-1; }
+.prose-body ol > li { counter-increment: step; }
+.prose-body ol > li::before { content: counter(step); background: hsl(var(--h) 80% 60% / 0.18); color: hsl(var(--h) 70% 45%); @apply left-0 top-1 h-6 w-6 rotate-0 rounded-full text-center text-xs font-semibold leading-6; }
+.prose-body .table { @apply my-6 overflow-x-auto; }
+.prose-body table { @apply w-full border-collapse text-sm; }
+.prose-body th, .prose-body td { @apply border border-zinc-200 dark:border-white/10 px-3 py-2 text-left align-top; }
+.prose-body th { background: hsl(var(--h) 80% 60% / 0.1); @apply font-semibold text-zinc-900 dark:text-white; }
+.prose-body details.solution { @apply my-5 rounded-2xl border border-zinc-200 dark:border-white/10 px-5 py-3; }
+.prose-body details.solution > summary { color: hsl(var(--h) 75% 50%); @apply cursor-pointer text-sm font-semibold; }
+.prose-body details.solution[open] > summary { @apply mb-3; }
 /* Kalın terimler fosforlu kalemle çizilmiş gibi */
 .prose-body strong { background: linear-gradient(transparent 58%, hsl(var(--h) 90% 60% / 0.3) 58%); @apply font-semibold text-zinc-900 dark:text-white; }
 .prose-body a { color: hsl(var(--h) 75% 50%); @apply underline underline-offset-4; }

@@ -6,7 +6,7 @@ import { PROVIDERS } from '@/lib/ai'
 import { freeImage } from '@/lib/topics'
 import { logJob, type Settings } from '@/lib/state'
 
-// Yapay zekâ kapakları veritabanının yanında durur (YunoHost veri klasörü: sistem yedeğine girer, JSON yedeğe girmez)
+// Yapay zekâ kapakları veritabanının yanında durur (YunoHost veri klasörü); JSON yedeğe base64 olarak girer
 export const IMAGE_DIR = path.join(path.dirname((process.env.DATABASE_URL || 'file:/app/prisma/dev.db').replace(/^file:/, '')), 'gorseller')
 export const IMAGE_NAME = /^\d+-\d+\.(jpg|png|webp)$/
 // Görsel başına sabit ~0,01 $ (1K); ayarlardan değiştirilebilir

@@ -35,6 +35,10 @@ export default async function LessonPage({ params }: { params: { seri: string; d
     const [title, url] = line.split('\t')
     return { title: title || url, url }
   }).filter((s) => /^https?:\/\//.test(s.url ?? ''))
+  const prerequisiteIds = lesson.prerequisites.split(',').map(Number).filter(Boolean)
+  const prerequisites = prerequisiteIds.length
+    ? await prisma.lesson.findMany({ where: { id: { in: prerequisiteIds }, status: 'published' }, select: { slug: true, title: true, series: { select: { slug: true, title: true } } } })
+    : []
   const accent = { ['--h' as string]: topicHue(lesson.series.slug) } as React.CSSProperties
 
   return (
@@ -55,6 +59,14 @@ export default async function LessonPage({ params }: { params: { seri: string; d
       <div className="mx-auto mt-10 max-w-4xl lg:grid lg:grid-cols-[minmax(0,1fr)_13rem] lg:gap-14">
         <div className="max-w-2xl min-w-0">
           {lesson.excerpt && <p className="border-l-4 border-violet-500 pl-5 text-lg text-zinc-600 dark:text-zinc-400">{lesson.excerpt}</p>}
+          {prerequisites.length > 0 && (
+            <aside className="mt-8 card">
+              <p className="text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">Başlamadan önce</p>
+              <ul className="mt-2 space-y-1 text-sm">
+                {prerequisites.map((p) => <li key={p.slug}><Link href={`/egitim/${p.series.slug}/${p.slug}`} className="hover:text-violet-500">{p.title}</Link><span className="text-zinc-500"> · {p.series.title}</span></li>)}
+              </ul>
+            </aside>
+          )}
           <div className="prose-body lesson-body mt-8" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.body, { math: true }) }} />
 
           {sources.length > 0 && (
@@ -63,7 +75,7 @@ export default async function LessonPage({ params }: { params: { seri: string; d
               <ol className="mt-3 space-y-1.5 text-sm list-decimal pl-5">
                 {sources.map((s) => <li key={s.url}><a href={s.url} className="hover:text-violet-500 break-words" rel="noopener noreferrer" target="_blank">{s.title} ↗</a></li>)}
               </ol>
-              <p className="text-xs text-zinc-500 mt-3">Bu ders yapay zekâ yardımıyla bu kaynaklardan derlendi ve yayımlanmadan önce incelendi. Önemli bir işte kullanmadan önce kaynaklara bakın.</p>
+              <p className="text-xs text-zinc-500 mt-3">Bu ders yapay zekâ yardımıyla bu kaynaklardan derlendi ve başka bir modelle kaynaklarına karşı denetlendi. Önemli bir işte kullanmadan önce kaynaklara bakın.</p>
             </aside>
           )}
 

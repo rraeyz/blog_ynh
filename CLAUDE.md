@@ -17,5 +17,15 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 
 ## Eğitim bölümü
 - `/egitim`: seriler ve sıralı dersler (`lib/lessons.ts`). Yapay zekâ konu seçmez: istekler, sonra müfredat sırası; seri sırası gelince derslere bölünür, müfredat bitince yeni seri önerilir.
-- Dersler OpenRouter'da `openrouter:web_search` aracıyla araştırılarak yazılır; en az 3 doğrulanmış kaynak şart, açılmayan linkler metne döner. Dersler taslak gelir, yönetici yayımlar.
-- Formül ($...$, $$...$$) yalnızca derslerde açılır (`renderMarkdown(body, { math: true })`): haberlerde $ para birimi olabilir.
+- Ders üç aşama (`writeLesson`): araştırma (OpenRouter `openrouter:web_search`; en az 3 doğrulanmış kaynak şart) → yalnızca notlardan yazım → notlarla karşılaştırmalı denetim (JSON bulgular). Ciddi bulgu yoksa ve `lessonAutoPublish` açıksa yayımlanır, yoksa taslak + `review`. Açılmayan linkler metne döner.
+- Müfredat: `ensureRoadmap` hep en az 2 bölünmemiş seri tutar; azalınca yapay zekâ alan (TRACKS), seviye ve son 30 günün önemli uzay/fizik haberlerine bakarak seri önerir.
+- Formül ($...$, $$...$$) ve `:::cozum` blokları yalnızca derslerde açılır (`renderMarkdown(body, { math: true })`): haberlerde $ para birimi olabilir.
+
+## Diğer
+- Gökyüzü takvimi (`lib/sky.ts`): haftalık, sonuç AppState `sky.week`; bülten gününde tazelenir.
+- Arama (`/ara`): yayımlananlar bellekte taranır (`searchScore`); büyürse FTS5.
+- Ayarlar sekmeli; `saveSettingsAction` yalnızca `SETTINGS_SECTIONS[section]` alanlarını yazar. Yeni ayar: şema + bölüm listesi + `parse` + `backup.ts` FIELDS.
+
+## Yapılacaklar (kullanıcı onayladı, sonraya)
+- Next.js 16'ya geçiş (iki repo): Next 14'teki DoS açıkları ancak böyle kapanır; büyük kırıcı değişiklikler (async params/cookies, middleware → proxy), ayrı dalda ve tam testle.
+- Ders görselleri/diyagramlar: maliyetli; ör. matplotlib/SVG üretimi ya da görsel modeli, derslerde şekil.
