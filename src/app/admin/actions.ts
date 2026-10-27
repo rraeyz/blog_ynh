@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { clientIp, endSession, recordFailure, requireAdmin, startSession, tooManyFailures } from '@/lib/auth'
 import { getSettings } from '@/lib/state'
 import { parseSourceUrl } from '@/lib/arxiv'
-import { addPaperFromUrl, readSource } from '@/lib/papers'
+import { addPaperFromUrl, hidePapers, readSource } from '@/lib/papers'
 import { writePost } from '@/lib/writer'
 import { createWeeklyDigest, digestBody, sendDigest } from '@/lib/newsletter'
 import { CATEGORIES } from '@/lib/topics'
@@ -190,6 +190,25 @@ export async function skipPaperAction(form: FormData) {
   back('/admin/makaleler', 'Atlandı')
 }
 
+const PAPER_TAB = (status: string) => `/admin/makaleler?durum=${status}`
+
+export async function deletePaperAction(form: FormData) {
+  await requireAdmin()
+  const status = text(form, 'status')
+  await hidePapers(status, id(form))
+  back(PAPER_TAB(status), 'Silindi')
+}
+
+// Sekmedekilerin hepsi: Bekliyor ve Hata atlanır, Atlandı silinir
+export async function bulkPapersAction(form: FormData) {
+  await requireAdmin()
+  const status = text(form, 'status')
+  if (status === 'skipped') back(PAPER_TAB(status), `${(await hidePapers('skipped')).count} makale silindi`)
+  if (status !== 'new' && status !== 'failed') throw new Error('Geçersiz istek')
+  const { count } = await prisma.paper.updateMany({ where: { status }, data: { status: 'skipped', error: '' } })
+  back(PAPER_TAB(status), `${count} makale atlandı`)
+}
+
 // --- Yazılar ---
 
 export async function savePostAction(form: FormData) {
@@ -246,6 +265,13 @@ export async function deletePostAction(form: FormData) {
   await requireAdmin()
   await prisma.post.deleteMany({ where: { id: id(form) } })
   back('/admin/yazilar', 'Yazı silindi')
+}
+
+// Yayındakiler toplu silinmez (okurların linkleri kırılır); onlar tek tek silinir
+export async function deleteDraftsAction() {
+  await requireAdmin()
+  const { count } = await prisma.post.deleteMany({ where: { status: 'draft' } })
+  back('/admin/yazilar', `${count} taslak silindi`)
 }
 
 // Önemli bir yazıyı haftayı beklemeden abonelere gönder: tek yazılık bülten taslağı açılır
