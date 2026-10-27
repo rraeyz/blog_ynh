@@ -28,6 +28,8 @@ export const isJobRunning = () => !!globalForJobs.jobRunning
 export async function dailyTask(): Promise<string> {
   const settings = await getSettings()
   const added = await fetchSources()
+  // Ara adımlar günlüğe: iş dakikalarca sürer, panelde nerede olduğu görünsün
+  await logJob(`Günlük iş: tarama bitti, ${added} yeni makale; yapay zekâ seçiyor…`)
   const result = await writeDaily(settings)
   const parts = [`${added} yeni makale`, `${result.written} yazı ${settings.autoPublish ? 'yayımlandı' : 'taslak'}`]
   if (result.failed) parts.push(`${result.failed} hata`)

@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { complete } from '@/lib/ai'
 import { paperText } from '@/lib/papers'
 import { extractJson, slugify } from '@/lib/text'
-import { addUsage, overBudget, type Settings } from '@/lib/state'
+import { addUsage, logJob, overBudget, type Settings } from '@/lib/state'
 import { CATEGORIES } from '@/lib/topics'
 import { coverIfNeeded } from '@/lib/images'
 
@@ -115,18 +115,24 @@ export async function writeDaily(settings: Settings): Promise<{ written: number;
   const summary = { written: 0, failed: 0, skipped: expired.count, budget: false }
   if (candidates.length === 0 || settings.postsPerDay <= 0) return summary
   if (await overBudget(settings)) return { ...summary, budget: true }
-  // Modele en yeni 150 makalenin başlığı ve özetinin başı gider (token için, ~10 bin)
-  const picked = await selectPapers(candidates.slice(0, 150), settings, settings.postsPerDay)
-  for (const id of picked) {
+  // Bekleyenlerin hepsi modele gider (makale başına ~70 token; 400 makale ~28 bin). Sınır yalnızca olağan dışı yığılmaya karşı
+  const pool = candidates.slice(0, 400)
+  const picked = await selectPapers(pool, settings, settings.postsPerDay)
+  await logJob(`Günlük iş: ${pool.length} makaleden ${picked.length} tanesi seçildi, yazılıyor…`)
+  for (let index = 0; index < picked.length; index++) {
+    const id = picked[index]
     if (await overBudget(settings)) {
       summary.budget = true
       break
     }
+    const step = `Günlük iş: yazı ${index + 1}/${picked.length}`
     try {
-      await writePost(id, settings)
+      const post = await writePost(id, settings)
       summary.written++
-    } catch {
+      await logJob(`${step} ${post.status === 'published' ? 'yayımlandı' : 'taslak'}: ${post.title.slice(0, 80)}`)
+    } catch (error) {
       summary.failed++
+      await logJob(`${step} başarısız: ${String((error as Error).message || error).slice(0, 150)}`)
     }
   }
   return summary
