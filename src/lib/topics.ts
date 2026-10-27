@@ -47,6 +47,8 @@ const FREE_IMAGES: Array<[RegExp, string]> = [
   [/(^|\.)esawebb\.org$/, 'ESA/Webb'],
   [/(^|\.)esahubble\.org$/, 'ESA/Hubble'],
   [/(^|\.)eso\.org$/, 'ESO'],
+  [/(^|\.)noirlab\.edu$/, 'NOIRLab/NSF/AURA'],
+  [/(^|\.)almaobservatory\.org$/, 'ALMA (ESO/NAOJ/NRAO)'],
 ]
 
 export function freeImage(paper: { url: string; imageUrl: string } | null | undefined): { src: string; credit: string } | null {
