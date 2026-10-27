@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { extractJson, slugify } from '../src/lib/text.ts'
+import { extractJson, parseSelection, slugify } from '../src/lib/text.ts'
 import { compressImage } from '../src/lib/compress.ts'
 import { complete, RETRY_DELAYS } from '../src/lib/ai.ts'
 import http from 'node:http'
@@ -175,4 +175,13 @@ test('geçici sağlayıcı hatasında yeniden denenir', async () => {
   } finally {
     server.close()
   }
+})
+
+test('seçim yanıtı: seçilenler ve ön puanlar', () => {
+  const ok = parseSelection('Seçimim:\n{"picked": [3, 1, 3, 9], "scores": {"1": 8, "2": 3, "3": 9.4, "4": 15, "9": 7, "x": 5}}', 4, 2)
+  assert.deepEqual(ok.picked, [2, 0], 'tekrar ve liste dışı numara atlanır, n kadar alınır')
+  assert.deepEqual(Array.from(ok.scores), [[0, 8], [1, 3], [2, 9], [3, 10]], 'puan yuvarlanır, 10\'a sıkıştırılır, liste dışı atlanır')
+  const fallback = parseSelection('{"scores": {"1": 2, "2": 9, "3": 6}}', 3, 2)
+  assert.deepEqual(fallback.picked, [1, 2], 'seçilenler yoksa en yüksek puanlılar')
+  assert.deepEqual(parseSelection('{"picked": [2]}', 3, 2), { picked: [1], scores: new Map() })
 })

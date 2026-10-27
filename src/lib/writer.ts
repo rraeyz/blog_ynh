@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { complete } from '@/lib/ai'
 import { paperText } from '@/lib/papers'
-import { extractJson, slugify } from '@/lib/text'
+import { extractJson, parseSelection, slugify } from '@/lib/text'
 import { addUsage, logJob, overBudget, type Settings } from '@/lib/state'
 import { CATEGORIES } from '@/lib/topics'
 import { coverIfNeeded } from '@/lib/images'
@@ -87,19 +87,21 @@ const SELECT = `Bir bilim editörüsün. Verilen makale ve haberlerden en öneml
 - alanında ya da günlük hayatta etkisi büyük olanlar,
 - meraklı ama uzman olmayan bir okuru ilgilendirecek olanlar.
 Küçük iyileştirmeleri, birbirinin tekrarı olanları ve yalnızca dar bir uzman kitleyi ilgilendirenleri seçme; eşit önemdeyse farklı konulardan seç.
-Yalnızca seçtiğin numaraları önem sırasıyla JSON dizi olarak yaz, örn. [3, 1, 7].`
+Ayrıca listedeki HER makaleye bu ölçütlere göre 1-10 arası bir puan ver (cömert olma; çoğu 3-6 arasında olmalı).
+Yanıtı yalnızca şu JSON biçiminde ver: {"picked": [seçtiğin numaralar önem sırasıyla], "scores": {"1": puan, "2": puan, ...}}`
 
-// Model en önemli n makaleyi seçer; başlık ve özetin başı gider (makale başına ~60 token)
+// Model en önemli n makaleyi seçer ve hepsine ön puan verir (Makaleler → Bekliyor bu puana göre sıralı).
+// Başlık ve özetin başı gider (makale başına ~60 token, puanlar için ~4 token)
 export async function selectPapers(candidates: Array<{ id: number; title: string; abstract: string }>, settings: Settings, n: number): Promise<number[]> {
   if (candidates.length <= n) return candidates.map((paper) => paper.id)
   const list = candidates.map((paper, index) => `${index + 1}. ${paper.title}\n   ${paper.abstract.replace(/\s+/g, ' ').slice(0, 220)}`).join('\n')
   const interests = settings.interests.trim() ? `Okurun ilgi alanları (eşit önemdekilerde bunlara öncelik ver): ${settings.interests}\n` : ''
   const result = await complete(settings, SELECT, `${interests}Seçilecek sayı: ${n}\n\nMakaleler:\n${list}`)
   await addUsage(result.inputTokens, result.outputTokens)
-  const picked = extractJson(result.text)
-  if (!Array.isArray(picked)) throw new Error('Seçim yanıtı dizi değil')
-  const ids = picked.map((i) => candidates[Number(i) - 1]?.id).filter((id): id is number => typeof id === 'number')
-  return Array.from(new Set(ids)).slice(0, n)
+  const { picked, scores } = parseSelection(result.text, candidates.length, n)
+  if (picked.length === 0) throw new Error('Seçim yanıtında geçerli makale yok')
+  await prisma.$transaction(Array.from(scores).map(([index, score]) => prisma.paper.update({ where: { id: candidates[index].id }, data: { score } })))
+  return picked.map((index) => candidates[index].id)
 }
 
 // Günlük iş: son 3 günün bekleyen makalelerinden seçip yazar. Seçilmeyenler 3 gün boyunca ertesi günlerin

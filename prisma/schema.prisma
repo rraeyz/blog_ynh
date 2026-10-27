@@ -51,6 +51,7 @@ model Paper {
   title       String
   authors     String   @default("")
   abstract    String   @default("")
+  score       Int      @default(0) // Seçimin ön puanı (1-10, başlık ve özetten); 0 = henüz puanlanmadı
   imageUrl    String   @default("") // Beslemedeki görsel; yalnızca serbest lisanslı kurumlarınki gösterilir (lib/topics.ts freeImage)
   topic       String   @default("") // arXiv birincil kategorisi (cs.AI) ya da beslemenin sitesi (lib/topics.ts)
   url         String
