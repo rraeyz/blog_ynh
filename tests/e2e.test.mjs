@@ -29,7 +29,7 @@ const fake = http.createServer((req, res) => {
     if (req.url === '/v1/chat/completions') {
       aiCalls++
       // Başlıktan sonra boş satır yok (Gemini böyle yazıyordu); vurgu ve "Kısaca" maddeleri
-      const content = JSON.stringify({ title: 'Kediler Neden Çok Uyur?', brief: 'Kediler günde 15 saat uyuyor.', highlights: ['Uyku enerji saklar', 'Avcılık için gerekli'], body: 'Giriş.\n## Ne yaptılar?\n<script>alert(1)</script> **önemli**\n> Büyük bulgu' })
+      const content = JSON.stringify({ title: 'Kediler Neden Çok Uyur?', brief: 'Kediler günde 15 saat uyuyor.', highlights: ['Uyku enerji saklar', 'Avcılık için gerekli'], body: 'Giriş.\n## Ne yaptılar?\n<script>alert(1)</script> **önemli**\n> Büyük bulgu', category: 'uzay', importance: 9 })
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content: `İşte yazı:\n${content}` } }], usage: { prompt_tokens: 100, completion_tokens: 50 } }))
     }
@@ -189,12 +189,24 @@ test('makale → taslak yazı → yayın', async () => {
   assert.match(page.html, /Kısaca[\s\S]*Uyku enerji saklar[\s\S]*Avcılık için gerekli/)
   const home = (await get('/')).html
   assert.match(home, /Yeni gelişmeler[\s\S]*Kediler Neden Çok Uyur\?[\s\S]*Kediler günde 15 saat uyuyor\.[\s\S]*Detaylar/)
+  assert.match(home, /href="\/\?konu=uzay#yazilar"[^>]*>Uzay</, 'konusu olan yazı sekme açar')
+  assert.match((await get('/?konu=uzay')).html, /Kediler Neden Çok Uyur/)
+  assert.match((await get('/?konu=saglik')).html, /Bu konuda henüz yazı yok/)
   const rss = await get('/rss.xml')
   assert.match(rss.html, /<link>https:\/\/blog\.example\.com\/yazi\/kediler-neden-cok-uyur<\/link>/)
   cookie = savedCookie
 
   const usage = (await get('/admin')).html
   assert.match(usage, /150/, 'token kullanımı sayılmalı')
+
+  // Yüksek puanlı yazı için öneri; öne çıkarılınca ana sayfada Öne çıkanlar
+  assert.match((await get('/admin/yazilar')).html, /önem 9\/10[\s\S]*Öneri/)
+  assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkar'), /Öne çıkarıldı/)
+  cookie = ''
+  assert.match((await get('/')).html, /Öne çıkanlar[\s\S]*★ Öne çıkan[\s\S]*Kediler Neden Çok Uyur/)
+  cookie = savedCookie
+  assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkanlardan kaldır'), /kaldırıldı/)
+  assert.match((await get('/')).html, /Okuma köşesi/)
 })
 
 test('yazıyı abonelere gönder (Künye)', async () => {
@@ -205,7 +217,9 @@ test('yazıyı abonelere gönder (Künye)', async () => {
   const sent = kunyeRequests[0]
   assert.equal(sent.auth, 'Bearer kunye-anahtari')
   assert.equal(sent.body.subject, 'Kediler Neden Çok Uyur?')
-  assert.match(sent.body.message, /Kediler günde 15 saat uyuyor\.\n\[Detaylar →\]\(https:\/\/blog\.example\.com\/yazi\/kediler-neden-cok-uyur\)/)
+  assert.match(sent.body.message, /Uzay<\/span>\n\*\*\[Kediler Neden Çok Uyur\?\]\(https:\/\/blog\.example\.com\/yazi\/kediler-neden-cok-uyur\)\*\*\nKediler günde 15 saat uyuyor\.\n\[Devamını oku →\]/)
+  assert.match(sent.body.message, /<a href="https:\/\/blog\.example\.com" class="cta-button">/, 'site linki tıklanabilir buton')
+  assert.equal(sent.body.fromName, 'Test Blog', 'gönderen adı blogun adı')
   assert.ok(new Date(sent.body.sendAt).getTime() > Date.now(), 'gelecekte bir zamana planlanmalı')
   assert.match(await submit(digestPath, 'Sil'), /silindi/)
 

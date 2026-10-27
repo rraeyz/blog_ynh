@@ -71,7 +71,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: { m
           <div>
             <label className="label" htmlFor="interests">İlgi alanları</label>
             <textarea id="interests" name="interests" defaultValue={s.interests} rows={2} className="input" placeholder="büyük dil modelleri, robotik, tıpta yapay zekâ" />
-            <p className="hint">Doluysa her gün yeni makalelerin başlıklarından bunlara en uygun olanları model seçer; boşsa en yeniler alınır.</p>
+            <p className="hint">Model her gün yeni makalelerin başlık ve özetlerine bakıp en önemlilerini seçer (yeni ve somut sonuç, etkisi büyük, genel okuru ilgilendiren). Burası doluysa eşit önemdekilerde bu konular öne alınır.</p>
           </div>
         </fieldset>
 

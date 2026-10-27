@@ -66,6 +66,9 @@ model Post {
   title        String
   excerpt      String    @default("") // Kısa gelişme metni: sitenin başında ve bültende görünür
   highlights   String    @default("") // "Kısaca" kutusu: satır başına bir madde
+  category     String    @default("") // Konu sekmesi (lib/topics.ts CATEGORIES); yazan model seçer
+  importance   Int       @default(0) // Modelin önem puanı (1-10): bülten seçimi ve öne çıkarma önerisi
+  featuredAt   DateTime? // Öne çıkanlarda (en fazla 10; yenisi eklenince en eskisi düşer)
   body         String // Markdown (lib/markdown.ts)
   status       String    @default("draft") // draft | published
   publishedAt  DateTime?

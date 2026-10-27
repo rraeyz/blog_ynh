@@ -3,6 +3,10 @@ import { complete } from '@/lib/ai'
 import { paperText } from '@/lib/papers'
 import { extractJson, slugify } from '@/lib/text'
 import { addUsage, overBudget, type Settings } from '@/lib/state'
+import { CATEGORIES } from '@/lib/topics'
+
+// Öne çıkanlara alınması önerilen en düşük önem puanı (panelde rozet)
+export const FEATURE_SUGGESTION = 8
 
 const SYSTEM = `Sen Türkçe yazan bir bilim iletişimcisisin. Sana bir makalenin bilgileri ve metni verilecek.
 Bu makaleyi teknik olmayan ama meraklı bir okur için Türkçe anlat.
@@ -19,9 +23,11 @@ Kurallar:
   - Önemli terimleri ve sayıları **kalın** yaz. Sıralanabilen şeyleri "- " ile listele.
   - En çarpıcı bulguyu "> " ile başlayan tek satırlık bir vurgu olarak "Ne yaptılar?" bölümüne koy.
   - Her başlıktan önce ve sonra boş satır bırak.
+- "category": şu anahtarlardan en uygun olanı: ${Object.entries(CATEGORIES).map(([key, c]) => `${key} (${c.hint})`).join(', ')}.
+- "importance": 1-10 arası tam sayı, gelişmenin önemi. 9-10: alanında çığır açan ya da geniş kitleyi doğrudan ilgilendiren; 6-8: somut, yeni ve dikkat çekici bir sonuç; 3-5: sağlam ama sıradan bir adım; 1-2: küçük bir iyileştirme. Cömert olma.
 
 Yanıtı yalnızca şu JSON biçiminde ver, başka hiçbir şey yazma:
-{"title": "...", "brief": "...", "highlights": ["...", "...", "..."], "body": "..."}`
+{"title": "...", "brief": "...", "highlights": ["...", "...", "..."], "body": "...", "category": "...", "importance": 5}`
 
 async function uniqueSlug(title: string): Promise<string> {
   const base = slugify(title) || 'yazi'
@@ -40,7 +46,7 @@ export async function writePost(paperId: number, settings: Settings, publish = s
     const user = `Başlık: ${paper.title}\nYazarlar: ${paper.authors || '-'}\nLink: ${paper.url}\n\nMetin:\n${text}`
     const result = await complete(settings, SYSTEM, user)
     await addUsage(result.inputTokens, result.outputTokens)
-    const data = extractJson(result.text) as { title?: unknown; brief?: unknown; excerpt?: unknown; highlights?: unknown; body?: unknown }
+    const data = extractJson(result.text) as { title?: unknown; brief?: unknown; excerpt?: unknown; highlights?: unknown; body?: unknown; category?: unknown; importance?: unknown }
     if (typeof data.title !== 'string' || typeof data.body !== 'string' || !data.title.trim() || !data.body.trim()) {
       throw new Error('Model beklenen biçimde yanıt vermedi')
     }
@@ -49,6 +55,8 @@ export async function writePost(paperId: number, settings: Settings, publish = s
       excerpt: String(typeof data.brief === 'string' ? data.brief : typeof data.excerpt === 'string' ? data.excerpt : '').trim().slice(0, 500),
       highlights: Array.isArray(data.highlights) ? data.highlights.filter((h): h is string => typeof h === 'string').map((h) => h.trim().replace(/\n/g, ' ')).filter(Boolean).slice(0, 5).join('\n') : '',
       body: data.body.trim(),
+      category: typeof data.category === 'string' && CATEGORIES[data.category] ? data.category : '',
+      importance: Math.min(10, Math.max(0, Math.round(Number(data.importance)) || 0)),
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
     }
@@ -72,15 +80,19 @@ export async function writePost(paperId: number, settings: Settings, publish = s
   }
 }
 
-// İlgi alanı girilmişse model en uygun n makaleyi seçer (yalnızca başlıklar gider, ucuz); yoksa en yeniler
-export async function selectPapers(candidates: Array<{ id: number; title: string }>, settings: Settings, n: number): Promise<number[]> {
-  if (candidates.length <= n || !settings.interests.trim()) return candidates.slice(0, n).map((paper) => paper.id)
-  const list = candidates.map((paper, index) => `${index + 1}. ${paper.title}`).join('\n')
-  const result = await complete(
-    settings,
-    'Bir bülten editörüsün. Verilen makale başlıklarından okurun ilgi alanlarına en uygun olanları seç. Yalnızca seçtiğin numaraları JSON dizi olarak yaz, örn. [3, 1, 7].',
-    `İlgi alanları: ${settings.interests}\nSeçilecek sayı: ${n}\n\nMakaleler:\n${list}`,
-  )
+const SELECT = `Bir bilim editörüsün. Verilen makale ve haberlerden en önemlilerini seç:
+- yeni ve somut bir sonuç (keşif, icat, ölçüm, yeni yöntem) içerenler,
+- alanında ya da günlük hayatta etkisi büyük olanlar,
+- meraklı ama uzman olmayan bir okuru ilgilendirecek olanlar.
+Küçük iyileştirmeleri, birbirinin tekrarı olanları ve yalnızca dar bir uzman kitleyi ilgilendirenleri seçme; eşit önemdeyse farklı konulardan seç.
+Yalnızca seçtiğin numaraları önem sırasıyla JSON dizi olarak yaz, örn. [3, 1, 7].`
+
+// Model en önemli n makaleyi seçer; başlık ve özetin başı gider (makale başına ~60 token)
+export async function selectPapers(candidates: Array<{ id: number; title: string; abstract: string }>, settings: Settings, n: number): Promise<number[]> {
+  if (candidates.length <= n) return candidates.map((paper) => paper.id)
+  const list = candidates.map((paper, index) => `${index + 1}. ${paper.title}\n   ${paper.abstract.replace(/\s+/g, ' ').slice(0, 220)}`).join('\n')
+  const interests = settings.interests.trim() ? `Okurun ilgi alanları (eşit önemdekilerde bunlara öncelik ver): ${settings.interests}\n` : ''
+  const result = await complete(settings, SELECT, `${interests}Seçilecek sayı: ${n}\n\nMakaleler:\n${list}`)
   await addUsage(result.inputTokens, result.outputTokens)
   const picked = extractJson(result.text)
   if (!Array.isArray(picked)) throw new Error('Seçim yanıtı dizi değil')
@@ -93,12 +105,12 @@ export async function writeDaily(settings: Settings): Promise<{ written: number;
   const candidates = await prisma.paper.findMany({
     where: { status: 'new', createdAt: { gte: new Date(Date.now() - 3 * 24 * 3600_000) } },
     orderBy: { publishedAt: 'desc' },
-    select: { id: true, title: true },
+    select: { id: true, title: true, abstract: true },
   })
   const summary = { written: 0, failed: 0, skipped: 0, budget: false }
   if (candidates.length === 0 || settings.postsPerDay <= 0) return summary
   if (await overBudget(settings)) return { ...summary, budget: true }
-  // Modele en yeni 80 başlık gider (token için); seçilmeyenlerin hepsi atlanır, ertesi güne yığılmaz
+  // Modele en yeni 80 makalenin başlığı ve özetinin başı gider (token için); seçilmeyenlerin hepsi atlanır, ertesi güne yığılmaz
   const picked = await selectPapers(candidates.slice(0, 80), settings, settings.postsPerDay)
   for (const id of picked) {
     if (await overBudget(settings)) {

@@ -11,7 +11,19 @@ const LABELS: Record<string, string> = {
   'gr-qc': 'Kütleçekim', nlin: 'Karmaşık Sistemler', 'q-fin': 'Finans', 'nucl-th': 'Nükleer Fizik', 'nucl-ex': 'Nükleer Fizik',
 }
 
+// Sitedeki konu sekmeleri. Yazıyı yazan model birini seçer (Post.category); renkler sabit
+export const CATEGORIES: Record<string, { label: string; hue: number; hint: string }> = {
+  uzay: { label: 'Uzay', hue: 262, hint: 'astronomi, gezegenler, uzay görevleri, teleskoplar' },
+  fizik: { label: 'Fizik', hue: 220, hint: 'parçacık, kuantum, malzeme fiziği, enerji' },
+  teknoloji: { label: 'Teknoloji', hue: 188, hint: 'icatlar, mühendislik, donanım, sensörler, elektronik, robotik' },
+  'yapay-zeka': { label: 'Yapay Zekâ', hue: 292, hint: 'yapay zekâ, yazılım, bilgisayar bilimi, siber güvenlik' },
+  saglik: { label: 'Sağlık', hue: 330, hint: 'tıp, biyoloji, genetik, sinirbilim' },
+  dunya: { label: 'Dünya ve İklim', hue: 168, hint: 'iklim, çevre, yer bilimleri, ekoloji' },
+  bilim: { label: 'Bilim', hue: 18, hint: 'kimya, matematik ve diğer her şey' },
+}
+
 export function topicLabel(topic: string): string {
+  if (CATEGORIES[topic]) return CATEGORIES[topic].label
   if (!topic) return 'Makale'
   return LABELS[topic] ?? LABELS[topic.split('.')[0]] ?? topic.replace(/^www\./, '')
 }
@@ -21,6 +33,7 @@ export function topicLabel(topic: string): string {
 const PALETTE = [262, 292, 330, 220, 200, 188, 168, 240, 276, 18]
 
 export function topicHue(topic: string): number {
+  if (CATEGORIES[topic]) return CATEGORIES[topic].hue
   let hash = 0
   for (const ch of topicLabel(topic)) hash = (hash * 31 + ch.codePointAt(0)!) >>> 0
   return PALETTE[hash % PALETTE.length]

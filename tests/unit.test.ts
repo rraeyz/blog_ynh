@@ -11,6 +11,8 @@ test('konu etiketi, rengi, okuma süresi, dönem', () => {
   assert.equal(topicLabel('astro-ph.GA'), 'Astrofizik', 'alt kategori bilinmiyorsa arşiv adı')
   assert.equal(topicLabel('www.nature.com'), 'nature.com')
   assert.equal(topicLabel(''), 'Makale')
+  assert.equal(topicLabel('uzay'), 'Uzay', 'konu sekmesi')
+  assert.equal(topicHue('uzay'), 262, 'konu sekmelerinin rengi sabit')
   assert.equal(topicHue('hep-th'), topicHue('hep-ph'), 'aynı etiket aynı renk')
   assert.ok(topicHue('cs.AI') >= 0 && topicHue('cs.AI') < 360)
   assert.equal(readingMinutes('kelime '.repeat(450)), 2)
