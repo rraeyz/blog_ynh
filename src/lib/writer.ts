@@ -95,7 +95,10 @@ Yanıtı yalnızca şu JSON biçiminde ver: {"picked": [seçtiğin numaralar ön
 export async function selectPapers(candidates: Array<{ id: number; title: string; abstract: string }>, settings: Settings, n: number): Promise<number[]> {
   if (candidates.length <= n) return candidates.map((paper) => paper.id)
   const list = candidates.map((paper, index) => `${index + 1}. ${paper.title}\n   ${paper.abstract.replace(/\s+/g, ' ').slice(0, 220)}`).join('\n')
-  const interests = settings.interests.trim() ? `Okurun ilgi alanları (eşit önemdekilerde bunlara öncelik ver): ${settings.interests}\n` : ''
+  // İlgi alanları öncelik verir (baştaki en çok); ama konusu uyan sıradan bir haber önemli bir haberin önüne geçmez
+  const interests = settings.interests.trim()
+    ? `Okurun öncelikli ilgi alanları (baştaki en öncelikli): ${settings.interests}\nBu alanlardaki somut ve yeni gelişmeleri, biraz daha az önemli olsalar bile öne al ve puanlarını buna göre ver; ama sıradan bir haberi yalnızca konusu uyuyor diye seçme.\n`
+    : ''
   const result = await complete(settings, SELECT, `${interests}Seçilecek sayı: ${n}\n\nMakaleler:\n${list}`)
   await addUsage(result.inputTokens, result.outputTokens)
   const { picked, scores } = parseSelection(result.text, candidates.length, n)
