@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { getSettings } from '@/lib/state'
 import { canSubscribe } from '@/lib/newsletter'
+import { activeTopics, TopicLink } from './parts'
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
-  const settings = await getSettings()
+  const [settings, topics] = await Promise.all([getSettings(), activeTopics()])
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-30 border-b border-zinc-200/70 dark:border-ink-line bg-paper/80 dark:bg-ink/75 backdrop-blur-xl">
@@ -19,6 +20,14 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
           </nav>
         </div>
       </header>
+      {topics.length > 0 && (
+        // Konu sayfaları: yalnızca bir konuyu okumak isteyen için; telefonda yana kayar
+        <nav aria-label="Konular" className="border-b border-zinc-200/70 dark:border-ink-line">
+          <div className="mx-auto max-w-5xl px-4 py-2.5 flex gap-2 overflow-x-auto">
+            {topics.map(([key, c]) => <TopicLink key={key} slug={key} label={c.label} />)}
+          </div>
+        </nav>
+      )}
       <main className="flex-1">{children}</main>
       <footer className="border-t border-zinc-200/70 dark:border-ink-line mt-20">
         <div className="mx-auto max-w-5xl px-4 py-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-500">

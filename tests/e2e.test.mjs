@@ -204,9 +204,12 @@ test('makale → taslak yazı → yayın', async () => {
   assert.match(page.html, /Kısaca[\s\S]*Uyku enerji saklar[\s\S]*Avcılık için gerekli/)
   const home = (await get('/')).html
   assert.match(home, /Yeni gelişmeler[\s\S]*Kediler Neden Çok Uyur\?[\s\S]*Kediler günde 15 saat uyuyor\.[\s\S]*Detaylar/)
-  assert.match(home, /href="\/\?konu=uzay#yazilar"[^>]*>Uzay</, 'konusu olan yazı sekme açar')
-  assert.match((await get('/?konu=uzay')).html, /Kediler Neden Çok Uyur/)
-  assert.match((await get('/?konu=saglik')).html, /Bu konuda henüz yazı yok/)
+  assert.match(home, /aria-label="Konular"[\s\S]*?href="\/konu\/uzay"[\s\S]*?Uzay</, 'konusu olan yazı üst menüde konu bağlantısı açar')
+  assert.doesNotMatch(home, /href="\/konu\/saglik"/, 'yazısı olmayan konu menüde görünmez')
+  const topic = (await get('/konu/uzay')).html
+  assert.match(topic, /<h1[^>]*>Uzay<\/h1>[\s\S]*1(<!-- -->)? yazı[\s\S]*Kediler Neden Çok Uyur/)
+  assert.match((await get('/konu/saglik')).html, /Bu konuda henüz yazı yok/)
+  assert.equal((await get('/konu/olmayan')).status, 404)
   const rss = await get('/rss.xml')
   assert.match(rss.html, /<link>https:\/\/blog\.example\.com\/yazi\/kediler-neden-cok-uyur<\/link>/)
   cookie = savedCookie
