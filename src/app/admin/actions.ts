@@ -11,6 +11,7 @@ import { parseSourceUrl } from '@/lib/arxiv'
 import { addPaperFromUrl, readSource } from '@/lib/papers'
 import { writePost } from '@/lib/writer'
 import { createWeeklyDigest, digestBody, sendDigest } from '@/lib/newsletter'
+import { CATEGORIES } from '@/lib/topics'
 import { dailyTask, isJobRunning, runExclusive, weeklyTask } from '@/lib/jobs'
 import { PROVIDERS } from '@/lib/ai'
 
@@ -198,7 +199,8 @@ export async function savePostAction(form: FormData) {
   const body = text(form, 'body')
   if (!title || !body) back(`/admin/yazilar/${postId}`, 'Başlık ve gövde boş olamaz')
   const highlights = text(form, 'highlights').split('\n').map((line) => line.trim()).filter(Boolean).slice(0, 5).join('\n')
-  await prisma.post.update({ where: { id: postId }, data: { title: title.slice(0, 300), excerpt: text(form, 'excerpt').slice(0, 500), highlights, body } })
+  const category = CATEGORIES[text(form, 'category')] ? text(form, 'category') : ''
+  await prisma.post.update({ where: { id: postId }, data: { title: title.slice(0, 300), excerpt: text(form, 'excerpt').slice(0, 500), highlights, body, category } })
   back(`/admin/yazilar/${postId}`, 'Kaydedildi')
 }
 
@@ -206,8 +208,26 @@ export async function publishPostAction(form: FormData) {
   await requireAdmin()
   const post = await prisma.post.findUniqueOrThrow({ where: { id: id(form) } })
   const publish = post.status !== 'published'
-  await prisma.post.update({ where: { id: post.id }, data: { status: publish ? 'published' : 'draft', publishedAt: publish ? post.publishedAt ?? new Date() : post.publishedAt } })
+  await prisma.post.update({ where: { id: post.id }, data: { status: publish ? 'published' : 'draft', publishedAt: publish ? post.publishedAt ?? new Date() : post.publishedAt, featuredAt: publish ? post.featuredAt : null } })
   back(`/admin/yazilar/${post.id}`, publish ? 'Yayımlandı' : 'Yayından kaldırıldı')
+}
+
+const MAX_FEATURED = 10
+
+// Öne çıkanlara al ya da çıkar. En fazla 10: yenisi eklenince en eski öne çıkan düşer (yazı yayında kalır)
+export async function featurePostAction(form: FormData) {
+  await requireAdmin()
+  const post = await prisma.post.findUniqueOrThrow({ where: { id: id(form) } })
+  const path = text(form, 'from') === 'list' ? '/admin/yazilar' : `/admin/yazilar/${post.id}`
+  if (post.featuredAt) {
+    await prisma.post.update({ where: { id: post.id }, data: { featuredAt: null } })
+    back(path, 'Öne çıkanlardan kaldırıldı')
+  }
+  if (post.status !== 'published') back(path, 'Önce yazıyı yayımla')
+  await prisma.post.update({ where: { id: post.id }, data: { featuredAt: new Date() } })
+  const dropped = await prisma.post.findMany({ where: { featuredAt: { not: null } }, orderBy: { featuredAt: 'desc' }, skip: MAX_FEATURED, select: { id: true, title: true } })
+  await prisma.post.updateMany({ where: { id: { in: dropped.map((p) => p.id) } }, data: { featuredAt: null } })
+  back(path, dropped.length ? `Öne çıkarıldı; "${dropped[0].title}" öne çıkanlardan düştü` : 'Öne çıkarıldı')
 }
 
 // Eski biçimde yazılmış (ya da beğenilmeyen) yazıyı aynı makaleden yeniden yazdırır; adresi ve yayın durumu değişmez

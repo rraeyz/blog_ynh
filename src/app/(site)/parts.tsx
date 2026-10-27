@@ -12,11 +12,13 @@ export type PostItem = {
   body: string
   publishedAt: Date | null
   createdAt: Date
+  category: string
   paper: { topic: string } | null
 }
 
 const DAYS = ['pazar', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi']
-const topicOf = (post: PostItem) => post.paper?.topic ?? ''
+// Konu sekmesi; konusu seçilmemiş eski yazılarda makalenin arXiv kategorisi ya da sitesi
+export const topicOf = (post: Pick<PostItem, 'category' | 'paper'>) => post.category || post.paper?.topic || ''
 export const postDate = (post: PostItem) => (post.publishedAt ?? post.createdAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })
 
 // Görseli olmayan yazılar için konuya göre renkli, yazıya göre biraz kayan soyut kapak
@@ -52,12 +54,12 @@ const Meta = ({ post, light }: { post: PostItem; light?: boolean }) => (
   <p className={`text-xs ${light ? 'text-white/70' : 'text-zinc-500'}`}>{postDate(post)} · {readingMinutes(post.body)} dk okuma</p>
 )
 
-// Öne çıkan (en yeni) yazı: büyük kapak, iki sütun
-export function FeaturedPost({ post }: { post: PostItem }) {
+// Büyük kapaklı, iki sütunlu kart (öne çıkanların ilki ya da en yeni yazı)
+export function FeaturedPost({ post, badge }: { post: PostItem; badge: string }) {
   return (
     <Link href={`/yazi/${post.slug}`} className="group grid md:grid-cols-5 overflow-hidden rounded-3xl bg-white dark:bg-ink-card border border-zinc-200 dark:border-ink-line shadow-sm hover:shadow-xl hover:shadow-violet-500/10 transition">
       <div className="md:col-span-3 min-h-56 md:min-h-80 relative p-6 flex flex-col justify-between" style={coverStyle(topicOf(post), post.slug)}>
-        <span className="self-start rounded-full bg-black/30 backdrop-blur px-3 py-1 text-xs font-semibold text-white">✦ En yeni</span>
+        <span className="self-start rounded-full bg-black/30 backdrop-blur px-3 py-1 text-xs font-semibold text-white">{badge}</span>
         <div className="self-start"><TopicChip topic={topicOf(post)} light /></div>
       </div>
       <div className="md:col-span-2 p-6 md:p-8 flex flex-col justify-center gap-3">

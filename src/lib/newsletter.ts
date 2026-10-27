@@ -1,24 +1,53 @@
 import { prisma } from '@/lib/prisma'
 import { logJob, type Settings } from '@/lib/state'
+import { topicLabel } from '@/lib/topics'
 
-// Bülten metni Künye'nin e-posta biçiminde: **kalın**, [link](url), satır sonları
-export function digestBody(posts: Array<{ title: string; excerpt: string; slug: string }>, siteUrl: string): string {
+// Bültene en fazla bu kadar yazı girer; fazlası varsa öne çıkanlar ve önem puanı yüksek olanlar seçilir
+export const DIGEST_MAX = 7
+
+type DigestPost = { title: string; excerpt: string; slug: string; category: string; paper?: { topic: string } | null }
+
+// Yapay zekâ çıktısı e-postaya HTML olarak girer (Künye ham HTML'e izin veriyor): önce kaçışlanır.
+// Köşeli parantez Künye'nin [metin](link) biçimini bozmasın diye normal paranteze döner
+const escapeMail = (value: string) =>
+  value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/\[/g, '(').replace(/\]/g, ')').replace(/\s+/g, ' ').trim()
+
+// Bülten metni Künye'nin e-posta biçiminde: paragraflar boş satırla, **kalın**, [link](url) ve ham HTML.
+// Her gelişme numaralı ve konusu renkli; okur hepsine göz gezdirir, merak ettiğine tıklar
+export function digestBody(posts: DigestPost[], siteUrl: string, total = posts.length): string {
   const base = siteUrl.replace(/\/+$/, '')
-  // Kısa gelişme + detay linki: okur hepsine göz gezdirir, merak ettiğine tıklar
-  const items = posts.map((post) => `**${post.title}**\n${post.excerpt}\n[Detaylar →](${base}/yazi/${post.slug})`)
-  const intro = posts.length === 1 ? 'Önemli bir gelişme var:' : `Bu haftanın ${posts.length} gelişmesi; merak ettiğinin detayı bir tık uzakta:`
-  return [intro, ...items, `Tüm gelişmeler: ${base}`].join('\n\n')
+  const items = posts.map((post, i) => {
+    const url = `${base}/yazi/${post.slug}`
+    const topic = post.category || post.paper?.topic
+    const label = `${posts.length > 1 ? `${i + 1}${topic ? ' · ' : ''}` : ''}${topic ? topicLabel(topic) : ''}`
+    return [
+      label && `<span style="color:#8b5cf6;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase">${label}</span>`,
+      `**[${escapeMail(post.title)}](${url})**`,
+      post.excerpt && escapeMail(post.excerpt),
+      `[Devamını oku →](${url})`,
+    ].filter(Boolean).join('\n')
+  })
+  const intro = posts.length === 1
+    ? 'Önemli bir gelişme var:'
+    : total > posts.length
+      ? `Bu hafta ${total} gelişme vardı; en dikkat çekici ${posts.length} tanesi:`
+      : `Bu haftanın ${posts.length} gelişmesi; merak ettiğinin detayı bir tık uzakta:`
+  return [intro, ...items, `<a href="${base}" class="cta-button">Bütün gelişmeleri sitede oku</a>`].join('\n\n')
 }
 
-// Son 7 günde yayımlanan yazılardan taslak bülten (yazı yoksa null)
+// Son 7 günde yayımlanan yazılardan taslak bülten (yazı yoksa null): önce öne çıkanlar, sonra önem puanı
 export async function createWeeklyDigest(settings: Settings) {
   const posts = await prisma.post.findMany({
     where: { status: 'published', publishedAt: { gte: new Date(Date.now() - 7 * 24 * 3600_000) } },
-    orderBy: { publishedAt: 'desc' },
+    orderBy: [{ featuredAt: { sort: 'desc', nulls: 'last' } }, { importance: 'desc' }, { publishedAt: 'desc' }],
+    include: { paper: { select: { topic: true } } },
   })
   if (posts.length === 0) return null
+  const chosen = posts.slice(0, DIGEST_MAX)
   const date = new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })
-  return prisma.digest.create({ data: { subject: `${settings.siteTitle} · ${date} haftası`, body: digestBody(posts, settings.siteUrl) } })
+  // Gönderen adı zaten blogun adı (sendDigest); konu satırı en önemli gelişmeyle merak uyandırır
+  const subject = `${date} haftası: ${chosen[0].title}${posts.length > 1 ? ` ve ${posts.length - 1} gelişme daha` : ''}`
+  return prisma.digest.create({ data: { subject: subject.slice(0, 300), body: digestBody(chosen, settings.siteUrl, posts.length) } })
 }
 
 export const canSubscribe = (settings: Settings) => !!settings.kunyeUrl.trim() && !!settings.kunyeToken.trim()
@@ -57,7 +86,8 @@ export async function sendDigest(id: number, settings: Settings): Promise<void> 
     const response = await fetch(`${kunyeUrl}/api/admin/scheduled-newsletters`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.kunyeToken.trim()}` },
-      body: JSON.stringify({ subject: digest.subject, message: digest.body, sendAt: new Date(Date.now() + 120_000).toISOString(), tag: settings.newsletterTag }),
+      // fromName: gelen kutusunda Künye'nin "Destek" adı yerine blogun adı görünür
+      body: JSON.stringify({ subject: digest.subject, message: digest.body, sendAt: new Date(Date.now() + 120_000).toISOString(), tag: settings.newsletterTag, fromName: settings.siteTitle }),
       signal: AbortSignal.timeout(30_000),
     })
     const data = await response.json().catch(() => ({}))

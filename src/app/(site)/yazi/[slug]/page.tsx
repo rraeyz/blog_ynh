@@ -6,7 +6,7 @@ import { isAdmin } from '@/lib/auth'
 import { getSettings } from '@/lib/state'
 import { headings, inline, renderMarkdown } from '@/lib/markdown'
 import { readingMinutes, topicHue } from '@/lib/topics'
-import { CardPost, coverStyle, postDate, SubscribeBox, TopicChip } from '../../parts'
+import { CardPost, coverStyle, postDate, SubscribeBox, TopicChip, topicOf } from '../../parts'
 import { ReadingProgress } from './ReadingProgress'
 
 // Taslak yazıyı yalnızca giriş yapmış yönetici görebilir (önizleme)
@@ -38,7 +38,7 @@ export default async function PostPage({ params }: { params: { slug: string } })
       include: { paper: { select: { topic: true } } },
     }),
   ])
-  const topic = post.paper?.topic ?? ''
+  const topic = topicOf(post)
   const highlights = post.highlights.split('\n').filter(Boolean)
   const toc = headings(post.body)
   // Yazının rengi konusundan: Kısaca kutusu, bölüm rozetleri, vurgu ve kalın terimler bu tonda

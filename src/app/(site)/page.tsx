@@ -2,35 +2,44 @@ import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { getSettings } from '@/lib/state'
 import { canSubscribe } from '@/lib/newsletter'
-import { periodLabel, topicHue } from '@/lib/topics'
-import { CardPost, FeaturedPost, postDate, RowPost, SubscribeBox, TopicChip, type PostItem } from './parts'
+import { CATEGORIES, periodLabel, topicHue } from '@/lib/topics'
+import { CardPost, FeaturedPost, postDate, RowPost, SubscribeBox, TopicChip, topicOf, type PostItem } from './parts'
 
 const PAGE_SIZE = 24
 
-export default async function HomePage({ searchParams }: { searchParams: { sayfa?: string } }) {
+export default async function HomePage({ searchParams }: { searchParams: { sayfa?: string; konu?: string } }) {
   const page = Math.max(1, Number(searchParams.sayfa) || 1)
-  const [settings, posts, weekCount] = await Promise.all([
+  const konu = searchParams.konu && CATEGORIES[searchParams.konu] ? searchParams.konu : ''
+  const published = { status: 'published' }
+  const include = { paper: { select: { topic: true } } }
+  const [settings, posts, latest, picked, counts, weekCount] = await Promise.all([
     getSettings(),
     prisma.post.findMany({
-      where: { status: 'published' },
+      where: { ...published, ...(konu ? { category: konu } : {}) },
       orderBy: { publishedAt: 'desc' },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE + 1,
-      include: { paper: { select: { topic: true } } },
+      include,
     }),
-    prisma.post.count({ where: { status: 'published', publishedAt: { gte: new Date(Date.now() - 7 * 86_400_000) } } }),
+    prisma.post.findMany({ where: published, orderBy: { publishedAt: 'desc' }, take: 5, include }),
+    prisma.post.findMany({ where: { ...published, featuredAt: { not: null } }, orderBy: { featuredAt: 'desc' }, take: 10, include }),
+    prisma.post.groupBy({ by: ['category'], where: published, _count: true }),
+    prisma.post.count({ where: { ...published, publishedAt: { gte: new Date(Date.now() - 7 * 86_400_000) } } }),
   ])
-  const shown: PostItem[] = posts.slice(0, PAGE_SIZE)
   const first = page === 1
-  const news = first ? shown.slice(0, 5) : []
-  // İlk sayfa: en yeni yazı büyük, sonraki ikisi orta boy, kalanı liste. Diğer sayfalar yalnızca liste
-  const featured = first ? shown[0] : undefined
-  const pair = first ? shown.slice(1, 3) : []
-  const rest = first ? shown.slice(3) : shown
+  // Yeni gelişmeler hep en yeni 5 yazı: eskiler buradan düşer, arşivde ve sekmelerde kalır
+  const news: PostItem[] = first ? latest : []
+  // Öne çıkanlar elle seçilir; hiç yoksa en yeni üç yazı "Okuma köşesi" olur
+  const highlight: PostItem[] = !first ? [] : picked.length > 0 ? picked : latest.slice(0, 3)
+  const tabs = Object.entries(CATEGORIES).filter(([key]) => counts.some((c) => c.category === key && c._count > 0))
+  const tabHref = (key: string, p = 1) => {
+    const query = new URLSearchParams({ ...(key ? { konu: key } : {}), ...(p > 1 ? { sayfa: String(p) } : {}) }).toString()
+    return `/${query ? `?${query}` : ''}#yazilar`
+  }
 
-  // Kalan yazılar zaman dilimlerine ayrılır: "Bu hafta", "Geçen hafta", "Ekim 2026"...
+  // Yazılar zaman dilimlerine ayrılır: "Bu hafta", "Geçen hafta", "Ekim 2026"...
   const groups: Array<[string, PostItem[]]> = []
-  for (const post of rest) {
+  for (const post of posts.slice(0, PAGE_SIZE)) {
     const label = periodLabel(post.publishedAt ?? post.createdAt)
     const last = groups[groups.length - 1]
     if (last?.[0] === label) last[1].push(post)
@@ -72,8 +81,8 @@ export default async function HomePage({ searchParams }: { searchParams: { sayfa
               <ol className="mt-6 space-y-6 border-l border-zinc-200 dark:border-ink-line ml-1.5">
                 {news.map((post) => (
                   <li key={post.id} className="relative pl-6">
-                    <span aria-hidden className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-white dark:ring-ink-card" style={{ background: `hsl(${topicHue(post.paper?.topic ?? '')} 80% 60%)` }} />
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500"><TopicChip topic={post.paper?.topic ?? ''} />{postDate(post)}</div>
+                    <span aria-hidden className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-white dark:ring-ink-card" style={{ background: `hsl(${topicHue(topicOf(post))} 80% 60%)` }} />
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500"><TopicChip topic={topicOf(post)} />{postDate(post)}</div>
                     <p className="mt-2 leading-relaxed text-zinc-800 dark:text-zinc-200">
                       <strong className="font-semibold text-zinc-900 dark:text-white">{post.title}</strong>
                       {post.excerpt && <span className="text-zinc-600 dark:text-zinc-400"> — {post.excerpt}</span>}
@@ -87,35 +96,59 @@ export default async function HomePage({ searchParams }: { searchParams: { sayfa
         </section>
       )}
 
-      <div id="yazilar" className="scroll-mt-24 space-y-6">
-        {featured && <h2 className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">Okuma köşesi</h2>}
-        {!featured && rest.length === 0 && (
-          <p className="rounded-3xl border border-dashed border-zinc-300 dark:border-ink-line p-10 text-center text-zinc-500">İlk yazılar hazırlanıyor. Bültene abone olursan ilk sen haberdar olursun.</p>
-        )}
-        {featured && <FeaturedPost post={featured} />}
-        {pair.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-5">
-            {pair.map((post, i) => (
-              <div key={post.id} className={i === 0 ? 'md:col-span-3' : 'md:col-span-2'}>
-                <CardPost post={post} tall={i === 0} />
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {highlight.length > 0 && (
+        <section className="space-y-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">{picked.length > 0 ? 'Öne çıkanlar' : 'Okuma köşesi'}</h2>
+          <FeaturedPost post={highlight[0]} badge={picked.length > 0 ? '★ Öne çıkan' : '✦ En yeni'} />
+          {highlight.length > 1 && (
+            // Kalanlar yana kayan bir katalog: telefonda parmakla, masaüstünde kaydırma çubuğuyla
+            <div className="-mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-3 md:mx-0 md:px-0">
+              {highlight.slice(1).map((post, i) => (
+                <div key={post.id} className="w-72 shrink-0 snap-start md:w-80">
+                  <CardPost post={post} tall={i % 3 === 0} />
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {first && <div className="my-12"><SubscribeBox settings={settings} /></div>}
 
-      {groups.map(([label, items]) => (
-        <section key={label} className="grid md:grid-cols-[160px_1fr] gap-x-8 gap-y-2 py-6 border-t border-zinc-200/70 dark:border-ink-line">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300 md:sticky md:top-24 self-start pt-3">{label}</h2>
-          <div className="space-y-1">{items.map((post) => <RowPost key={post.id} post={post} />)}</div>
-        </section>
-      ))}
+      <section id="yazilar" className="scroll-mt-20 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-semibold">Yazılar</h2>
+          {tabs.length > 0 && (
+            <nav aria-label="Konular" className="flex flex-wrap gap-2">
+              {[['', 'Tümü'] as const, ...tabs.map(([key, c]) => [key, c.label] as const)].map(([key, label]) => (
+                <Link
+                  key={key}
+                  href={tabHref(key)}
+                  aria-current={konu === key ? 'page' : undefined}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${konu === key ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900' : 'border border-zinc-300 dark:border-ink-line hover:border-violet-500'}`}
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+          )}
+        </div>
+        {groups.length === 0 && (
+          <p className="mt-6 rounded-3xl border border-dashed border-zinc-300 dark:border-ink-line p-10 text-center text-zinc-500">
+            {konu ? 'Bu konuda henüz yazı yok.' : 'İlk yazılar hazırlanıyor. Bültene abone olursan ilk sen haberdar olursun.'}
+          </p>
+        )}
+        {groups.map(([label, items]) => (
+          <div key={label} className="grid md:grid-cols-[160px_1fr] gap-x-8 gap-y-2 py-6 border-t border-zinc-200/70 dark:border-ink-line first:mt-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300 md:sticky md:top-24 self-start pt-3">{label}</h3>
+            <div className="space-y-1">{items.map((post) => <RowPost key={post.id} post={post} />)}</div>
+          </div>
+        ))}
+      </section>
 
       <nav className="mt-10 flex justify-between text-sm">
-        {page > 1 ? <Link href={`/?sayfa=${page - 1}`} className="rounded-full border border-zinc-300 dark:border-ink-line px-4 py-2 hover:border-violet-500">← Daha yeni</Link> : <span />}
-        {posts.length > PAGE_SIZE && <Link href={`/?sayfa=${page + 1}`} className="rounded-full border border-zinc-300 dark:border-ink-line px-4 py-2 hover:border-violet-500">Daha eski →</Link>}
+        {page > 1 ? <Link href={tabHref(konu, page - 1)} className="rounded-full border border-zinc-300 dark:border-ink-line px-4 py-2 hover:border-violet-500">← Daha yeni</Link> : <span />}
+        {posts.length > PAGE_SIZE && <Link href={tabHref(konu, page + 1)} className="rounded-full border border-zinc-300 dark:border-ink-line px-4 py-2 hover:border-violet-500">Daha eski →</Link>}
       </nav>
     </div>
   )
