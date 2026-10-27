@@ -20,7 +20,7 @@ Bilim haberlerini ve makaleleri (RSS/arXiv) çeker, yapay zekâyla Türkçe anla
 | İş | Sıklık | Yaklaşık |
 |---|---|---|
 | Haber yazıları (ör. Claude Haiku) | günde 5 | ayda 1-2 $ |
-| Ders (araştırma + yazım + denetim, ör. Claude Sonnet) | haftada 3 | ders başına 0,35-0,50 $ |
+| Ders (araştırma + yazım + denetim, ör. Claude Sonnet) | haftada 3 | ders başına 0,40-0,80 $ |
 | Gökyüzü takvimi | haftada 1 | 0,05-0,10 $ |
 | Kapak görseli | serbest görseli olmayan yazı başına | 0,01 $ |
 

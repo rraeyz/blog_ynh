@@ -116,7 +116,7 @@ function Section({ section, s }: { section: string; s: Settings }) {
     <>
       <p className="hint">
         Seçili günlerde günlük işten sonra sıradaki ders üç aşamada hazırlanır: web&apos;de araştırma, notlardan ders yazımı, notlarla karşılaştırmalı
-        denetim. Ders başına yaklaşık 0,35-0,50 $ (OpenRouter). Müfredat ve istekler Eğitim sayfasında.
+        denetim. Ders başına yaklaşık 0,40-0,80 $ (OpenRouter). Müfredat ve istekler Eğitim sayfasında.
       </p>
       <Field label="Ders modeli" id="lessonModel" hint="Araştırma, yazım ve denetimde kullanılır; doğruluk önemli olduğu için güçlü bir model (ör. anthropic/claude-sonnet-5.5).">
         <input id="lessonModel" name="lessonModel" defaultValue={s.lessonModel} className="input" />
