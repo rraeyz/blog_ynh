@@ -12,11 +12,16 @@ const PASSWORD = 'e2e-sifre-12345'
 
 // --- Sahte yapay zekâ (OpenAI uyumlu) + sahte Künye + örnek makale sayfası ---
 const kunyeRequests = []
+const subscribeRequests = []
 let aiCalls = 0
 const fake = http.createServer((req, res) => {
   let body = ''
   req.on('data', (chunk) => { body += chunk })
   req.on('end', () => {
+    if (req.url === '/feed.xml') {
+      res.writeHead(200, { 'Content-Type': 'application/rss+xml' })
+      return res.end('<rss><channel><item><title>Beslemeden yazı</title><link>http://127.0.0.1:3901/makale</link><description>Kısa</description></item></channel></rss>')
+    }
     if (req.url === '/makale') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       return res.end('<html><head><title>Örnek Makale</title></head><body><p>Bu makale kedilerin uykusunu inceliyor.</p></body></html>')
@@ -26,6 +31,12 @@ const fake = http.createServer((req, res) => {
       const content = JSON.stringify({ title: 'Kediler Neden Çok Uyur?', excerpt: 'Kısa özet.', body: 'Giriş.\n\n## Ne yaptılar?\n\n<script>alert(1)</script> **önemli**' })
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content: `İşte yazı:\n${content}` } }], usage: { prompt_tokens: 100, completion_tokens: 50 } }))
+    }
+    if (req.url === '/api/subscribe' && req.method === 'POST') {
+      const ok = req.headers.authorization === 'Bearer kunye-anahtari'
+      if (ok) subscribeRequests.push(JSON.parse(body))
+      res.writeHead(ok ? 200 : 401, { 'Content-Type': 'application/json' })
+      return res.end(JSON.stringify(ok ? { success: true, message: 'Bültene başarıyla abone oldunuz!' } : { error: 'Unauthorized' }))
     }
     if (req.url === '/api/admin/scheduled-newsletters' && req.method === 'POST') {
       kunyeRequests.push({ auth: req.headers.authorization, body: JSON.parse(body) })
@@ -47,16 +58,23 @@ async function get(path) {
   return { status: res.status, location: res.headers.get('location') || '', html: await res.text() }
 }
 
-// Sayfadaki formlardan `pick` ile eşleşeni bulup gönderir (gizli alanlar dahil). Yönlendirme adresini döner
-async function submit(path, pick, fields = {}) {
+const unescapeHtml = (text) => text.replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+
+// Sayfadaki formlardan `pick` ile eşleşeni bulup gönderir (gizli alanlar dahil)
+async function post(path, pick, fields = {}) {
   const page = await get(path)
   const forms = page.html.match(/<form[\s\S]*?<\/form>/g) || []
   const form = forms.find((f) => f.includes(pick))
   assert.ok(form, `${path} sayfasında "${pick}" formu yok`)
   const data = new FormData()
-  for (const [, name, value] of form.matchAll(/<input type="hidden" name="([^"]+)"(?: value="([^"]*)")?/g)) data.append(name, value ?? '')
+  for (const [, name, value] of form.matchAll(/<input type="hidden" name="([^"]+)"(?: value="([^"]*)")?/g)) data.append(name, unescapeHtml(value ?? ''))
   for (const [name, value] of Object.entries(fields)) data.set(name, value)
-  const res = await fetch(B + path, { method: 'POST', body: data, headers: cookie ? { cookie } : {}, redirect: 'manual' })
+  return fetch(B + path, { method: 'POST', body: data, headers: cookie ? { cookie } : {}, redirect: 'manual' })
+}
+
+// Form gönderir ve yönlendirme adresini döner (panel işlemleri)
+async function submit(path, pick, fields = {}) {
+  const res = await post(path, pick, fields)
   const setCookie = res.headers.get('set-cookie') || ''
   const session = setCookie.match(/blog-session=([^;]*)/)
   if (session) cookie = session[1] ? `blog-session=${session[1]}` : ''
@@ -122,10 +140,28 @@ test('ayarlar', async () => {
   assert.match(await submit('/admin/ayarlar', 'aiProvider', { ...SETTINGS, kunyeUrl: 'ftp://x' }), /http/)
 })
 
+test('abonelik kutusu (Künye üzerinden)', async () => {
+  const saved = cookie
+  cookie = ''
+  try {
+    const page = (await get('/')).html
+    assert.match(page, /id="abone"/, 'Künye bağlıyken kutu görünür')
+    const ask = async (fields) => (await (await post('/', 'sub-email', fields)).text())
+    assert.match(await ask({ email: 'gecersiz' }), /Geçerli bir e-posta/)
+    assert.match(await ask({ email: 'bot@example.com', website: 'spam' }), /Teşekkürler/)
+    assert.equal(subscribeRequests.length, 0, 'bot ve geçersiz adres Künye\'ye gitmez')
+    assert.match(await ask({ email: 'okur@example.com' }), /başarıyla abone oldunuz/)
+    assert.deepEqual(subscribeRequests, [{ email: 'okur@example.com', name: '', tag: 'Blog' }])
+  } finally {
+    cookie = saved
+  }
+})
+
 test('kaynak ekleme', async () => {
-  assert.match(await submit('/admin/kaynaklar', 'Kaynak ekle', { url: 'https://example.com/x' }), /kategori linki/)
-  assert.match(await submit('/admin/kaynaklar', 'Kaynak ekle', { url: 'https://arxiv.org/list/cs.AI/recent' }), /Eklendi: cs.AI/)
-  assert.match(await submit('/admin/kaynaklar', 'Kaynak ekle', { url: 'https://arxiv.org/list/cs.AI/recent' }), /zaten ekli/)
+  assert.match(await submit('/admin/kaynaklar', 'Kaynak ekle', { url: `${FAKE}/makale` }), /beslemesi bulunamadı/)
+  assert.match(await submit('/admin/kaynaklar', 'Kaynak ekle', { url: 'https://arxiv.org/abs/2510.12345' }), /tek bir makalenin/)
+  assert.match(await submit('/admin/kaynaklar', 'Kaynak ekle', { url: `${FAKE}/feed.xml` }), /Eklendi \(şu an 1 makale/)
+  assert.match(await submit('/admin/kaynaklar', 'Kaynak ekle', { url: `${FAKE}/feed.xml` }), /zaten ekli/)
 })
 
 let postId
@@ -173,6 +209,40 @@ test('yazıyı abonelere gönder (Künye)', async () => {
   const second = await submit('/admin/bultenler', 'Son 7 günden')
   const secondPath = second.match(/\/admin\/bultenler\/\d+/)[0]
   assert.match(await submit(secondPath, 'Abonelere gönder'), /API anahtarı geçersiz/)
+})
+
+test('tam yedek ve geri yükleme', async () => {
+  const download = async () => {
+    const res = await fetch(`${B}/api/admin/yedek`, { headers: cookie ? { cookie } : {} })
+    return { status: res.status, data: res.status === 200 ? await res.json() : null }
+  }
+  const saved = cookie
+  cookie = ''
+  assert.equal((await download()).status, 401, 'girişsiz yedek indirilemez')
+  cookie = saved
+
+  const { data: backup } = await download()
+  assert.equal(backup.format, 'blog-backup')
+  assert.ok(backup.posts.length >= 1 && backup.papers.length >= 1 && backup.sources.length >= 1)
+  assert.equal(backup.settings.aiModel, 'test-model')
+  assert.ok(!('passwordHash' in backup.settings), 'şifre yedeğe girmez')
+
+  const upload = async (content) => {
+    const data = new FormData()
+    data.append('file', new Blob([content], { type: 'application/json' }), 'yedek.json')
+    const res = await fetch(`${B}/api/admin/yedek`, { method: 'POST', body: data, headers: { cookie }, redirect: 'manual' })
+    return decodeURIComponent(res.headers.get('location') || '')
+  }
+  assert.match(await upload('{"x":1}'), /bu blogun yedeği değil/)
+  assert.match(await upload('bozuk'), /JSON değil/)
+  assert.match(await upload(JSON.stringify({ ...backup, posts: 'yok' })), /bozuk/)
+
+  // Yazıyı sil, yedekten geri getir
+  assert.match(await submit(`/admin/yazilar/${postId}`, 'Sil'), /silindi/)
+  assert.equal((await get(`/admin/yazilar/${postId}`)).status, 404)
+  assert.match(await upload(JSON.stringify(backup)), new RegExp(`Yedek yüklendi: ${backup.sources.length} kaynak, ${backup.papers.length} makale, ${backup.posts.length} yazı`))
+  assert.equal((await get(`/admin/yazilar/${postId}`)).status, 200, 'yazı geri gelmeli')
+  assert.equal((await get('/admin')).status, 200, 'oturum açık kalmalı')
 })
 
 test('yetkisiz form gönderimi reddedilir', async () => {

@@ -4,12 +4,14 @@ arXiv'den ya da verdiğin linklerden makaleleri çeker, yapay zekâyla Türkçe 
 
 ## Nasıl çalışır
 
-1. **Kaynaklar:** arXiv kategori linki eklersin (`https://arxiv.org/list/cs.AI/recent`, birden fazla için `cs.AI+cs.LG`). Her gün ayarlanan saatte yeni makaleler çekilir.
+1. **Kaynaklar:** İstediğin kadar kaynak: arXiv kategori ya da arşiv linki (`https://arxiv.org/list/cs.AI/recent`, `https://arxiv.org/archive/astro-ph`, birden fazla için `cs.AI+cs.LG`) ya da herhangi bir sitenin RSS/Atom beslemesi. Her gün ayarlanan saatte yeni makaleler çekilir.
 2. **Seçim:** İlgi alanı yazdıysan model başlıklardan en uygun olanları seçer; yazmadıysan en yeniler alınır. Seçilmeyenler "Atlandı" olur.
 3. **Yazı:** Model her makale için Türkçe bir yazı hazırlar (giriş, Ne yaptılar?, Neden önemli?, Sınırlamalar). Varsayılan olarak **taslak** bekler; Ayarlar'dan onaysız yayına alınabilir.
 4. **Tek makale:** Makaleler sayfasından arXiv makale linki ya da herhangi bir sayfa linki ekleyip "Yazıya dönüştür" denebilir.
 5. **Bülten:** Seçilen günde son 7 günün yazılarından bülten taslağı hazırlanır; Ayarlar'dan onaysız gönderime alınabilir. Önemli bir yazı haftayı beklemeden yazının sayfasındaki "Abonelere gönder" ile gönderilir.
-6. **Gönderim Künye'den:** Abone listesi ve e-posta (SMTP) Künye'de kalır. Blog, Künye'nin API anahtarıyla bülteni Künye'ye planlar; Künye iki dakika içinde abonelere yollar.
+6. **Abonelik kutusu:** Ana sayfada ve her yazının altında. Kayıt ve onay e-postası Künye'de; blogdan gelen aboneler bülten etiketiyle (boşsa "Blog") işaretlenir.
+7. **Yedekleme:** Ayarlar → Yedekleme: tam yedek (API anahtarları dahil, şifre hariç) indirilir ve geri yüklenir.
+8. **Gönderim Künye'den:** Abone listesi ve e-posta (SMTP) Künye'de kalır. Blog, Künye'nin API anahtarıyla bülteni Künye'ye planlar; Künye iki dakika içinde abonelere yollar.
 
 ## Yapay zekâ
 

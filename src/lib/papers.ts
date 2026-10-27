@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { apiUrl, htmlTitle, htmlToText, parseAtom, parseSourceUrl, type PaperData } from '@/lib/arxiv'
+import { apiUrl, htmlTitle, htmlToText, parseAtom, parseFeed, parseSourceUrl, type PaperData } from '@/lib/arxiv'
 
 const USER_AGENT = 'blog_ynh (+https://github.com/rraeyz/blog_ynh)'
 
@@ -34,7 +34,7 @@ export async function addPaperFromUrl(input: string): Promise<{ id: number; titl
   } else {
     const html = await fetchText(ref.url)
     const text = htmlToText(html)
-    paper = { externalId: `url:${ref.url}`, title: htmlTitle(html) || ref.url, authors: '', abstract: text.slice(0, 1500), url: ref.url, publishedAt: new Date() }
+    paper = { externalId: `url:${ref.url}`, title: htmlTitle(html) || ref.url, authors: '', abstract: text.slice(0, 1500), topic: new URL(ref.url).hostname.replace(/^www\./, ''), url: ref.url, publishedAt: new Date() }
   }
   const existing = await prisma.paper.findUnique({ where: { externalId: paper.externalId } })
   if (existing) {
@@ -46,15 +46,23 @@ export async function addPaperFromUrl(input: string): Promise<{ id: number; titl
   return { id: created.id, title: created.title }
 }
 
+// Kaynaktaki güncel makaleler: arXiv kategorisi API'den, diğer adresler RSS/Atom beslemesi olarak
+export async function readSource(url: string): Promise<PaperData[]> {
+  const ref = parseSourceUrl(url)
+  if (!ref || ref.kind === 'paper') throw new Error('Kaynak olarak arXiv kategori/arşiv linki ya da bir RSS/Atom besleme adresi gir')
+  if (ref.kind === 'category') return parseAtom(await fetchText(apiUrl(ref)))
+  const papers = parseFeed(await fetchText(ref.url))
+  if (papers.length === 0) throw new Error('Bu adreste RSS/Atom beslemesi bulunamadı (sitenin "RSS" ya da "feed" linkini dene)')
+  return papers
+}
+
 // Açık kaynakların hepsini tarar; her kaynağın hatası kendi satırına yazılır
 export async function fetchSources(): Promise<number> {
   const sources = await prisma.source.findMany({ where: { enabled: true } })
   let added = 0
   for (const source of sources) {
-    const ref = parseSourceUrl(source.url)
     try {
-      if (ref?.kind !== 'category') throw new Error('Desteklenmeyen kaynak linki')
-      const count = await savePapers(parseAtom(await fetchText(apiUrl(ref))))
+      const count = await savePapers(await readSource(source.url))
       added += count
       await prisma.source.update({ where: { id: source.id }, data: { lastFetchedAt: new Date(), lastError: '' } })
     } catch (error) {

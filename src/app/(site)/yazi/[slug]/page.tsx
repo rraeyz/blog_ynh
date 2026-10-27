@@ -1,8 +1,13 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { isAdmin } from '@/lib/auth'
+import { getSettings } from '@/lib/state'
 import { renderMarkdown } from '@/lib/markdown'
+import { readingMinutes } from '@/lib/topics'
+import { CardPost, coverStyle, postDate, SubscribeBox, TopicChip } from '../../parts'
+import { ReadingProgress } from './ReadingProgress'
 
 // Taslak yazıyı yalnızca giriş yapmış yönetici görebilir (önizleme)
 async function findPost(slug: string) {
@@ -13,25 +18,65 @@ async function findPost(slug: string) {
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const post = await findPost(params.slug)
-  return post ? { title: post.title, description: post.excerpt } : {}
+  if (!post) return {}
+  return {
+    title: post.title,
+    description: post.excerpt,
+    openGraph: { type: 'article', title: post.title, description: post.excerpt, publishedTime: post.publishedAt?.toISOString() },
+  }
 }
 
 export default async function PostPage({ params }: { params: { slug: string } }) {
   const post = await findPost(params.slug)
   if (!post) notFound()
+  const [settings, more] = await Promise.all([
+    getSettings(),
+    prisma.post.findMany({
+      where: { status: 'published', id: { not: post.id } },
+      orderBy: { publishedAt: 'desc' },
+      take: 2,
+      include: { paper: { select: { topic: true } } },
+    }),
+  ])
+  const topic = post.paper?.topic ?? ''
+
   return (
-    <article>
-      {post.status !== 'published' && <p className="mb-4 rounded-lg bg-amber-100 dark:bg-amber-950 px-3 py-2 text-sm">Taslak önizlemesi: yayımlanmadı.</p>}
-      <time className="text-xs text-stone-500">{(post.publishedAt ?? post.createdAt).toLocaleDateString('tr-TR', { dateStyle: 'long' })}</time>
-      <h1 className="text-3xl font-bold mt-1 mb-6">{post.title}</h1>
-      <div className="prose-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(post.body) }} />
-      {post.paper && (
-        <aside className="mt-10 card text-sm">
-          <p className="font-medium">Kaynak makale</p>
-          <a href={post.paper.url} className="underline break-words" rel="noopener noreferrer" target="_blank">{post.paper.title}</a>
-          {post.paper.authors && <p className="text-stone-500 mt-1">{post.paper.authors}</p>}
-          <p className="text-stone-500 mt-2">Bu yazı yapay zekâ yardımıyla hazırlandı; ayrıntılar ve kesin sonuçlar için kaynak makaleye bakın.</p>
-        </aside>
+    <article className="mx-auto max-w-5xl px-4">
+      <ReadingProgress />
+      {post.status !== 'published' && <p className="mt-6 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300 px-4 py-2 text-sm">Taslak önizlemesi: henüz yayımlanmadı.</p>}
+
+      <header className="mt-8 overflow-hidden rounded-3xl p-7 md:p-12 text-white min-h-72 flex flex-col justify-end" style={coverStyle(topic, post.slug)}>
+        <div className="max-w-3xl">
+          <TopicChip topic={topic} light />
+          <h1 className="mt-4 text-3xl md:text-5xl font-semibold leading-tight drop-shadow-sm">{post.title}</h1>
+          <p className="mt-4 text-sm text-white/80">{postDate(post)} · {readingMinutes(post.body)} dk okuma</p>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-2xl">
+        {post.excerpt && <p className="mt-10 border-l-4 border-violet-500 pl-5 text-lg italic text-zinc-600 dark:text-zinc-400">{post.excerpt}</p>}
+        <div className="prose-body mt-8" dangerouslySetInnerHTML={{ __html: renderMarkdown(post.body) }} />
+
+        {post.paper && (
+          <aside className="mt-12 card">
+            <p className="text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">Kaynak makale</p>
+            <a href={post.paper.url} className="mt-2 block font-display font-semibold hover:text-violet-500 break-words" rel="noopener noreferrer" target="_blank">{post.paper.title} ↗</a>
+            {post.paper.authors && <p className="text-sm text-zinc-500 mt-1 line-clamp-2">{post.paper.authors}</p>}
+            <p className="text-xs text-zinc-500 mt-3">Bu yazı yapay zekâ yardımıyla hazırlandı; ayrıntılar ve kesin sonuçlar için kaynak makaleye bakın.</p>
+          </aside>
+        )}
+      </div>
+
+      <div className="mt-14"><SubscribeBox settings={settings} /></div>
+
+      {more.length > 0 && (
+        <section className="mt-14">
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="text-xl font-semibold">Sıradaki okumalar</h2>
+            <Link href="/#yazilar" className="text-sm text-violet-600 dark:text-violet-300 hover:underline">Tümü →</Link>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2">{more.map((item) => <CardPost key={item.id} post={item} />)}</div>
+        </section>
       )}
     </article>
   )

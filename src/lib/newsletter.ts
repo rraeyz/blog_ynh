@@ -19,6 +19,28 @@ export async function createWeeklyDigest(settings: Settings) {
   return prisma.digest.create({ data: { subject: `${settings.siteTitle} · ${date} haftası`, body: digestBody(posts, settings.siteUrl) } })
 }
 
+export const canSubscribe = (settings: Settings) => !!settings.kunyeUrl.trim() && !!settings.kunyeToken.trim()
+
+// Sitedeki abonelik kutusu: kayıt ve (açıksa) onay e-postası Künye'de. Abone, bülten etiketiyle
+// (boşsa "Blog") işaretlenir. Dönen metin ziyaretçiye gösterilir
+export async function subscribeToKunye(email: string, name: string, settings: Settings): Promise<{ ok: boolean; message: string }> {
+  try {
+    const response = await fetch(`${settings.kunyeUrl.trim().replace(/\/+$/, '')}/api/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.kunyeToken.trim()}` },
+      body: JSON.stringify({ email, name, tag: settings.newsletterTag || 'Blog' }),
+      signal: AbortSignal.timeout(20_000),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (response.ok && typeof data.message === 'string') return { ok: true, message: data.message }
+    if (response.status === 400 && typeof data.error === 'string') return { ok: false, message: data.error }
+    console.error('Künye abonelik hatası:', response.status, data.error)
+  } catch (error) {
+    console.error('Künye abonelik hatası:', error)
+  }
+  return { ok: false, message: 'Şu an abone olunamıyor, biraz sonra tekrar dene.' }
+}
+
 // Künye'ye "iki dakika sonra gönder" diye planlar; Künye dakikada bir bakıp abonelere yollar
 export async function sendDigest(id: number, settings: Settings): Promise<void> {
   const digest = await prisma.digest.findUniqueOrThrow({ where: { id } })

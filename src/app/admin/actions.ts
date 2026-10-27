@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { clientIp, endSession, recordFailure, requireAdmin, startSession, tooManyFailures } from '@/lib/auth'
 import { getSettings } from '@/lib/state'
 import { parseSourceUrl } from '@/lib/arxiv'
-import { addPaperFromUrl } from '@/lib/papers'
+import { addPaperFromUrl, readSource } from '@/lib/papers'
 import { writePost } from '@/lib/writer'
 import { createWeeklyDigest, digestBody, sendDigest } from '@/lib/newsletter'
 import { dailyTask, isJobRunning, runExclusive, weeklyTask } from '@/lib/jobs'
@@ -132,11 +132,18 @@ export async function saveSettingsAction(form: FormData) {
 export async function addSourceAction(form: FormData) {
   await requireAdmin()
   const url = text(form, 'url')
-  const ref = parseSourceUrl(url)
-  if (ref?.kind !== 'category') back('/admin/kaynaklar', 'arXiv kategori linki gir (örn. https://arxiv.org/list/cs.AI/recent). Tek makale için Makaleler sayfasını kullan.')
+  if (parseSourceUrl(url)?.kind === 'paper') back('/admin/kaynaklar', 'Bu tek bir makalenin linki; onu Makaleler sayfasından ekle')
   if (await prisma.source.findUnique({ where: { url } })) back('/admin/kaynaklar', 'Bu kaynak zaten ekli')
-  await prisma.source.create({ data: { url } })
-  back('/admin/kaynaklar', `Eklendi: ${ref.categories.join(', ')}`)
+  // Eklemeden önce bir kez okunur: çalışmayan adres listeye girmesin
+  let message: string
+  try {
+    const papers = await readSource(url)
+    await prisma.source.create({ data: { url } })
+    message = `Eklendi (şu an ${papers.length} makale görünüyor; ilk taramada alınır)`
+  } catch (error) {
+    message = errorText(error)
+  }
+  back('/admin/kaynaklar', message)
 }
 
 export async function toggleSourceAction(form: FormData) {

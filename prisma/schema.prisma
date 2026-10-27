@@ -49,6 +49,7 @@ model Paper {
   title       String
   authors     String   @default("")
   abstract    String   @default("")
+  topic       String   @default("") // arXiv birincil kategorisi (cs.AI) ya da beslemenin sitesi (lib/topics.ts)
   url         String
   publishedAt DateTime @default(now())
   status      String   @default("new") // new | skipped | written | failed

@@ -1,15 +1,16 @@
 // arXiv linklerini çözümleme ve Atom/HTML ayrıştırma. Saf fonksiyonlar (dış bağımlılık yok): tests/unit.test.ts
 
 export type SourceRef =
-  | { kind: 'category'; categories: string[] } // arxiv.org/list/cs.AI/recent, rss.arxiv.org/rss/cs.AI+cs.LG
+  | { kind: 'category'; categories: string[] } // arxiv.org/list/cs.AI/recent, /archive/astro-ph, rss.arxiv.org/rss/cs.AI+cs.LG
   | { kind: 'paper'; id: string } // arxiv.org/abs/2510.12345v2, /pdf/..., /html/...
-  | { kind: 'web'; url: string } // başka herhangi bir sayfa: tek makale olarak eklenir
+  | { kind: 'web'; url: string } // başka herhangi bir adres: kaynak olarak RSS/Atom beslemesi, tek makale olarak sayfa
 
 export interface PaperData {
   externalId: string
   title: string
   authors: string
   abstract: string
+  topic: string
   url: string
   publishedAt: Date
 }
@@ -28,7 +29,7 @@ export function parseSourceUrl(input: string): SourceRef | null {
   const host = url.hostname.replace(/^www\./, '')
   const parts = url.pathname.split('/').filter(Boolean)
   if (host === 'arxiv.org' || host === 'export.arxiv.org' || host === 'rss.arxiv.org') {
-    if ((parts[0] === 'list' || parts[0] === 'rss' || parts[0] === 'atom') && parts[1]) {
+    if (['list', 'rss', 'atom', 'archive'].includes(parts[0]) && parts[1]) {
       const categories = decodeURIComponent(parts[1]).split('+').filter((c) => CATEGORY.test(c))
       if (categories.length) return { kind: 'category', categories }
     }
@@ -45,7 +46,8 @@ export function parseSourceUrl(input: string): SourceRef | null {
 export function apiUrl(ref: SourceRef, maxResults = 100): string {
   if (ref.kind === 'paper') return `https://export.arxiv.org/api/query?id_list=${encodeURIComponent(ref.id)}`
   if (ref.kind === 'category') {
-    const query = ref.categories.map((c) => `cat:${c}`).join('+OR+')
+    // Noktasız ad bir arşivdir (astro-ph): alt kategorileriyle (astro-ph.GA ...) birlikte aranır
+    const query = ref.categories.map((c) => `cat:${c}${c.includes('.') ? '' : '*'}`).join('+OR+')
     return `https://export.arxiv.org/api/query?search_query=${query}&sortBy=submittedDate&sortOrder=descending&max_results=${maxResults}`
   }
   return ref.url
@@ -81,6 +83,7 @@ export function parseAtom(xml: string): PaperData[] {
       title,
       authors: authors.join(', '),
       abstract: clean(tag(entry, 'summary')),
+      topic: entry.match(/<arxiv:primary_category[^>]*term="([^"]+)"/)?.[1] ?? '',
       url: `https://arxiv.org/abs/${id}`,
       publishedAt: Number.isNaN(published.getTime()) ? new Date() : published,
     })
@@ -102,3 +105,29 @@ export function htmlToText(html: string): string {
 }
 
 export const htmlTitle = (html: string) => clean(tag(html, 'title'))
+
+const unwrap = (text: string) => text.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+
+// Herhangi bir RSS 2.0 / Atom beslemesi → makaleler (bağlantısı olmayan öğeler atlanır)
+export function parseFeed(xml: string): PaperData[] {
+  const papers: PaperData[] = []
+  for (const item of xml.match(/<(item|entry)[\s>][\s\S]*?<\/\1>/g) ?? []) {
+    const atomLink = item.match(/<link[^>]*rel="alternate"[^>]*href="([^"]+)"/)?.[1] ?? item.match(/<link[^>]*href="([^"]+)"/)?.[1]
+    const link = clean(unwrap(atomLink ?? tag(item, 'link')))
+    const title = clean(unwrap(tag(item, 'title')).replace(/<[^>]+>/g, ''))
+    if (!/^https?:\/\//.test(link) || !title) continue
+    const body = unwrap(tag(item, 'content:encoded') || tag(item, 'description') || tag(item, 'summary') || tag(item, 'content'))
+    const date = new Date(clean(tag(item, 'pubDate') || tag(item, 'published') || tag(item, 'updated') || tag(item, 'dc:date')))
+    papers.push({
+      externalId: `url:${link}`,
+      title,
+      authors: clean(unwrap(tag(item, 'dc:creator') || tag(tag(item, 'author'), 'name') || tag(item, 'author'))),
+      // Bazı beslemeler açıklamayı kaçışlanmış HTML olarak verir: önce çöz, sonra etiketleri at
+      abstract: htmlToText(decodeEntities(body)).slice(0, 4000),
+      topic: link.match(/^https?:\/\/([^/?#:]+)/)![1].replace(/^www\./, ''),
+      url: link,
+      publishedAt: Number.isNaN(date.getTime()) ? new Date() : date,
+    })
+  }
+  return papers
+}

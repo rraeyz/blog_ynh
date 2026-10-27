@@ -2,6 +2,7 @@ import { getSettings } from '@/lib/state'
 import { PROVIDERS } from '@/lib/ai'
 import { changePasswordAction, saveSettingsAction } from '../../actions'
 import { Notice } from '../../Notice'
+import { ConfirmButton } from '../../ConfirmButton'
 
 const DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
 
@@ -106,6 +107,20 @@ export default async function SettingsPage({ searchParams }: { searchParams: { m
 
         <button className="btn-primary">Kaydet</button>
       </form>
+
+      <section className="card space-y-4 mt-8">
+        <h2 className="font-semibold">Yedekleme</h2>
+        <p className="text-sm text-stone-500">
+          Tam yedek: ayarlar, kaynaklar, makaleler, yazılar ve bültenler. Yapay zekâ ve Künye API anahtarlarını da içerir; dosyayı güvenli bir yerde sakla, kimseyle paylaşma.
+          Yönetici şifresi yedeğe girmez.
+        </p>
+        <a href="/api/admin/yedek" className="btn-primary" download>Tam yedeği indir</a>
+        <form action="/api/admin/yedek" method="post" encType="multipart/form-data" className="flex flex-col sm:flex-row gap-2 pt-2">
+          <input name="file" type="file" accept="application/json,.json" required aria-label="Yedek dosyası" className="input" />
+          <ConfirmButton question="Yedek yüklensin mi? Mevcut kaynaklar, makaleler, yazılar, bültenler ve ayarlar yedektekilerle DEĞİŞTİRİLİR." className="btn whitespace-nowrap">Yedekten yükle</ConfirmButton>
+        </form>
+        <p className="hint">Sunucudaki günlük otomatik veritabanı yedekleri ayrıca YunoHost tarafında tutulur (son 7 gün).</p>
+      </section>
 
       <form action={changePasswordAction} className="card space-y-4 mt-8">
         <h2 className="font-semibold">Şifre değiştir</h2>
