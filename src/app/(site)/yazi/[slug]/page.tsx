@@ -82,10 +82,10 @@ export default async function PostPage({ params }: { params: { slug: string } })
 
         {post.paper && (
           <aside className="mt-12 card">
-            <p className="text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">Kaynak makale</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">Kaynak</p>
             <a href={post.paper.url} className="mt-2 block font-display font-semibold hover:text-violet-500 break-words" rel="noopener noreferrer" target="_blank">{post.paper.title} ↗</a>
             {post.paper.authors && <p className="text-sm text-zinc-500 mt-1 line-clamp-2">{post.paper.authors}</p>}
-            <p className="text-xs text-zinc-500 mt-3">Bu yazı yapay zekâ yardımıyla hazırlandı; ayrıntılar ve kesin sonuçlar için kaynak makaleye bakın.</p>
+            <p className="text-xs text-zinc-500 mt-3">Bu yazı yapay zekâ yardımıyla hazırlandı; ayrıntılar ve kesin sonuçlar için kaynağa bakın.</p>
           </aside>
         )}
       </div>

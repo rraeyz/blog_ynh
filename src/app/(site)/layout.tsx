@@ -22,10 +22,11 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <main className="flex-1">{children}</main>
       <footer className="border-t border-zinc-200/70 dark:border-ink-line mt-20">
         <div className="mx-auto max-w-5xl px-4 py-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-500">
-          <span>© {new Date().getFullYear()} {settings.siteTitle}</span>
+          {/* Telif sahibi site adından bağımsız: site adı değişse de alt bilgide marka kalır */}
+          <span>© {new Date().getFullYear()} Raeyz Labs</span>
           <a href="/rss.xml" className="hover:text-violet-500" title="Feedly, Inoreader gibi bir besleme okuyucuya bu adresi ekleyerek yeni yazıları takip edebilirsin">RSS beslemesi</a>
           {settings.kunyeUrl && <a href={settings.kunyeUrl} className="hover:text-violet-500">{settings.kunyeUrl.replace(/^https?:\/\//, '')}</a>}
-          <span className="ml-auto">Yazılar yapay zekâ yardımıyla hazırlanır; kaynak makaleler her yazıda.</span>
+          <span className="ml-auto">Yazılar yapay zekâ yardımıyla hazırlanır; kaynağı her yazının sonunda.</span>
         </div>
       </footer>
     </div>
