@@ -26,6 +26,8 @@ docker-compose build
 # Sonra container'ı yeni imajla değiştir
 docker-compose up -d --remove-orphans
 docker image prune -f > /dev/null 2>&1 || true
+# Derleme önbelleği her güncellemede birikir (bir ara 140 GB'ı buldu); silinince sonraki derleme biraz uzar ama disk dolmaz
+docker builder prune -af > /dev/null 2>&1 || true
 
 wait_for_app
 
