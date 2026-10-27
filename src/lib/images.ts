@@ -7,6 +7,8 @@ import { logJob, type Settings } from '@/lib/state'
 // Yapay zekâ kapakları veritabanının yanında durur (YunoHost veri klasörü: sistem yedeğine girer, JSON yedeğe girmez)
 export const IMAGE_DIR = path.join(path.dirname((process.env.DATABASE_URL || 'file:/app/prisma/dev.db').replace(/^file:/, '')), 'gorseller')
 export const IMAGE_NAME = /^\d+-\d+\.(jpg|png|webp)$/
+// Görsel başına sabit ~0,01 $ (1K); ayarlardan değiştirilebilir
+export const DEFAULT_IMAGE_MODEL = 'black-forest-labs/flux-3-image-klein'
 const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
 export const removeImage = (name: string) => (IMAGE_NAME.test(name) ? unlink(path.join(IMAGE_DIR, name)).catch(() => {}) : Promise.resolve())
@@ -18,13 +20,11 @@ export async function generateCover(postId: number, settings: Settings): Promise
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.imageApiKey.trim()}` },
     body: JSON.stringify({
-      model: settings.imageModel.trim() || 'openai/gpt-image-2',
+      model: settings.imageModel.trim() || DEFAULT_IMAGE_MODEL,
       prompt: `Editorial cover illustration for a popular-science news article. Headline: "${post.title}". Summary: ${post.excerpt}\n` +
         'Style: modern digital illustration with vivid colors; it must clearly look like an illustration, not a real photograph. No text, letters, numbers, logos or watermarks.',
+      // Yalnızca her görsel modelinin kabul ettiği alanlar: model değiştirince istek reddedilmesin
       aspect_ratio: '16:9',
-      quality: 'low',
-      output_format: 'jpeg',
-      output_compression: 80,
       n: 1,
     }),
     signal: AbortSignal.timeout(180_000),
