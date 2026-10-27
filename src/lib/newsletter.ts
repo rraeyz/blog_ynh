@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import type { Settings } from '@/lib/state'
+import { logJob, type Settings } from '@/lib/state'
 
 // Bülten metni Künye'nin e-posta biçiminde: **kalın**, [link](url), satır sonları
 export function digestBody(posts: Array<{ title: string; excerpt: string; slug: string }>, siteUrl: string): string {
@@ -36,9 +36,11 @@ export async function subscribeToKunye(email: string, name: string, settings: Se
     const data = await response.json().catch(() => ({}))
     if (response.ok && typeof data.message === 'string') return { ok: true, message: data.message }
     if (response.status === 400 && typeof data.error === 'string') return { ok: false, message: data.error }
-    console.error('Künye abonelik hatası:', response.status, data.error)
+    // Ziyaretçiye ayrıntı gösterilmez; sebep panelin iş günlüğünde görünür
+    await logJob(`Abonelik başarısız: Künye yanıtı ${response.status}${data.error ? ` (${String(data.error).slice(0, 120)})` : ''}`)
   } catch (error) {
-    console.error('Künye abonelik hatası:', error)
+    const cause = (error as { cause?: { code?: string } })?.cause?.code
+    await logJob(`Abonelik başarısız: Künye'ye ulaşılamadı (${cause || String((error as Error).message || error).slice(0, 120)})`)
   }
   return { ok: false, message: 'Şu an abone olunamıyor, biraz sonra tekrar dene.' }
 }

@@ -20,8 +20,10 @@ export function headings(source: string): Array<{ id: string; text: string }> {
   return Array.from(source.matchAll(/^##\s+(.+)$/gm), (m) => ({ id: slugify(m[1]), text: m[1].trim() }))
 }
 
+// Her "##" bölümü <section> içine alınır: sayfada numaralı ve farklı renkte kartlar olarak gösterilir
 export function renderMarkdown(source: string): string {
   const html: string[] = []
+  let inSection = false
   let paragraph: string[] = []
   let list: string[] = []
   let quote: string[] = []
@@ -42,6 +44,11 @@ export function renderMarkdown(source: string): string {
     else if (heading) {
       flush()
       const level = heading[1].length
+      if (level === 2) {
+        if (inSection) html.push('</section>')
+        html.push('<section>')
+        inSection = true
+      }
       html.push(`<h${level} id="${slugify(heading[2])}">${inline(heading[2])}</h${level}>`)
     } else if (item) {
       if (paragraph.length || quote.length) flush()
@@ -55,5 +62,6 @@ export function renderMarkdown(source: string): string {
     }
   }
   flush()
+  if (inSection) html.push('</section>')
   return html.join('\n')
 }

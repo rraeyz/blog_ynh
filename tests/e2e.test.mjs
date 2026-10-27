@@ -214,6 +214,26 @@ test('yazıyı abonelere gönder (Künye)', async () => {
   const second = await submit('/admin/bultenler', 'Son 7 günden')
   const secondPath = second.match(/\/admin\/bultenler\/\d+/)[0]
   assert.match(await submit(secondPath, 'Abonelere gönder'), /API anahtarı geçersiz/)
+
+  // Abonelik başarısız olunca ziyaretçi genel mesaj görür, sebep panel günlüğüne yazılır
+  const saved = cookie
+  cookie = ''
+  try {
+    assert.match(await (await post('/', 'sub-email', { email: 'ikinci@example.com' })).text(), /Şu an abone olunamıyor/)
+  } finally {
+    cookie = saved
+  }
+  assert.match((await get('/admin')).html, /Abonelik başarısız: Künye yanıtı 401/)
+})
+
+test('yazıyı yapay zekâyla yeniden yaz', async () => {
+  const before = aiCalls
+  assert.match(await submit(`/admin/yazilar/${postId}`, 'yeniden yaz'), /Yeniden yazılıyor/)
+  await waitFor(async () => /Yeniden yazım: .*yeniden yazıldı/.test((await get('/admin')).html), 'yeniden yazım')
+  assert.equal(aiCalls, before + 1)
+  const page = (await get(`/admin/yazilar/${postId}`)).html
+  assert.match(page, /Yayından kaldır/, 'yayın durumu korunur')
+  assert.equal((await get('/yazi/kediler-neden-cok-uyur')).status, 200, 'adres değişmez')
 })
 
 test('tam yedek ve geri yükleme', async () => {
