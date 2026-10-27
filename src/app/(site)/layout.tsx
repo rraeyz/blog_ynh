@@ -15,7 +15,6 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
           </Link>
           <nav className="ml-auto flex items-center gap-1 text-sm">
             <Link href="/#yazilar" className="hidden sm:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Yazılar</Link>
-            <a href="/rss.xml" className="hidden sm:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">RSS</a>
             {canSubscribe(settings) && <Link href="#abone" className="rounded-full bg-violet-600 text-white px-4 py-1.5 font-medium hover:bg-violet-500 transition">Abone ol</Link>}
           </nav>
         </div>
@@ -24,7 +23,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <footer className="border-t border-zinc-200/70 dark:border-ink-line mt-20">
         <div className="mx-auto max-w-5xl px-4 py-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-500">
           <span>© {new Date().getFullYear()} {settings.siteTitle}</span>
-          <a href="/rss.xml" className="hover:text-violet-500">RSS</a>
+          <a href="/rss.xml" className="hover:text-violet-500" title="Feedly, Inoreader gibi bir besleme okuyucuya bu adresi ekleyerek yeni yazıları takip edebilirsin">RSS beslemesi</a>
           {settings.kunyeUrl && <a href={settings.kunyeUrl} className="hover:text-violet-500">{settings.kunyeUrl.replace(/^https?:\/\//, '')}</a>}
           <span className="ml-auto">Yazılar yapay zekâ yardımıyla hazırlanır; kaynak makaleler her yazıda.</span>
         </div>

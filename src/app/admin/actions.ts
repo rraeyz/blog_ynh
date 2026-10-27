@@ -210,6 +210,18 @@ export async function publishPostAction(form: FormData) {
   back(`/admin/yazilar/${post.id}`, publish ? 'Yayımlandı' : 'Yayından kaldırıldı')
 }
 
+// Eski biçimde yazılmış (ya da beğenilmeyen) yazıyı aynı makaleden yeniden yazdırır; adresi ve yayın durumu değişmez
+export async function rewritePostAction(form: FormData) {
+  await requireAdmin()
+  const post = await prisma.post.findUniqueOrThrow({ where: { id: id(form) } })
+  if (!post.paperId) back(`/admin/yazilar/${post.id}`, 'Bu yazının kaynak makalesi yok, yeniden yazılamaz')
+  const settings = await getSettings()
+  inBackground(`/admin/yazilar/${post.id}`, 'Yeniden yazım', async () => {
+    const updated = await writePost(post.paperId!, settings, false, post.id)
+    return `"${updated.title}" yeniden yazıldı`
+  }, 'Yeniden yazılıyor; bir dakika sonra sayfayı yenile (sonuç Genel → İş günlüğü\'nde)')
+}
+
 export async function deletePostAction(form: FormData) {
   await requireAdmin()
   await prisma.post.deleteMany({ where: { id: id(form) } })

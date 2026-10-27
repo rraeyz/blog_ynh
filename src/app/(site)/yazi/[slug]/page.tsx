@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { isAdmin } from '@/lib/auth'
 import { getSettings } from '@/lib/state'
 import { headings, inline, renderMarkdown } from '@/lib/markdown'
-import { readingMinutes } from '@/lib/topics'
+import { readingMinutes, topicHue } from '@/lib/topics'
 import { CardPost, coverStyle, postDate, SubscribeBox, TopicChip } from '../../parts'
 import { ReadingProgress } from './ReadingProgress'
 
@@ -41,9 +41,11 @@ export default async function PostPage({ params }: { params: { slug: string } })
   const topic = post.paper?.topic ?? ''
   const highlights = post.highlights.split('\n').filter(Boolean)
   const toc = headings(post.body)
+  // Yazının rengi konusundan: Kısaca kutusu, bölüm rozetleri, vurgu ve kalın terimler bu tonda
+  const accent = { ['--h' as string]: topicHue(topic) } as React.CSSProperties
 
   return (
-    <article className="mx-auto max-w-5xl px-4">
+    <article className="mx-auto max-w-5xl px-4" style={accent}>
       <ReadingProgress />
       {post.status !== 'published' && <p className="mt-6 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300 px-4 py-2 text-sm">Taslak önizlemesi: henüz yayımlanmadı.</p>}
 
@@ -58,19 +60,19 @@ export default async function PostPage({ params }: { params: { slug: string } })
       <div className="mx-auto mt-10 max-w-4xl lg:grid lg:grid-cols-[minmax(0,1fr)_13rem] lg:gap-14">
       <div className="max-w-2xl">
         {highlights.length > 0 ? (
-          <section className="rounded-2xl border border-violet-500/30 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/5 p-6">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">Kısaca</h2>
+          <section className="rounded-3xl border border-[hsl(var(--h)_80%_60%/0.3)] bg-[linear-gradient(135deg,hsl(var(--h)_85%_60%/0.14),hsl(calc(var(--h)+45)_85%_60%/0.05))] p-6">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-[hsl(var(--h)_70%_45%)] dark:text-[hsl(var(--h)_85%_75%)]">Kısaca · 30 saniyede</h2>
             <ul className="mt-3 space-y-2.5">
               {highlights.map((item) => (
                 <li key={item} className="flex gap-3 text-zinc-800 dark:text-zinc-200">
-                  <span aria-hidden className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-500 text-[0.7rem] text-white">✓</span>
+                  <span aria-hidden className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--h)_75%_55%)] text-[0.7rem] text-white">✓</span>
                   <span dangerouslySetInnerHTML={{ __html: inline(item) }} />
                 </li>
               ))}
             </ul>
           </section>
         ) : post.excerpt && <p className="border-l-4 border-violet-500 pl-5 text-lg text-zinc-600 dark:text-zinc-400">{post.excerpt}</p>}
-        <div className="prose-body mt-8" dangerouslySetInnerHTML={{ __html: renderMarkdown(post.body) }} />
+        <div className="prose-body mt-8" style={accent} dangerouslySetInnerHTML={{ __html: renderMarkdown(post.body) }} />
 
         {post.paper && (
           <aside className="mt-12 card">

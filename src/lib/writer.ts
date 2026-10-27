@@ -31,8 +31,9 @@ async function uniqueSlug(title: string): Promise<string> {
   }
 }
 
-// Bir makaleden yazı üretir; ayara göre taslak ya da yayımlanmış olarak kaydeder
-export async function writePost(paperId: number, settings: Settings, publish = settings.autoPublish) {
+// Bir makaleden yazı üretir; ayara göre taslak ya da yayımlanmış olarak kaydeder.
+// replacePostId verilirse o yazının metni yeniden yazılır (adresi ve yayın durumu aynı kalır)
+export async function writePost(paperId: number, settings: Settings, publish = settings.autoPublish, replacePostId?: number) {
   const paper = await prisma.paper.findUniqueOrThrow({ where: { id: paperId } })
   try {
     const text = await paperText(paper, settings.readMode, settings.maxInputChars)
@@ -43,24 +44,30 @@ export async function writePost(paperId: number, settings: Settings, publish = s
     if (typeof data.title !== 'string' || typeof data.body !== 'string' || !data.title.trim() || !data.body.trim()) {
       throw new Error('Model beklenen biçimde yanıt vermedi')
     }
-    const post = await prisma.post.create({
-      data: {
-        slug: await uniqueSlug(data.title),
-        title: data.title.trim().slice(0, 300),
-        excerpt: String(typeof data.brief === 'string' ? data.brief : typeof data.excerpt === 'string' ? data.excerpt : '').trim().slice(0, 500),
-        highlights: Array.isArray(data.highlights) ? data.highlights.filter((h): h is string => typeof h === 'string').map((h) => h.trim().replace(/\n/g, ' ')).filter(Boolean).slice(0, 5).join('\n') : '',
-        body: data.body.trim(),
-        status: publish ? 'published' : 'draft',
-        publishedAt: publish ? new Date() : null,
-        paperId: paper.id,
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
-      },
-    })
+    const content = {
+      title: data.title.trim().slice(0, 300),
+      excerpt: String(typeof data.brief === 'string' ? data.brief : typeof data.excerpt === 'string' ? data.excerpt : '').trim().slice(0, 500),
+      highlights: Array.isArray(data.highlights) ? data.highlights.filter((h): h is string => typeof h === 'string').map((h) => h.trim().replace(/\n/g, ' ')).filter(Boolean).slice(0, 5).join('\n') : '',
+      body: data.body.trim(),
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+    }
+    const post = replacePostId
+      ? await prisma.post.update({ where: { id: replacePostId }, data: content })
+      : await prisma.post.create({
+          data: {
+            ...content,
+            slug: await uniqueSlug(content.title),
+            status: publish ? 'published' : 'draft',
+            publishedAt: publish ? new Date() : null,
+            paperId: paper.id,
+          },
+        })
     await prisma.paper.update({ where: { id: paper.id }, data: { status: 'written', error: '' } })
     return post
   } catch (error) {
-    await prisma.paper.update({ where: { id: paper.id }, data: { status: 'failed', error: String((error as Error).message || error).slice(0, 300) } })
+    // Yeniden yazımda eski yazı yerinde kalır; makale "Hata"ya düşmez
+    if (!replacePostId) await prisma.paper.update({ where: { id: paper.id }, data: { status: 'failed', error: String((error as Error).message || error).slice(0, 300) } })
     throw error
   }
 }

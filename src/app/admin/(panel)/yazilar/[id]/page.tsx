@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { deletePostAction, postToDigestAction, publishPostAction, savePostAction } from '../../../actions'
+import { deletePostAction, postToDigestAction, publishPostAction, rewritePostAction, savePostAction } from '../../../actions'
 import { Notice } from '../../../Notice'
 import { ConfirmButton } from '../../../ConfirmButton'
 
@@ -16,6 +16,7 @@ export default async function EditPostPage({ params, searchParams }: { params: {
         <a href={`/yazi/${post.slug}`} className="btn" target="_blank">Önizle</a>
         <form action={publishPostAction}><input type="hidden" name="id" value={post.id} /><button className={published ? 'btn' : 'btn-primary'}>{published ? 'Yayından kaldır' : 'Yayımla'}</button></form>
         {published && <form action={postToDigestAction}><input type="hidden" name="id" value={post.id} /><button className="btn">Abonelere gönder…</button></form>}
+        {post.paperId && <form action={rewritePostAction}><input type="hidden" name="id" value={post.id} /><ConfirmButton question="Yazı aynı makaleden yapay zekâyla baştan yazılsın mı? Elle yaptığın düzenlemeler kaybolur." className="btn">Yapay zekâyla yeniden yaz</ConfirmButton></form>}
         <form action={deletePostAction}><input type="hidden" name="id" value={post.id} /><ConfirmButton question="Yazı silinsin mi?" className="btn-danger">Sil</ConfirmButton></form>
       </div>
       {post.paper && <p className="text-sm text-stone-500 mb-4">Kaynak: <a href={post.paper.url} className="underline" target="_blank" rel="noopener noreferrer">{post.paper.title}</a> · {post.inputTokens + post.outputTokens} token</p>}

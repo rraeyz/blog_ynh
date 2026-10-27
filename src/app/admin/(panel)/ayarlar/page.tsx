@@ -79,7 +79,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: { m
           <legend className="font-semibold px-1">Otomasyon</legend>
           <div className="grid sm:grid-cols-2 gap-4">
             <div><label className="label" htmlFor="postsPerDay">Günde kaç yazı</label><input id="postsPerDay" name="postsPerDay" type="number" min={0} max={20} defaultValue={s.postsPerDay} className="input" /></div>
-            <div><label className="label" htmlFor="dailyHour">Günlük iş saati</label><input id="dailyHour" name="dailyHour" type="number" min={0} max={23} defaultValue={s.dailyHour} className="input" /></div>
+            <div>
+              <label className="label" htmlFor="dailyHour">Günlük iş saati</label>
+              <select id="dailyHour" name="dailyHour" defaultValue={s.dailyHour} className="input">
+                {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}
+              </select>
+              <p className="hint">Her gün bu saatte kaynaklar taranır ve yeni yazılar hazırlanır (Türkiye saati).</p>
+            </div>
           </div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="autoPublish" defaultChecked={s.autoPublish} /> Yazıları onaysız yayımla (kapalıyken taslak olarak bekler)</label>
           <div>

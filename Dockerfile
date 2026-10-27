@@ -32,7 +32,8 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache dumb-init
+# tzdata: TZ=Europe/Istanbul (conf/docker-compose.yml) günlük iş saatini Türkiye saatine göre çalıştırsın
+RUN apk add --no-cache dumb-init tzdata
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
