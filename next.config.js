@@ -31,9 +31,9 @@ const nextConfig = {
     // src/instrumentation.ts: açılışta günlük/haftalık otomatik işler
     instrumentationHook: true,
     // better-sqlite3 .node binary'si bundle'lanamaz; runtime'da node_modules'dan yüklenir
-    serverComponentsExternalPackages: ['better-sqlite3', '@prisma/client', '@prisma/adapter-better-sqlite3', '@prisma/driver-adapter-utils', 'bcryptjs'],
+    serverComponentsExternalPackages: ['sharp', 'better-sqlite3', '@prisma/client', '@prisma/adapter-better-sqlite3', '@prisma/driver-adapter-utils', 'bcryptjs'],
     outputFileTracingIncludes: {
-      '/': ['./generated/**/*', './node_modules/@prisma/**/*', './node_modules/better-sqlite3/**/*', './node_modules/bcryptjs/**/*'],
+      '/': ['./generated/**/*', './node_modules/@prisma/**/*', './node_modules/better-sqlite3/**/*', './node_modules/bcryptjs/**/*', './node_modules/sharp/**/*', './node_modules/@img/**/*'],
     },
   },
 }

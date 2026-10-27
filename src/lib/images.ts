@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { mkdir, unlink, writeFile } from 'node:fs/promises'
 import { prisma } from '@/lib/prisma'
+import { compressImage } from '@/lib/compress'
 import { freeImage } from '@/lib/topics'
 import { logJob, type Settings } from '@/lib/state'
 
@@ -32,11 +33,10 @@ export async function generateCover(postId: number, settings: Settings): Promise
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(response.status === 401 ? 'OpenRouter anahtarı geçersiz' : response.status === 402 ? 'OpenRouter bakiyesi yetersiz' : data.error?.message || `OpenRouter yanıtı ${response.status}`)
   const image = data.data?.[0]
-  const ext = EXT[image?.media_type ?? 'image/png']
-  if (typeof image?.b64_json !== 'string' || !ext) throw new Error('OpenRouter görsel döndürmedi')
-  const name = `${post.id}-${Date.now()}.${ext}`
+  if (typeof image?.b64_json !== 'string' || !EXT[image.media_type ?? 'image/png']) throw new Error('OpenRouter görsel döndürmedi')
+  const name = `${post.id}-${Date.now()}.webp`
   await mkdir(IMAGE_DIR, { recursive: true })
-  await writeFile(path.join(IMAGE_DIR, name), Buffer.from(image.b64_json, 'base64'))
+  await writeFile(path.join(IMAGE_DIR, name), await compressImage(Buffer.from(image.b64_json, 'base64')))
   await prisma.post.update({ where: { id: post.id }, data: { image: name } })
   await removeImage(post.image)
   return typeof data.usage?.cost === 'number' ? `${name} (${data.usage.cost.toFixed(3)} $)` : name
