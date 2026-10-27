@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+
+jobs:
+  check:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-24.04
+    env:
+      DATABASE_URL: file:./prisma/ci.db
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx tsc --noEmit
+      - run: npx next lint
+      - run: npm test
+      - run: npx next build
+
+  docker:
+    name: Docker imajı + uçtan uca test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: İmajı derle
+        run: docker build -t blog-ci .
+
+      - name: Container'ı başlat
+        run: |
+          mkdir -p "$RUNNER_TEMP/data/prisma"
+          # YunoHost kurulumu gibi: .env'de tek kullanımlık kurulum anahtarı
+          echo "SETUP_TOKEN=ci-setup-token-0123456789" > "$RUNNER_TEMP/data/.env"
+          # host ağı: testteki sahte yapay zekâ/Künye sunucusuna (127.0.0.1:3901) container içinden ulaşılsın
+          docker run -d --name blog --network host \
+            --env-file "$RUNNER_TEMP/data/.env" \
+            -v "$RUNNER_TEMP/data/prisma:/app/prisma" \
+            blog-ci
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/api/health && break
+            sleep 2
+          done
+          docker logs blog
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Uçtan uca testler (tests/e2e.test.mjs)
+        env:
+          BASE_URL: http://localhost:3000
+          SETUP_TOKEN: ci-setup-token-0123456789
+        run: node --test tests/e2e.test.mjs
+
+      - name: Container içi araçlar (yedekleme, migration)
+        run: |
+          docker exec blog node /app/db-backup.js /app/prisma/backups/ci-test.db
+          docker exec blog node /app/db-migrate.js /app/template.db /app/prisma/dev.db | grep "şeması güncel"
+
+      - name: Container logları
+        if: always()
+        run: docker logs blog || true

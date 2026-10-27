@@ -1,0 +1,52 @@
+#!/bin/bash
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+#=================================================
+# UPDATE SOURCE FILES
+#=================================================
+ynh_script_progression --message="Updating source files..." --weight=3
+
+# Kaynak kod install ile aynı yöntemle çekilir. Veriler ($data_dir: database,
+# .env) install_dir dışında olduğu için etkilenmez.
+fetch_app_source
+
+ynh_add_config --template="docker-compose.yml" --destination="$install_dir/docker-compose.yml"
+
+#=================================================
+# REBUILD AND RESTART DOCKER CONTAINER
+#=================================================
+ynh_script_progression --message="Rebuilding Docker container..." --weight=10
+
+cd "$install_dir"
+
+# Önce yeni imajı derle: eski container build boyunca çalışmaya devam eder (kesinti yok)
+docker-compose build
+# Sonra container'ı yeni imajla değiştir
+docker-compose up -d --remove-orphans
+docker image prune -f > /dev/null 2>&1 || true
+
+wait_for_app
+
+#=================================================
+# UPDATE NGINX CONFIGURATION
+#=================================================
+ynh_script_progression --message="Updating NGINX configuration..." --weight=1
+
+ynh_add_nginx_config
+
+#=================================================
+# UPDATE SYSTEMD SERVICE
+#=================================================
+ynh_add_systemd_config
+
+# Eski kurulumlardaki güvensiz (cat ile kopyalayan) yedekleme cron'unu güncelle
+setup_backup_cron
+
+chown -R "$app:$app" "$install_dir"
+
+#=================================================
+# END OF SCRIPT
+#=================================================
+ynh_script_progression --message="Upgrade of $app completed" --last

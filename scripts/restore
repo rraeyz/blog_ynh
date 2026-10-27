@@ -1,0 +1,56 @@
+#!/bin/bash
+
+source ../settings/scripts/_common.sh
+source /usr/share/yunohost/helpers
+
+#=================================================
+# RESTORE THE DATA (.env, DATABASE, UPLOADS)
+#=================================================
+ynh_script_progression --message="Restoring data..." --weight=3
+
+mkdir -p "$data_dir/prisma" "$data_dir/backup"
+
+ynh_restore_file --origin_path="$data_dir/.env"
+chmod 600 "$data_dir/.env"
+
+# backup scripti database'i "database.db" adıyla yedekliyor
+ynh_restore_file --origin_path="database.db" --dest_path="$data_dir/prisma/dev.db" --not_mandatory
+
+#=================================================
+# RESTORE THE APP SOURCE AND DOCKER IMAGE
+#=================================================
+ynh_script_progression --message="Restoring source files..." --weight=3
+
+# Kaynak kod yedekte yok (sadece veri yedekleniyor); GitHub'dan yeniden çekilir
+fetch_app_source
+ynh_add_config --template="docker-compose.yml" --destination="$install_dir/docker-compose.yml"
+
+ynh_script_progression --message="Building and starting Docker container..." --weight=10
+
+cd "$install_dir"
+docker-compose build
+docker-compose up -d
+
+wait_for_app
+
+#=================================================
+# RESTORE NGINX CONFIGURATION
+#=================================================
+ynh_restore_file --origin_path="/etc/nginx/conf.d/$domain.d/$app.conf"
+
+ynh_systemd_action --service_name=nginx --action=reload
+
+#=================================================
+# RESTORE SYSTEMD
+#=================================================
+ynh_restore_file --origin_path="/etc/systemd/system/$app.service"
+systemctl enable "$app.service" --quiet
+systemctl daemon-reload
+
+chown -R "$app:$app" "$install_dir"
+chown -R "$app:$app" "$data_dir"
+
+#=================================================
+# END OF SCRIPT
+#=================================================
+ynh_script_progression --message="Restoration completed for $app" --last

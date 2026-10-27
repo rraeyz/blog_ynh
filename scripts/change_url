@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Domain veya yol değişince çalışır: `yunohost app change-url <app> -d yeni.domain -p /`
+# Yeni değerler $domain/$path, eskiler $old_domain/$old_path değişkenlerinde.
+
+source _common.sh
+source /usr/share/yunohost/helpers
+
+#=================================================
+# CHECKS
+#=================================================
+
+# Uygulama henüz alt yolda (ör. /blog) çalışmıyor; hata verirsek YunoHost eski ayarı geri yükler
+if [ "$path" != "/" ]; then
+    ynh_die --message="Alt yola kurulum desteklenmiyor. Yolu / olarak bırakın (ör. -p /)."
+fi
+
+#=================================================
+# MODIFY URL IN NGINX CONF
+#=================================================
+ynh_script_progression --message="Updating NGINX web server configuration..." --weight=1
+
+ynh_change_url_nginx_config
+
+# Bülten linkleri ve RSS, panelde kayıtlı adresi kullanır; container'ın yeniden başlaması gerekmez
+ynh_print_info --message="Panelde Ayarlar → Sitenin adresi alanını https://$domain olarak güncelleyin."
+
+#=================================================
+# END OF SCRIPT
+#=================================================
+ynh_script_progression --message="Change of URL completed for $app" --last

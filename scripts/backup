@@ -1,0 +1,40 @@
+#!/bin/bash
+
+source ../settings/scripts/_common.sh
+source /usr/share/yunohost/helpers
+
+#=================================================
+# BACKUP THE APP CONFIGURATION
+#=================================================
+ynh_script_progression --message="Backing up configuration..." --weight=2
+
+ynh_backup --src_path="$data_dir/.env"
+ynh_backup --src_path="$install_dir/docker-compose.yml"
+
+#=================================================
+# BACKUP THE DATABASE
+#=================================================
+ynh_script_progression --message="Backing up database..." --weight=5
+
+# Çalışan database doğrudan kopyalanmaz (yazma sırasında bozuk yedek olabilir);
+# önce tutarlı bir anlık kopya alınır. ynh_backup dosyayı bu script bittikten sonra
+# kopyaladığı için anlık kopya burada silinmez (bir sonraki yedekte üzerine yazılır).
+snapshot_database
+if [ -f "$data_dir/prisma/backup-snapshot.db" ]; then
+    ynh_backup --src_path="$data_dir/prisma/backup-snapshot.db" --dest_path="database.db"
+fi
+
+#=================================================
+# BACKUP THE NGINX CONFIGURATION
+#=================================================
+ynh_backup --src_path="/etc/nginx/conf.d/$domain.d/$app.conf"
+
+#=================================================
+# BACKUP THE SYSTEMD CONFIGURATION
+#=================================================
+ynh_backup --src_path="/etc/systemd/system/$app.service"
+
+#=================================================
+# END OF SCRIPT
+#=================================================
+ynh_script_progression --message="Backup script completed for $app" --last
