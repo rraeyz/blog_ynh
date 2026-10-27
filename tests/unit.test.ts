@@ -5,6 +5,8 @@ import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, pa
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
 import { extractJson, slugify } from '../src/lib/text.ts'
 import { compressImage } from '../src/lib/compress.ts'
+import { complete, RETRY_DELAYS } from '../src/lib/ai.ts'
+import http from 'node:http'
 import sharp from 'sharp'
 import { coverOf, freeImage, periodLabel, readingMinutes, topicHue, topicLabel } from '../src/lib/topics.ts'
 
@@ -147,4 +149,30 @@ test('kapak görseli küçültülüp WebP olur', async () => {
   const meta = await sharp(await compressImage(png)).metadata()
   assert.equal(meta.format, 'webp')
   assert.equal(meta.width, 1600)
+})
+
+test('JSON metninde kaçışsız satır sonu (Gemini)', () => {
+  const raw = '{"title": "Başlık", "body": "Giriş.\n## Ne yaptılar?\n\tSatır \\"alıntı\\""}'
+  assert.deepEqual(extractJson(raw), { title: 'Başlık', body: 'Giriş.\n## Ne yaptılar?\n\tSatır "alıntı"' })
+})
+
+test('geçici sağlayıcı hatasında yeniden denenir', async () => {
+  RETRY_DELAYS.splice(0, RETRY_DELAYS.length, 10, 10)
+  let calls = 0
+  const server = http.createServer((req, res) => {
+    req.resume()
+    req.on('end', () => {
+      calls++
+      if (calls === 1) return res.writeHead(503, { 'Content-Type': 'application/json' }).end('{"error":{"message":"overloaded"}}')
+      res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { content: 'tamam' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }))
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const settings = { aiProvider: 'custom', aiModel: 'm', aiApiKey: '', aiBaseUrl: `http://127.0.0.1:${(server.address() as { port: number }).port}` } as never
+  try {
+    assert.equal((await complete(settings, 's', 'u')).text, 'tamam')
+    assert.equal(calls, 2)
+  } finally {
+    server.close()
+  }
 })

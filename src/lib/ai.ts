@@ -19,6 +19,9 @@ export interface Completion {
 }
 
 const TIMEOUT = 5 * 60 * 1000
+// Sağlayıcı geçici olarak meşgulse (Gemini'de sık "503") iki kez daha denenir; testler süreleri kısaltır
+export const RETRY_DELAYS = [15_000, 45_000]
+const RETRY_STATUS = new Set([429, 500, 502, 503, 504])
 
 export function aiConfig(settings: Settings) {
   const provider = PROVIDERS[settings.aiProvider] ? settings.aiProvider : 'anthropic'
@@ -46,13 +49,23 @@ export async function complete(settings: Settings, system: string, user: string)
   }
 
   if (!baseUrl) throw new Error('Özel sağlayıcı için API adresi girilmemiş')
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
-    body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
-    signal: AbortSignal.timeout(TIMEOUT),
-  })
-  const data = await response.json().catch(() => null)
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
+      body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+      signal: AbortSignal.timeout(TIMEOUT),
+    })
+    const data = await response.json().catch(() => null)
+    if (!response.ok && RETRY_STATUS.has(response.status) && attempt < RETRY_DELAYS.length) {
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS[attempt]))
+      continue
+    }
+    return completion(provider, response, data)
+  }
+}
+
+function completion(provider: string, response: Response, data: any): Completion {
   if (!response.ok) throw new Error(`${PROVIDERS[provider].label} hata ${response.status}: ${String(data?.error?.message ?? data?.error ?? '').slice(0, 200)}`)
   const text = data?.choices?.[0]?.message?.content
   if (typeof text !== 'string') throw new Error('Modelden metin yanıtı gelmedi')
