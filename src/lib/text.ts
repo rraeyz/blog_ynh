@@ -22,7 +22,30 @@ export function extractJson(text: string): unknown {
   const close = open === '{' ? '}' : ']'
   const end = text.lastIndexOf(close)
   if (end <= start) throw new Error('Yanıttaki JSON eksik')
-  return JSON.parse(text.slice(start, end + 1))
+  const raw = text.slice(start, end + 1)
+  try {
+    return JSON.parse(raw)
+  } catch {
+    // Bazı modeller (Gemini) metnin içine kaçışsız satır sonu koyar ("Bad control character"): onlar kaçışlanıp yeniden denenir
+    return JSON.parse(escapeControlInStrings(raw))
+  }
+}
+
+function escapeControlInStrings(json: string): string {
+  let out = ''
+  let inString = false
+  let escaped = false
+  for (const ch of json) {
+    if (inString && !escaped && ch < ' ') {
+      out += ch === '\n' ? '\\n' : ch === '\r' ? '\\r' : ch === '\t' ? '\\t' : `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`
+      continue
+    }
+    if (inString && !escaped && ch === '"') inString = false
+    else if (!inString && ch === '"') inString = true
+    escaped = inString && !escaped && ch === '\\'
+    out += ch
+  }
+  return out
 }
 
 export const monthKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
