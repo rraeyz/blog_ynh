@@ -59,7 +59,7 @@ export default async function HomePage({ searchParams }: { searchParams: { sayfa
             </p>
             <h1 className="mt-5 text-4xl md:text-5xl font-semibold leading-[1.08]">{settings.siteDescription || settings.siteTitle}</h1>
             <p className="mt-4 text-lg text-zinc-600 dark:text-zinc-400">
-              Yeni makaleleri seçip kısaca anlatıyoruz. Merak ettiğinin detayına bir tıkla ulaşırsın; kaynak makale her yazının sonunda.
+              Bilimden ve teknolojiden en ilginç gelişmeleri seçip sade Türkçeyle anlatıyoruz. Önce kısaca oku, merak ettiğinin detayına bir tıkla in; kaynağı her yazının sonunda.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href="#yazilar" className="rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-6 py-3 font-medium hover:opacity-90 transition">Yazılara göz at</Link>

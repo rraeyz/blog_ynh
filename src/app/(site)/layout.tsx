@@ -25,7 +25,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
           <span>© {new Date().getFullYear()} {settings.siteTitle}</span>
           <a href="/rss.xml" className="hover:text-violet-500" title="Feedly, Inoreader gibi bir besleme okuyucuya bu adresi ekleyerek yeni yazıları takip edebilirsin">RSS beslemesi</a>
           {settings.kunyeUrl && <a href={settings.kunyeUrl} className="hover:text-violet-500">{settings.kunyeUrl.replace(/^https?:\/\//, '')}</a>}
-          <span className="ml-auto">Yazılar yapay zekâ yardımıyla hazırlanır; kaynak makaleler her yazıda.</span>
+          <span className="ml-auto">Yazılar yapay zekâ yardımıyla hazırlanır; kaynağı her yazının sonunda.</span>
         </div>
       </footer>
     </div>

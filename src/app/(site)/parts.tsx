@@ -124,7 +124,7 @@ export function SubscribeBox({ settings, compact }: { settings: Settings; compac
       <div className={`relative grid gap-6 ${compact ? '' : 'md:grid-cols-2 md:items-center'}`}>
         <div>
           <p className="text-sm font-medium text-violet-200">Haftalık bülten</p>
-          <h2 className="text-2xl md:text-3xl font-semibold mt-1">Haftanın en ilginç makaleleri, her {DAYS[settings.digestWeekday]} e-postanda.</h2>
+          <h2 className="text-2xl md:text-3xl font-semibold mt-1">Haftanın en ilginç gelişmeleri, her {DAYS[settings.digestWeekday]} e-postanda.</h2>
           <p className="text-violet-100/80 mt-2 text-sm">Kahveni içerken 5 dakikada okunur. Reklam yok, istediğin an tek tıkla ayrılırsın.</p>
         </div>
         <SubscribeForm />
