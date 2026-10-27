@@ -81,3 +81,18 @@ export function parseSelection(text: string, count: number, n: number, minSpace 
 }
 
 export const monthKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+
+// Ders çıktısı: "Özet: ..." satırı ve ilk "## " başlığından başlayan gövde (öncesindeki "araştırdım…" gibi sözler atılır)
+export function parseLesson(text: string): { excerpt: string; body: string } | null {
+  const excerpt = text.match(/^\s*\**Özet:?\**:?\s*(.+)$/m)?.[1].trim() ?? ''
+  const start = text.search(/^##\s/m)
+  if (start < 0) return null
+  return { excerpt: excerpt.slice(0, 500), body: text.slice(start).trim() }
+}
+
+// Gövdedeki [metin](https://...) linkleri
+export const markdownLinks = (body: string) => Array.from(new Set(Array.from(body.matchAll(/\[[^\]]+\]\((https?:\/\/[^\s)]+)\)/g), (m) => m[1])))
+
+// Açılmayan linkler metne döner: okur ölü linke tıklamasın
+export const unlink = (body: string, dead: Set<string>) =>
+  body.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (all, label: string, url: string) => (dead.has(url) ? label : all))

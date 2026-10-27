@@ -6,6 +6,8 @@ import { ConfirmButton } from '../../ConfirmButton'
 
 const DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
 
+const LESSON_DAYS = [['1', 'Pzt'], ['2', 'Sal'], ['3', 'Çar'], ['4', 'Per'], ['5', 'Cum'], ['6', 'Cmt'], ['0', 'Paz']]
+
 export default async function SettingsPage({ searchParams }: { searchParams: { mesaj?: string } }) {
   const s = await getSettings()
   return (
@@ -124,7 +126,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: { m
             OpenRouter bakiyesinden düşer, aylık token sınırına sayılmaz.
           </p>
           <div>
-            <label className="label" htmlFor="imageApiKey">OpenRouter API anahtarı</label>
+            <label className="label" htmlFor="imageApiKey">OpenRouter API anahtarı (görseller ve dersler)</label>
             <input id="imageApiKey" name="imageApiKey" type="password" autoComplete="off" className="input" placeholder={s.imageApiKey ? 'kayıtlı (değiştirmek için yenisini yaz)' : 'openrouter.ai → Keys; boşsa görsel üretilmez'} />
             {s.imageApiKey && <label className="hint flex items-center gap-1"><input type="checkbox" name="imageApiKeyClear" /> Kayıtlı anahtarı sil</label>}
           </div>
@@ -132,6 +134,28 @@ export default async function SettingsPage({ searchParams }: { searchParams: { m
             <label className="label" htmlFor="imageModel">Görsel modeli</label>
             <input id="imageModel" name="imageModel" defaultValue={s.imageModel} className="input" />
             <p className="hint">openrouter.ai/models?output_modalities=image adresindeki model adlarından biri.</p>
+          </div>
+        </fieldset>
+
+        <fieldset className="card space-y-4">
+          <legend className="font-semibold px-1">Eğitim</legend>
+          <p className="hint">
+            Seçili günlerde, günlük işten sonra müfredattaki sıradaki ders web&apos;de araştırılıp yazılır ve taslak olarak bekler; Eğitim sayfasından
+            okuyup yayımlarsın. Görsellerdeki OpenRouter anahtarını kullanır. Ders başına yaklaşık 0,15-0,25 $ (model + web araması).
+          </p>
+          <div>
+            <label className="label" htmlFor="lessonModel">Ders modeli</label>
+            <input id="lessonModel" name="lessonModel" defaultValue={s.lessonModel} className="input" />
+            <p className="hint">OpenRouter model adı; doğruluk önemli olduğu için güçlü bir model (ör. anthropic/claude-sonnet-5.5).</p>
+          </div>
+          <div>
+            <p className="label">Ders yazılan günler</p>
+            <div className="flex flex-wrap gap-3 text-sm">
+              {LESSON_DAYS.map(([value, label]) => (
+                <label key={value} className="flex items-center gap-1.5"><input type="checkbox" name="lessonDay" value={value} defaultChecked={s.lessonWeekdays.split(',').includes(value)} /> {label}</label>
+              ))}
+            </div>
+            <p className="hint">Hiçbiri seçili değilse ders yazılmaz.</p>
           </div>
         </fieldset>
 

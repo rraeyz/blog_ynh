@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { extractJson, parseSelection, slugify } from '../src/lib/text.ts'
+import { extractJson, markdownLinks, parseLesson, parseSelection, slugify, unlink } from '../src/lib/text.ts'
+import { isPrivateIp } from '../src/lib/net.ts'
 import { compressImage } from '../src/lib/compress.ts'
 import { complete, RETRY_DELAYS } from '../src/lib/ai.ts'
 import http from 'node:http'
@@ -195,4 +196,27 @@ test('seçimde her gün en az bir uzay haberi', () => {
   assert.deepEqual(parseSelection(`{"picked": [1, 4, 2], ${scores}, "space": [3, 4, 5]}`, 5, 3, 2).picked, [0, 3, 2], 'en az 2: sondaki uzay olmayan, kalan en yüksek puanlı uzayla değişir')
   assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [5]}`, 5, 3, 3).picked, [0, 1, 4], 'yeterli uzay haberi yoksa olanlarla yetinilir')
   assert.deepEqual(parseSelection(`{"picked": [1, 2], ${scores}, "space": [4, 5]}`, 5, 2, 0).picked, [0, 1], '0 ise kural yok')
+})
+
+test('ders: kod bloğu ve formüller', () => {
+  const html = renderMarkdown('## Matematiği\nAiry diski: $\\theta = 1.22 \\lambda / D$ ve **kalın**.\n$$\nF = \\frac{a}{b}\n$$\n```python\nimport numpy as np\nx = 1 < 2\n```\n```iraf\nimexam <b>\n```', { math: true })
+  assert.match(html, /class="katex"/, 'satır içi formül KaTeX ile')
+  assert.match(html, /<div class="math"><span class="katex-display">/, 'ayrı satırdaki formül')
+  assert.match(html, /<pre><code class="hljs language-python">[\s\S]*hljs-keyword[\s\S]*&lt;/, 'bilinen dil renklenir, kaçışlanır')
+  assert.match(html, /<code class="hljs language-iraf">imexam &lt;b&gt;/, 'bilinmeyen dil düz ama kaçışlı')
+  assert.match(html, /<strong>kalın<\/strong>/)
+  // Haber yazılarında $ para birimi: formül açılmaz
+  assert.doesNotMatch(renderMarkdown('Fiyatı $5 ile $10 arası'), /katex/)
+  assert.match(renderMarkdown('```\nkapanmamış blok'), /<pre><code class="hljs">kapanmamış blok<\/code><\/pre>/)
+  assert.doesNotMatch(renderMarkdown('$<img src=x onerror=alert(1)>$', { math: true }), /<img/, 'formül içi HTML çalışmaz')
+})
+
+test('ders çıktısı, linkler ve iç ağ adresleri', () => {
+  assert.deepEqual(parseLesson('Araştırdım.\nÖzet: Airy diski kırınımdır.\n\n## Nedir?\nMetin'), { excerpt: 'Airy diski kırınımdır.', body: '## Nedir?\nMetin' })
+  assert.equal(parseLesson('Başlıksız metin'), null)
+  const body = 'Bak [ESO](https://eso.org/a) ve [yok](https://x.com/404) ve tekrar [ESO](https://eso.org/a)'
+  assert.deepEqual(markdownLinks(body), ['https://eso.org/a', 'https://x.com/404'])
+  assert.equal(unlink(body, new Set(['https://x.com/404'])), 'Bak [ESO](https://eso.org/a) ve yok ve tekrar [ESO](https://eso.org/a)')
+  for (const ip of ['127.0.0.1', '10.1.2.3', '192.168.1.5', '172.20.0.1', '169.254.169.254', '::1', '::ffff:127.0.0.1', 'fd00::1', '0.0.0.0']) assert.ok(isPrivateIp(ip), ip)
+  for (const ip of ['8.8.8.8', '172.32.0.1', '2606:4700::1111']) assert.ok(!isPrivateIp(ip), ip)
 })

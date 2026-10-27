@@ -8,7 +8,8 @@ export const PROVIDERS: Record<string, { label: string; baseUrl: string; default
   openai: { label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', defaultModel: '' },
   gemini: { label: 'Google Gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', defaultModel: '' },
   deepseek: { label: 'DeepSeek', baseUrl: 'https://api.deepseek.com', defaultModel: 'deepseek-chat' },
-  openrouter: { label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', defaultModel: '' },
+  // OPENROUTER_BASE_URL yalnızca testlerin sahte sunucusu için
+  openrouter: { label: 'OpenRouter', baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1', defaultModel: '' },
   custom: { label: 'Özel adres (OpenAI uyumlu: OpenCode, Ollama...)', baseUrl: '', defaultModel: '' },
 }
 
@@ -16,6 +17,8 @@ export interface Completion {
   text: string
   inputTokens: number
   outputTokens: number
+  // OpenRouter web aramasının kullandığı sayfalar (url_citation); diğer sağlayıcılarda boş
+  citations: Array<{ url: string; title: string }>
 }
 
 const TIMEOUT = 5 * 60 * 1000
@@ -30,7 +33,8 @@ export function aiConfig(settings: Settings) {
   return { provider, model, baseUrl, apiKey: settings.aiApiKey.trim() }
 }
 
-export async function complete(settings: Settings, system: string, user: string): Promise<Completion> {
+// extra: OpenAI uyumlu istek gövdesine eklenen alanlar (ör. OpenRouter web_search aracı, max_tokens)
+export async function complete(settings: Settings, system: string, user: string, extra: Record<string, unknown> = {}): Promise<Completion> {
   const { provider, model, baseUrl, apiKey } = aiConfig(settings)
   if (!model) throw new Error('Ayarlar → Yapay zekâ bölümünde model adı girilmemiş')
   if (!apiKey && provider !== 'custom') throw new Error('Ayarlar → Yapay zekâ bölümünde API anahtarı girilmemiş')
@@ -45,7 +49,7 @@ export async function complete(settings: Settings, system: string, user: string)
     })
     if (response.stop_reason === 'refusal') throw new Error('Model bu isteği yanıtlamayı reddetti')
     const text = response.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('')
-    return { text, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens }
+    return { text, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, citations: [] }
   }
 
   if (!baseUrl) throw new Error('Özel sağlayıcı için API adresi girilmemiş')
@@ -53,7 +57,7 @@ export async function complete(settings: Settings, system: string, user: string)
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
-      body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }),
+      body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], ...extra }),
       signal: AbortSignal.timeout(TIMEOUT),
     })
     const data = await response.json().catch(() => null)
@@ -69,5 +73,9 @@ function completion(provider: string, response: Response, data: any): Completion
   if (!response.ok) throw new Error(`${PROVIDERS[provider].label} hata ${response.status}: ${String(data?.error?.message ?? data?.error ?? '').slice(0, 200)}`)
   const text = data?.choices?.[0]?.message?.content
   if (typeof text !== 'string') throw new Error('Modelden metin yanıtı gelmedi')
-  return { text, inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0 }
+  const annotations: Array<{ type?: string; url_citation?: { url?: unknown; title?: unknown } }> = data?.choices?.[0]?.message?.annotations ?? []
+  const citations = annotations.flatMap((a) =>
+    a.type === 'url_citation' && typeof a.url_citation?.url === 'string' ? [{ url: a.url_citation.url, title: String(a.url_citation.title ?? '') }] : [],
+  )
+  return { text, inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0, citations }
 }

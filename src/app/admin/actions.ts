@@ -13,6 +13,7 @@ import { writePost } from '@/lib/writer'
 import { generateCover, removeImage } from '@/lib/images'
 import { createWeeklyDigest, digestBody, sendDigest } from '@/lib/newsletter'
 import { CATEGORIES } from '@/lib/topics'
+import { addLesson, addSeries, lessonTask, planSeries, requestLesson, STARTER_SERIES, writeLesson } from '@/lib/lessons'
 import { dailyTask, isJobRunning, runExclusive, weeklyTask } from '@/lib/jobs'
 import { PROVIDERS } from '@/lib/ai'
 
@@ -127,6 +128,8 @@ export async function saveSettingsAction(form: FormData) {
       newsletterTag: text(form, 'newsletterTag').slice(0, 50),
       imageApiKey: text(form, 'imageApiKey') || (form.get('imageApiKeyClear') ? '' : current.imageApiKey),
       imageModel: text(form, 'imageModel').slice(0, 200) || current.imageModel,
+      lessonModel: text(form, 'lessonModel').slice(0, 200) || current.lessonModel,
+      lessonWeekdays: form.getAll('lessonDay').map(String).filter((d) => /^[0-6]$/.test(d)).join(','),
     },
   })
   back('/admin/ayarlar', 'Ayarlar kaydedildi')
@@ -347,4 +350,123 @@ export async function runDailyAction() {
 export async function runWeeklyAction() {
   await requireAdmin()
   inBackground('/admin', 'Haftalık bülten (elle)', weeklyTask, 'Haftalık bülten hazırlanıyor; sonuç aşağıdaki günlükte görünür')
+}
+
+// --- Eğitim ---
+
+const lessonPath = (lessonId: number) => `/admin/egitim/ders/${lessonId}`
+const seriesPath = (seriesId: number) => `/admin/egitim/seri/${seriesId}`
+const sourceList = (value: string) => value.split('\n').map((l) => l.trim()).filter((l) => /^https?:\/\/\S+$/.test(l)).slice(0, 5).join('\n')
+
+export async function runLessonAction() {
+  await requireAdmin()
+  const settings = await getSettings()
+  if (!settings.imageApiKey.trim()) back('/admin/egitim', 'Önce Ayarlar → Görseller bölümüne OpenRouter anahtarını gir (dersler de onu kullanır)')
+  inBackground('/admin/egitim', 'Ders', () => lessonTask(settings), 'Sıradaki ders araştırılıp yazılıyor; birkaç dakika sürer (sonuç Genel → İş günlüğünde)')
+}
+
+export async function seedSeriesAction() {
+  await requireAdmin()
+  if ((await prisma.series.count()) > 0) back('/admin/egitim', 'Müfredat zaten var')
+  for (const [i, series] of STARTER_SERIES.entries()) await addSeries(series.title, series.summary, i + 1)
+  back('/admin/egitim', 'Başlangıç müfredatı eklendi')
+}
+
+export async function requestLessonAction(form: FormData) {
+  await requireAdmin()
+  const title = text(form, 'title').slice(0, 200)
+  if (!title) back('/admin/egitim', 'Ders başlığı gir')
+  await requestLesson(title, text(form, 'scope').slice(0, 1000), sourceList(text(form, 'sourceUrls')))
+  back('/admin/egitim', 'İstek sıranın en önüne eklendi')
+}
+
+export async function addSeriesAction(form: FormData) {
+  await requireAdmin()
+  const title = text(form, 'title').slice(0, 200)
+  if (!title) back('/admin/egitim', 'Seri adı gir')
+  const series = await addSeries(title, text(form, 'summary').slice(0, 1000))
+  back(seriesPath(series.id), 'Seri eklendi; ders listesi sırası gelince çıkarılır (ya da şimdi çıkar)')
+}
+
+export async function saveSeriesAction(form: FormData) {
+  await requireAdmin()
+  const seriesId = id(form)
+  const title = text(form, 'title').slice(0, 200)
+  if (!title) back(seriesPath(seriesId), 'Seri adı boş olamaz')
+  await prisma.series.update({ where: { id: seriesId }, data: { title, summary: text(form, 'summary').slice(0, 1000), position: Number.parseInt(text(form, 'position'), 10) || 0 } })
+  back(seriesPath(seriesId), 'Kaydedildi')
+}
+
+export async function deleteSeriesAction(form: FormData) {
+  await requireAdmin()
+  await prisma.series.deleteMany({ where: { id: id(form) } })
+  back('/admin/egitim', 'Seri ve dersleri silindi')
+}
+
+export async function planSeriesAction(form: FormData) {
+  await requireAdmin()
+  const seriesId = id(form)
+  if (await prisma.lesson.count({ where: { seriesId } })) back(seriesPath(seriesId), 'Bu serinin dersleri zaten var')
+  const settings = await getSettings()
+  inBackground(seriesPath(seriesId), 'Seri planı', async () => `${await planSeries(seriesId, settings)} ders planlandı`, 'Ders listesi araştırılıp çıkarılıyor; bir dakika sonra yenile')
+}
+
+export async function addLessonAction(form: FormData) {
+  await requireAdmin()
+  const seriesId = id(form)
+  const title = text(form, 'title').slice(0, 200)
+  if (!title) back(seriesPath(seriesId), 'Ders başlığı gir')
+  await addLesson(seriesId, title, text(form, 'scope').slice(0, 1000), sourceList(text(form, 'sourceUrls')))
+  await prisma.series.update({ where: { id: seriesId }, data: { planned: true } })
+  back(seriesPath(seriesId), 'Ders eklendi')
+}
+
+export async function saveLessonAction(form: FormData) {
+  await requireAdmin()
+  const lessonId = id(form)
+  const title = text(form, 'title').slice(0, 200)
+  if (!title) back(lessonPath(lessonId), 'Başlık boş olamaz')
+  await prisma.lesson.update({
+    where: { id: lessonId },
+    data: {
+      title,
+      position: Number.parseInt(text(form, 'position'), 10) || 0,
+      scope: text(form, 'scope').slice(0, 1000),
+      sourceUrls: sourceList(text(form, 'sourceUrls')),
+      excerpt: text(form, 'excerpt').slice(0, 500),
+      body: text(form, 'body'),
+    },
+  })
+  back(lessonPath(lessonId), 'Kaydedildi')
+}
+
+export async function publishLessonAction(form: FormData) {
+  await requireAdmin()
+  const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: id(form) } })
+  if (lesson.status !== 'published' && !lesson.body.trim()) back(lessonPath(lesson.id), 'Ders henüz yazılmadı')
+  const publish = lesson.status !== 'published'
+  await prisma.lesson.update({ where: { id: lesson.id }, data: { status: publish ? 'published' : 'draft', publishedAt: publish ? lesson.publishedAt ?? new Date() : lesson.publishedAt } })
+  back(lessonPath(lesson.id), publish ? 'Yayımlandı' : 'Yayından kaldırıldı')
+}
+
+export async function rewriteLessonAction(form: FormData) {
+  await requireAdmin()
+  const lessonId = id(form)
+  const settings = await getSettings()
+  if (!settings.imageApiKey.trim()) back(lessonPath(lessonId), 'Önce Ayarlar → Görseller bölümüne OpenRouter anahtarını gir')
+  inBackground(lessonPath(lessonId), 'Ders', async () => `"${(await writeLesson(lessonId, settings)).title}" yazıldı (taslak)`, 'Ders araştırılıp yazılıyor; birkaç dakika sonra yenile')
+}
+
+// Hata alan ders yeniden sıraya girer
+export async function retryLessonAction(form: FormData) {
+  await requireAdmin()
+  await prisma.lesson.updateMany({ where: { id: id(form), status: 'failed' }, data: { status: 'planned', error: '' } })
+  back('/admin/egitim', 'Ders yeniden sıraya alındı')
+}
+
+export async function deleteLessonAction(form: FormData) {
+  await requireAdmin()
+  const lesson = await prisma.lesson.findUnique({ where: { id: id(form) }, select: { seriesId: true } })
+  await prisma.lesson.deleteMany({ where: { id: id(form) } })
+  back(lesson ? seriesPath(lesson.seriesId) : '/admin/egitim', 'Ders silindi')
 }

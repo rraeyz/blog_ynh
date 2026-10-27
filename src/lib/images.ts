@@ -2,6 +2,7 @@ import path from 'node:path'
 import { mkdir, unlink, writeFile } from 'node:fs/promises'
 import { prisma } from '@/lib/prisma'
 import { compressImage } from '@/lib/compress'
+import { PROVIDERS } from '@/lib/ai'
 import { freeImage } from '@/lib/topics'
 import { logJob, type Settings } from '@/lib/state'
 
@@ -17,7 +18,7 @@ export const removeImage = (name: string) => (IMAGE_NAME.test(name) ? unlink(pat
 // Temsili kapak: başlık ve kısa metinden, OpenRouter'ın görsel API'siyle. Fotoğraf gibi görünmesin (bilim haberinde yanıltır)
 export async function generateCover(postId: number, settings: Settings): Promise<string> {
   const post = await prisma.post.findUniqueOrThrow({ where: { id: postId } })
-  const response = await fetch('https://openrouter.ai/api/v1/images', {
+  const response = await fetch(`${PROVIDERS.openrouter.baseUrl}/images`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.imageApiKey.trim()}` },
     body: JSON.stringify({

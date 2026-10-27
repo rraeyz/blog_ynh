@@ -12,8 +12,10 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 
 ## Doğrulama
 - `npx tsc --noEmit && npx next lint && npm test`
-- Uçtan uca: `npm run build`, boş veritabanıyla `npm start`, sonra `BASE_URL=... node --test tests/e2e.test.mjs`
+- Uçtan uca: `npm run build`, boş veritabanıyla `OPENROUTER_BASE_URL=http://127.0.0.1:3901/or/v1 BLOG_ALLOW_PRIVATE_URLS=1 npm start` (sahte yapay zekâ/OpenRouter/Künye sunucusu 127.0.0.1:3901'de; iç ağ adresleri normalde `lib/net.ts` ile engellenir), sonra `BASE_URL=... node --test tests/e2e.test.mjs`
 - Bulut oturumunda Node `fetch` proxy'yi kendiliğinden kullanmaz: sunucuyu `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt` ile başlat.
 
-## Yapılacaklar
-- YunoHost paketi (Künye'deki `manifest.toml`, `conf/`, `scripts/`, Dockerfile düzeni).
+## Eğitim bölümü
+- `/egitim`: seriler ve sıralı dersler (`lib/lessons.ts`). Yapay zekâ konu seçmez: istekler, sonra müfredat sırası; seri sırası gelince derslere bölünür, müfredat bitince yeni seri önerilir.
+- Dersler OpenRouter'da `openrouter:web_search` aracıyla araştırılarak yazılır; en az 3 doğrulanmış kaynak şart, açılmayan linkler metne döner. Dersler taslak gelir, yönetici yayımlar.
+- Formül ($...$, $$...$$) yalnızca derslerde açılır (`renderMarkdown(body, { math: true })`): haberlerde $ para birimi olabilir.

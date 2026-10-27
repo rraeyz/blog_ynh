@@ -1,5 +1,6 @@
 import { cleanupPapers, fetchSources } from '@/lib/papers'
 import { writeDaily } from '@/lib/writer'
+import { lessonTask } from '@/lib/lessons'
 import { createWeeklyDigest, sendDigest } from '@/lib/newsletter'
 import { getSettings, getState, logJob, setState } from '@/lib/state'
 
@@ -55,6 +56,12 @@ async function tick() {
   if ((await getState('job.dailyDate')) !== today()) {
     await setState('job.dailyDate', today())
     await runExclusive('Günlük iş', dailyTask)
+  }
+  // Ders günlerinde günlük işten sonra (aynı anda iki yapay zekâ işi çalışmasın diye sırayla)
+  const lessonDays = settings.lessonWeekdays.split(',').map((d) => d.trim())
+  if (lessonDays.includes(String(new Date().getDay())) && (await getState('job.lessonDate')) !== today()) {
+    await setState('job.lessonDate', today())
+    await runExclusive('Ders', () => lessonTask(settings))
   }
   if (new Date().getDay() === settings.digestWeekday && (await getState('job.weeklyDate')) !== today()) {
     await setState('job.weeklyDate', today())

@@ -8,11 +8,13 @@ const VERSION = 1
 
 // Geri yüklemede yalnızca bu alanlar alınır (yedek dosyası güvenilmeyen girdidir)
 const FIELDS = {
-  settings: ['siteTitle', 'siteDescription', 'siteUrl', 'aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'readMode', 'maxInputChars', 'postsPerDay', 'spacePerDay', 'dailyHour', 'interests', 'monthlyTokenLimit', 'autoPublish', 'autoNewsletter', 'digestWeekday', 'kunyeUrl', 'kunyeToken', 'newsletterTag', 'imageApiKey', 'imageModel'],
+  settings: ['siteTitle', 'siteDescription', 'siteUrl', 'aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'readMode', 'maxInputChars', 'postsPerDay', 'spacePerDay', 'dailyHour', 'interests', 'monthlyTokenLimit', 'autoPublish', 'autoNewsletter', 'digestWeekday', 'kunyeUrl', 'kunyeToken', 'newsletterTag', 'imageApiKey', 'imageModel', 'lessonModel', 'lessonWeekdays'],
   sources: ['id', 'url', 'enabled', 'lastFetchedAt', 'lastError', 'createdAt'],
   papers: ['id', 'externalId', 'title', 'authors', 'abstract', 'score', 'imageUrl', 'topic', 'url', 'publishedAt', 'status', 'error', 'createdAt'],
   posts: ['id', 'slug', 'title', 'excerpt', 'highlights', 'category', 'importance', 'image', 'featuredAt', 'body', 'status', 'publishedAt', 'paperId', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
   digests: ['id', 'createdAt', 'subject', 'body', 'status', 'sentAt', 'result'],
+  series: ['id', 'slug', 'title', 'summary', 'position', 'planned', 'createdAt'],
+  lessons: ['id', 'seriesId', 'position', 'slug', 'title', 'scope', 'sourceUrls', 'excerpt', 'body', 'sources', 'status', 'error', 'publishedAt', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
 } as const
 
 type Row = Record<string, unknown>
@@ -26,12 +28,14 @@ const rows = (value: unknown, fields: readonly string[]) => {
 }
 
 export async function createBackup() {
-  const [settings, sources, papers, posts, digests] = await Promise.all([
+  const [settings, sources, papers, posts, digests, series, lessons] = await Promise.all([
     prisma.settings.findUnique({ where: { id: 1 } }),
     prisma.source.findMany({ orderBy: { id: 'asc' } }),
     prisma.paper.findMany({ orderBy: { id: 'asc' } }),
     prisma.post.findMany({ orderBy: { id: 'asc' } }),
     prisma.digest.findMany({ orderBy: { id: 'asc' } }),
+    prisma.series.findMany({ orderBy: { id: 'asc' } }),
+    prisma.lesson.findMany({ orderBy: { id: 'asc' } }),
   ])
   return {
     format: BACKUP_FORMAT,
@@ -42,6 +46,8 @@ export async function createBackup() {
     papers,
     posts,
     digests,
+    series,
+    lessons,
   }
 }
 
@@ -54,10 +60,14 @@ export async function restoreBackup(data: unknown) {
   const papers = rows(backup.papers, FIELDS.papers)
   const posts = rows(backup.posts, FIELDS.posts)
   const digests = rows(backup.digests, FIELDS.digests)
+  // Eğitim bölümünden önceki yedeklerde bu alanlar yok
+  const series = rows(backup.series ?? [], FIELDS.series)
+  const lessons = rows(backup.lessons ?? [], FIELDS.lessons)
 
   // Hepsi ya da hiçbiri: hata olursa veritabanı değişmeden kalır
   await prisma.$transaction(async (tx) => {
     await tx.post.deleteMany()
+    await tx.series.deleteMany() // dersler seriyle birlikte silinir
     await tx.digest.deleteMany()
     await tx.paper.deleteMany()
     await tx.source.deleteMany()
@@ -67,6 +77,8 @@ export async function restoreBackup(data: unknown) {
     if (papers.length) await tx.paper.createMany({ data: papers as never })
     if (posts.length) await tx.post.createMany({ data: posts as never })
     if (digests.length) await tx.digest.createMany({ data: digests as never })
+    if (series.length) await tx.series.createMany({ data: series as never })
+    if (lessons.length) await tx.lesson.createMany({ data: lessons as never })
   })
-  return { sources: sources.length, papers: papers.length, posts: posts.length, digests: digests.length }
+  return { sources: sources.length, papers: papers.length, posts: posts.length, digests: digests.length, lessons: lessons.length }
 }
