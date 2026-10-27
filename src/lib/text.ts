@@ -48,10 +48,11 @@ function escapeControlInStrings(json: string): string {
   return out
 }
 
-// Seçim yanıtı: {"picked": [3, 1], "scores": {"1": 6, "2": 3}} (numaralar listedeki sıra, 1'den başlar).
-// Seçilen numaralar bozuksa en yüksek puanlılar alınır; puanlar 1-10'a sıkıştırılır
+// Seçim yanıtı: {"picked": [3, 1], "scores": {"1": 6, "2": 3}, "space": [2]} (numaralar listedeki sıra, 1'den başlar).
+// Seçilen numaralar bozuksa en yüksek puanlılar alınır; puanlar 1-10'a sıkıştırılır.
+// Her gün en az bir uzay yazısı: seçilenlerde uzay haberi yoksa en yüksek puanlı uzay haberi sonuncunun yerine girer
 export function parseSelection(text: string, count: number, n: number): { picked: number[]; scores: Map<number, number> } {
-  const data = extractJson(text) as { picked?: unknown; scores?: unknown }
+  const data = extractJson(text) as { picked?: unknown; scores?: unknown; space?: unknown }
   const scores = new Map<number, number>()
   if (data && typeof data.scores === 'object' && !Array.isArray(data.scores)) {
     for (const [key, value] of Object.entries(data.scores as Record<string, unknown>)) {
@@ -63,7 +64,13 @@ export function parseSelection(text: string, count: number, n: number): { picked
   const valid = (i: number) => Number.isInteger(i) && i >= 0 && i < count
   let picked = Array.isArray(data?.picked) ? data.picked.map((i) => Number(i) - 1).filter(valid) : []
   if (picked.length === 0) picked = Array.from(scores.entries()).sort((a, b) => b[1] - a[1]).map(([i]) => i)
-  return { picked: Array.from(new Set(picked)).slice(0, n), scores }
+  picked = Array.from(new Set(picked)).slice(0, n)
+  const space = Array.isArray(data?.space) ? data.space.map((i) => Number(i) - 1).filter(valid) : []
+  if (n > 0 && space.length > 0 && !picked.some((i) => space.includes(i))) {
+    const best = space.reduce((a, b) => ((scores.get(b) ?? 0) > (scores.get(a) ?? 0) ? b : a))
+    picked = picked.length < n ? [...picked, best] : [...picked.slice(0, n - 1), best]
+  }
+  return { picked, scores }
 }
 
 export const monthKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`

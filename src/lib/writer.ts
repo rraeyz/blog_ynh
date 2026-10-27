@@ -88,7 +88,9 @@ const SELECT = `Bir bilim editörüsün. Verilen makale ve haberlerden en öneml
 - meraklı ama uzman olmayan bir okuru ilgilendirecek olanlar.
 Küçük iyileştirmeleri, birbirinin tekrarı olanları ve yalnızca dar bir uzman kitleyi ilgilendirenleri seçme; eşit önemdeyse farklı konulardan seç.
 Ayrıca listedeki HER makaleye bu ölçütlere göre 1-10 arası bir puan ver (cömert olma; çoğu 3-6 arasında olmalı).
-Yanıtı yalnızca şu JSON biçiminde ver: {"picked": [seçtiğin numaralar önem sırasıyla], "scores": {"1": puan, "2": puan, ...}}`
+Seçtiklerinin en az biri astronomi, astrofizik ya da uzay araştırması haberi olsun (listede somut bir uzay gelişmesi varsa).
+"space" alanına listedeki bütün astronomi/astrofizik/uzay haberlerinin numaralarını yaz.
+Yanıtı yalnızca şu JSON biçiminde ver: {"picked": [seçtiğin numaralar önem sırasıyla], "scores": {"1": puan, "2": puan, ...}, "space": [uzay haberlerinin numaraları]}`
 
 // Model en önemli n makaleyi seçer ve hepsine ön puan verir (Makaleler → Bekliyor bu puana göre sıralı).
 // Başlık ve özetin başı gider (makale başına ~60 token, puanlar için ~4 token)
