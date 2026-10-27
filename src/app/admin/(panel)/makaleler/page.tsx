@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
-import { addPaperAction, skipPaperAction, writePaperAction } from '../../actions'
+import { addPaperAction, bulkPapersAction, deletePaperAction, skipPaperAction, writePaperAction } from '../../actions'
 import { Notice } from '../../Notice'
+import { ConfirmButton } from '../../ConfirmButton'
 
 const STATUS: Record<string, string> = { new: 'Bekliyor', failed: 'Hata', skipped: 'Atlandı', written: 'Yazıldı' }
 
@@ -17,8 +18,9 @@ export default async function PapersPage({ searchParams }: { searchParams: { mes
       <Notice message={searchParams.mesaj} />
       <h1 className="text-xl font-bold mb-2">Makaleler</h1>
       <p className="text-sm text-zinc-500 mb-4">
-        Kaynaklardan çekilen ham makaleler. Günlük iş <b>Bekliyor</b> listesinden seçip yazıya dönüştürür; seçilmeyenler <b>Atlandı</b>&apos;ya,
-        yazıya dönüşenler <b>Yazıldı</b>&apos;ya geçer. İstediğini elle de dönüştürebilir ya da aşağıya tek bir makale linki ekleyebilirsin.
+        Kaynaklardan çekilen ham makaleler. Günlük iş <b>Bekliyor</b> listesinden en önemlileri seçip yazıya dönüştürür. Seçilmeyenler 3 gün
+        boyunca sonraki günlerin seçimine yeniden girer, sonra <b>Atlandı</b>&apos;ya geçer. Atlanan, hatalı ve silinen makaleler 30 gün sonra
+        kendiliğinden temizlenir; silinen bir makale kaynağında dursa da geri gelmez. İstediğini elle de dönüştürebilir ya da aşağıya tek bir makale linki ekleyebilirsin.
       </p>
       <form action={addPaperAction} className="card mb-6 flex flex-col sm:flex-row gap-2">
         <input name="url" type="url" required placeholder="https://arxiv.org/abs/2510.12345 ya da herhangi bir makale/yazı linki" className="input" />
@@ -29,6 +31,14 @@ export default async function PapersPage({ searchParams }: { searchParams: { mes
           <Link key={key} href={`/admin/makaleler?durum=${key}`} className={key === status ? 'btn-primary' : 'btn'}>{label} · {count(key)}</Link>
         ))}
       </nav>
+      {status !== 'written' && papers.length > 0 && (
+        <form action={bulkPapersAction} className="mb-4">
+          <input type="hidden" name="status" value={status} />
+          <ConfirmButton question={status === 'skipped' ? `Atlanan ${count(status)} makalenin hepsi silinsin mi?` : `Bu listedeki ${count(status)} makalenin hepsi atlansın mı?`} className="btn">
+            {status === 'skipped' ? `Hepsini sil (${count(status)})` : `Hepsini atla (${count(status)})`}
+          </ConfirmButton>
+        </form>
+      )}
       {papers.length === 0 ? (
         <p className="text-sm text-stone-500">Bu listede makale yok.</p>
       ) : (
@@ -45,6 +55,7 @@ export default async function PapersPage({ searchParams }: { searchParams: { mes
                   <>
                     <form action={writePaperAction}><input type="hidden" name="id" value={paper.id} /><button className="btn-primary">Yazıya dönüştür</button></form>
                     {paper.status !== 'skipped' && <form action={skipPaperAction}><input type="hidden" name="id" value={paper.id} /><button className="btn">Atla</button></form>}
+                    <form action={deletePaperAction}><input type="hidden" name="id" value={paper.id} /><input type="hidden" name="status" value={paper.status} /><button className="btn">Sil</button></form>
                   </>
                 )}
               </div>

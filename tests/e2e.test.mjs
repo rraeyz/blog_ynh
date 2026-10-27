@@ -165,6 +165,21 @@ test('kaynak ekleme', async () => {
   assert.match(await submit('/admin/kaynaklar', 'Kaynak ekle', { url: `${FAKE}/feed.xml` }), /zaten ekli/)
 })
 
+test('makaleleri sil, toplu atla ve sil', async () => {
+  const tab = async (status) => (await get(`/admin/makaleler?durum=${status}`)).html
+  const count = (label, n) => new RegExp(`${label}(<!-- -->)? · (<!-- -->)?${n}<`)
+  const add = () => submit('/admin/makaleler', 'Ekle', { url: `${FAKE}/feed.xml` })
+  assert.match(await add(), /Eklendi/)
+  assert.match(await submit('/admin/makaleler?durum=new', 'Hepsini atla'), /1 makale atlandı/)
+  assert.match(await submit('/admin/makaleler?durum=skipped', 'Hepsini sil'), /1 makale silindi/)
+  assert.match(await tab('skipped'), count('Atlandı', 0))
+  // Silinen makalenin kaydı kalır: elle yeniden eklenince geri gelir, tek tek de silinebilir
+  await add()
+  assert.match(await tab('new'), count('Bekliyor', 1))
+  assert.match(await submit('/admin/makaleler?durum=new', '>Sil<'), /Silindi/)
+  assert.match(await tab('new'), count('Bekliyor', 0))
+})
+
 let postId
 test('makale → taslak yazı → yayın', async () => {
   assert.match(await submit('/admin/makaleler', 'Ekle', { url: `${FAKE}/makale` }), /Eklendi: Örnek Makale/)

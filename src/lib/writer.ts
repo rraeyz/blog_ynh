@@ -100,18 +100,21 @@ export async function selectPapers(candidates: Array<{ id: number; title: string
   return Array.from(new Set(ids)).slice(0, n)
 }
 
-// Günlük iş: son 3 günün bekleyen makalelerinden seçip yazar, seçilmeyenleri atlar
+// Günlük iş: son 3 günün bekleyen makalelerinden seçip yazar. Seçilmeyenler 3 gün boyunca ertesi günlerin
+// seçimine yeniden girer (daha önemlileri yüzünden kalan iyi bir haber ikinci şans bulur); 3 günü dolan atlanır
 export async function writeDaily(settings: Settings): Promise<{ written: number; failed: number; skipped: number; budget: boolean }> {
+  const cutoff = new Date(Date.now() - 3 * 24 * 3600_000)
+  const expired = await prisma.paper.updateMany({ where: { status: 'new', createdAt: { lt: cutoff } }, data: { status: 'skipped' } })
   const candidates = await prisma.paper.findMany({
-    where: { status: 'new', createdAt: { gte: new Date(Date.now() - 3 * 24 * 3600_000) } },
+    where: { status: 'new', createdAt: { gte: cutoff } },
     orderBy: { publishedAt: 'desc' },
     select: { id: true, title: true, abstract: true },
   })
-  const summary = { written: 0, failed: 0, skipped: 0, budget: false }
+  const summary = { written: 0, failed: 0, skipped: expired.count, budget: false }
   if (candidates.length === 0 || settings.postsPerDay <= 0) return summary
   if (await overBudget(settings)) return { ...summary, budget: true }
-  // Modele en yeni 80 makalenin başlığı ve özetinin başı gider (token için); seçilmeyenlerin hepsi atlanır, ertesi güne yığılmaz
-  const picked = await selectPapers(candidates.slice(0, 80), settings, settings.postsPerDay)
+  // Modele en yeni 150 makalenin başlığı ve özetinin başı gider (token için, ~10 bin)
+  const picked = await selectPapers(candidates.slice(0, 150), settings, settings.postsPerDay)
   for (const id of picked) {
     if (await overBudget(settings)) {
       summary.budget = true
@@ -123,10 +126,6 @@ export async function writeDaily(settings: Settings): Promise<{ written: number;
     } catch {
       summary.failed++
     }
-  }
-  const rest = candidates.filter((paper) => !picked.includes(paper.id)).map((paper) => paper.id)
-  if (!summary.budget && rest.length) {
-    summary.skipped = (await prisma.paper.updateMany({ where: { id: { in: rest }, status: 'new' }, data: { status: 'skipped' } })).count
   }
   return summary
 }

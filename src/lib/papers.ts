@@ -39,11 +39,25 @@ export async function addPaperFromUrl(input: string): Promise<{ id: number; titl
   const existing = await prisma.paper.findUnique({ where: { externalId: paper.externalId } })
   if (existing) {
     // Daha önce atlanmışsa yeniden sıraya al
-    if (existing.status === 'skipped' || existing.status === 'failed') await prisma.paper.update({ where: { id: existing.id }, data: { status: 'new', error: '' } })
+    if (['skipped', 'failed', 'deleted'].includes(existing.status)) await prisma.paper.update({ where: { id: existing.id }, data: { status: 'new', error: '', abstract: paper.abstract } })
     return { id: existing.id, title: existing.title }
   }
   const created = await prisma.paper.create({ data: paper })
   return { id: created.id, title: created.title }
+}
+
+// Silinen makale gizlenir ama kaydı kalır: kaynağın beslemesinde durdukça yeniden "Bekliyor"a düşmesin.
+// Yazısı olan makaleye dokunulmaz (yazının kaynak kartı ona bağlı)
+export const hidePapers = (status: string, id?: number) =>
+  prisma.paper.updateMany({ where: { status, ...(id ? { id } : {}), post: { is: null } }, data: { status: 'deleted', abstract: '', error: '' } })
+
+// Otomatik temizlik (günlük iş): 30 günden eski atlanan, hatalı ve silinen makaleler veritabanından tamamen silinir.
+// shortcut: 30 günden uzun süre beslemede kalan bir haber yeniden "Bekliyor"a düşer; olursa süreyi uzat
+export async function cleanupPapers(): Promise<number> {
+  const { count } = await prisma.paper.deleteMany({
+    where: { status: { in: ['skipped', 'failed', 'deleted'] }, createdAt: { lt: new Date(Date.now() - 30 * 86_400_000) }, post: { is: null } },
+  })
+  return count
 }
 
 // Kaynaktaki güncel makaleler: arXiv kategorisi API'den, diğer adresler RSS/Atom beslemesi olarak

@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { Notice } from '../../Notice'
-import { featurePostAction } from '../../actions'
+import { deleteDraftsAction, deletePostAction, featurePostAction } from '../../actions'
+import { ConfirmButton } from '../../ConfirmButton'
 import { topicLabel } from '@/lib/topics'
 import { FEATURE_SUGGESTION } from '@/lib/writer'
 
@@ -10,7 +11,12 @@ export default async function PostsPage({ searchParams }: { searchParams: { mesa
   return (
     <>
       <Notice message={searchParams.mesaj} />
-      <h1 className="text-xl font-bold mb-1">Yazılar</h1>
+      <div className="flex items-center gap-2 mb-1">
+        <h1 className="text-xl font-bold flex-1">Yazılar</h1>
+        {posts.some((post) => post.status === 'draft') && (
+          <form action={deleteDraftsAction}><ConfirmButton question="Bütün taslaklar silinsin mi? Yayındaki yazılara dokunulmaz." className="btn">Taslakları sil</ConfirmButton></form>
+        )}
+      </div>
       <p className="text-sm text-stone-500 mb-4">☆ ile yayındaki yazıyı ana sayfadaki Öne çıkanlara al (en fazla 10; yenisi eklenince en eskisi düşer). <span className="text-violet-700 dark:text-violet-300">Öneri</span> rozeti, yapay zekânın önem puanı {FEATURE_SUGGESTION}/10 ve üstü olanlarda görünür.</p>
       {posts.length === 0 ? (
         <p className="text-sm text-stone-500">Henüz yazı yok. Makaleler sayfasından bir makaleyi yazıya dönüştür ya da Genel&apos;den günlük işi çalıştır.</p>
@@ -38,6 +44,10 @@ export default async function PostsPage({ searchParams }: { searchParams: { mesa
                 </form>
               )}
               <span className="text-xs text-stone-500">{post.createdAt.toLocaleDateString('tr-TR')}</span>
+              <form action={deletePostAction}>
+                <input type="hidden" name="id" value={post.id} />
+                <ConfirmButton question={`"${post.title}" silinsin mi?`} className="text-stone-400 hover:text-red-600 text-lg leading-none"><span aria-hidden>×</span><span className="sr-only">Sil</span></ConfirmButton>
+              </form>
             </li>
           ))}
         </ul>

@@ -1,4 +1,4 @@
-import { fetchSources } from '@/lib/papers'
+import { cleanupPapers, fetchSources } from '@/lib/papers'
 import { writeDaily } from '@/lib/writer'
 import { createWeeklyDigest, sendDigest } from '@/lib/newsletter'
 import { getSettings, getState, logJob, setState } from '@/lib/state'
@@ -31,7 +31,10 @@ export async function dailyTask(): Promise<string> {
   const result = await writeDaily(settings)
   const parts = [`${added} yeni makale`, `${result.written} yazı ${settings.autoPublish ? 'yayımlandı' : 'taslak'}`]
   if (result.failed) parts.push(`${result.failed} hata`)
+  if (result.skipped) parts.push(`${result.skipped} makale 3 gün seçilmeyip atlandı`)
   if (result.budget) parts.push('aylık token sınırına ulaşıldı')
+  const cleaned = await cleanupPapers()
+  if (cleaned) parts.push(`${cleaned} eski makale temizlendi`)
   return parts.join(', ')
 }
 
