@@ -86,16 +86,22 @@ const SELECT = `Bir bilim editörüsün. Verilen makale ve haberlerden en öneml
 - yeni ve somut bir sonuç (keşif, icat, ölçüm, yeni yöntem) içerenler,
 - alanında ya da günlük hayatta etkisi büyük olanlar,
 - meraklı ama uzman olmayan bir okuru ilgilendirecek olanlar.
-Küçük iyileştirmeleri, birbirinin tekrarı olanları ve yalnızca dar bir uzman kitleyi ilgilendirenleri seçme; eşit önemdeyse farklı konulardan seç.
+Temel bilimde gerçek bir ilk (yeni bir ötegezegen ya da süpernova, yeni bir parçacık ya da kuantum olgusu, ilk kez yapılan bir ölçüm, yeni bir gözlem tekniği) teknik görünse bile önemlidir: okura anlatılabilir.
+Küçük iyileştirmeleri, birbirinin tekrarı olanları, kurum duyurularını (bütçe, atama, etkinlik) ve aynı alanda sıradan bir ek sonucu seçme; eşit önemdeyse farklı konulardan seç.
 Ayrıca listedeki HER makaleye bu ölçütlere göre 1-10 arası bir puan ver (cömert olma; çoğu 3-6 arasında olmalı).
-Yanıtı yalnızca şu JSON biçiminde ver: {"picked": [seçtiğin numaralar önem sırasıyla], "scores": {"1": puan, "2": puan, ...}}`
+Seçtiklerinin en az biri astronomi, astrofizik ya da uzay araştırması haberi olsun (listede somut bir uzay gelişmesi varsa).
+"space" alanına listedeki bütün astronomi/astrofizik/uzay haberlerinin numaralarını yaz.
+Yanıtı yalnızca şu JSON biçiminde ver: {"picked": [seçtiğin numaralar önem sırasıyla], "scores": {"1": puan, "2": puan, ...}, "space": [uzay haberlerinin numaraları]}`
 
 // Model en önemli n makaleyi seçer ve hepsine ön puan verir (Makaleler → Bekliyor bu puana göre sıralı).
 // Başlık ve özetin başı gider (makale başına ~60 token, puanlar için ~4 token)
 export async function selectPapers(candidates: Array<{ id: number; title: string; abstract: string }>, settings: Settings, n: number): Promise<number[]> {
   if (candidates.length <= n) return candidates.map((paper) => paper.id)
   const list = candidates.map((paper, index) => `${index + 1}. ${paper.title}\n   ${paper.abstract.replace(/\s+/g, ' ').slice(0, 220)}`).join('\n')
-  const interests = settings.interests.trim() ? `Okurun ilgi alanları (eşit önemdekilerde bunlara öncelik ver): ${settings.interests}\n` : ''
+  // İlgi alanları öncelik verir (baştaki en çok); ama konusu uyan sıradan bir haber önemli bir haberin önüne geçmez
+  const interests = settings.interests.trim()
+    ? `Okurun öncelikli ilgi alanları (baştaki en öncelikli): ${settings.interests}\nBu alanlardaki somut ve yeni gelişmeleri, biraz daha az önemli olsalar bile öne al ve puanlarını buna göre ver; ama sıradan bir haberi yalnızca konusu uyuyor diye seçme.\n`
+    : ''
   const result = await complete(settings, SELECT, `${interests}Seçilecek sayı: ${n}\n\nMakaleler:\n${list}`)
   await addUsage(result.inputTokens, result.outputTokens)
   const { picked, scores } = parseSelection(result.text, candidates.length, n)
