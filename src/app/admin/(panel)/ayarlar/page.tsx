@@ -71,7 +71,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: { m
           <div>
             <label className="label" htmlFor="interests">İlgi alanları</label>
             <textarea id="interests" name="interests" defaultValue={s.interests} rows={2} className="input" placeholder="büyük dil modelleri, robotik, tıpta yapay zekâ" />
-            <p className="hint">Model her gün yeni makalelerin başlık ve özetlerine bakıp en önemlilerini seçer (yeni ve somut sonuç, etkisi büyük, genel okuru ilgilendiren). Burada yazdığın konular öncelik alır, baştaki en çok; ama sıradan bir haber yalnızca konusu uyuyor diye seçilmez. Ayrıca her gün seçilenlerden en az biri astronomi/uzay haberidir (o gün uzay haberi varsa).</p>
+            <p className="hint">Model her gün yeni makalelerin başlık ve özetlerine bakıp en önemlilerini seçer (yeni ve somut sonuç, etkisi büyük, genel okuru ilgilendiren). Burada yazdığın konular öncelik alır, baştaki en çok; ama sıradan bir haber yalnızca konusu uyuyor diye seçilmez.</p>
           </div>
         </fieldset>
 
@@ -79,6 +79,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: { m
           <legend className="font-semibold px-1">Otomasyon</legend>
           <div className="grid sm:grid-cols-2 gap-4">
             <div><label className="label" htmlFor="postsPerDay">Günde kaç yazı</label><input id="postsPerDay" name="postsPerDay" type="number" min={0} max={20} defaultValue={s.postsPerDay} className="input" /></div>
+            <div>
+              <label className="label" htmlFor="spacePerDay">Bunlardan en az kaçı astronomi/uzay</label>
+              <input id="spacePerDay" name="spacePerDay" type="number" min={0} max={20} defaultValue={s.spacePerDay} className="input" />
+              <p className="hint">O gün yeterli uzay haberi yoksa kalanlar diğer konulardan seçilir.</p>
+            </div>
             <div>
               <label className="label" htmlFor="dailyHour">Günlük iş saati</label>
               <select id="dailyHour" name="dailyHour" defaultValue={s.dailyHour} className="input">

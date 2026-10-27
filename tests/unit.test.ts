@@ -192,4 +192,7 @@ test('seçimde her gün en az bir uzay haberi', () => {
   assert.deepEqual(parseSelection(`{"picked": [1, 5], ${scores}, "space": [4, 5]}`, 5, 3).picked, [0, 4], 'zaten uzay varsa dokunulmaz')
   assert.deepEqual(parseSelection(`{"picked": [1], ${scores}, "space": [4]}`, 5, 3).picked, [0, 3], 'yer varsa eklenir')
   assert.deepEqual(parseSelection(`{"picked": [1, 2], ${scores}, "space": []}`, 5, 2).picked, [0, 1], 'uzay haberi yoksa değişmez')
+  assert.deepEqual(parseSelection(`{"picked": [1, 4, 2], ${scores}, "space": [3, 4, 5]}`, 5, 3, 2).picked, [0, 3, 2], 'en az 2: sondaki uzay olmayan, kalan en yüksek puanlı uzayla değişir')
+  assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [5]}`, 5, 3, 3).picked, [0, 1, 4], 'yeterli uzay haberi yoksa olanlarla yetinilir')
+  assert.deepEqual(parseSelection(`{"picked": [1, 2], ${scores}, "space": [4, 5]}`, 5, 2, 0).picked, [0, 1], '0 ise kural yok')
 })

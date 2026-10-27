@@ -115,6 +115,7 @@ export async function saveSettingsAction(form: FormData) {
       readMode: text(form, 'readMode') === 'full' ? 'full' : 'abstract',
       maxInputChars: intIn(text(form, 'maxInputChars'), 500, 400_000, current.maxInputChars),
       postsPerDay: intIn(text(form, 'postsPerDay'), 0, 20, current.postsPerDay),
+      spacePerDay: intIn(text(form, 'spacePerDay'), 0, 20, current.spacePerDay),
       dailyHour: intIn(text(form, 'dailyHour'), 0, 23, current.dailyHour),
       interests: text(form, 'interests').slice(0, 1000),
       monthlyTokenLimit: intIn(text(form, 'monthlyTokenLimit'), 0, 1_000_000_000, current.monthlyTokenLimit),

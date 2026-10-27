@@ -8,7 +8,7 @@ const VERSION = 1
 
 // Geri yüklemede yalnızca bu alanlar alınır (yedek dosyası güvenilmeyen girdidir)
 const FIELDS = {
-  settings: ['siteTitle', 'siteDescription', 'siteUrl', 'aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'readMode', 'maxInputChars', 'postsPerDay', 'dailyHour', 'interests', 'monthlyTokenLimit', 'autoPublish', 'autoNewsletter', 'digestWeekday', 'kunyeUrl', 'kunyeToken', 'newsletterTag', 'imageApiKey', 'imageModel'],
+  settings: ['siteTitle', 'siteDescription', 'siteUrl', 'aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'readMode', 'maxInputChars', 'postsPerDay', 'spacePerDay', 'dailyHour', 'interests', 'monthlyTokenLimit', 'autoPublish', 'autoNewsletter', 'digestWeekday', 'kunyeUrl', 'kunyeToken', 'newsletterTag', 'imageApiKey', 'imageModel'],
   sources: ['id', 'url', 'enabled', 'lastFetchedAt', 'lastError', 'createdAt'],
   papers: ['id', 'externalId', 'title', 'authors', 'abstract', 'score', 'imageUrl', 'topic', 'url', 'publishedAt', 'status', 'error', 'createdAt'],
   posts: ['id', 'slug', 'title', 'excerpt', 'highlights', 'category', 'importance', 'image', 'featuredAt', 'body', 'status', 'publishedAt', 'paperId', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],

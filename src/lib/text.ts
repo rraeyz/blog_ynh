@@ -50,8 +50,8 @@ function escapeControlInStrings(json: string): string {
 
 // Seçim yanıtı: {"picked": [3, 1], "scores": {"1": 6, "2": 3}, "space": [2]} (numaralar listedeki sıra, 1'den başlar).
 // Seçilen numaralar bozuksa en yüksek puanlılar alınır; puanlar 1-10'a sıkıştırılır.
-// Her gün en az bir uzay yazısı: seçilenlerde uzay haberi yoksa en yüksek puanlı uzay haberi sonuncunun yerine girer
-export function parseSelection(text: string, count: number, n: number): { picked: number[]; scores: Map<number, number> } {
+// Günde en az minSpace uzay yazısı: eksikse en yüksek puanlı uzay haberleri önce boş yerlere, sonra sondaki uzay olmayanların yerine girer
+export function parseSelection(text: string, count: number, n: number, minSpace = 1): { picked: number[]; scores: Map<number, number> } {
   const data = extractJson(text) as { picked?: unknown; scores?: unknown; space?: unknown }
   const scores = new Map<number, number>()
   if (data && typeof data.scores === 'object' && !Array.isArray(data.scores)) {
@@ -66,9 +66,16 @@ export function parseSelection(text: string, count: number, n: number): { picked
   if (picked.length === 0) picked = Array.from(scores.entries()).sort((a, b) => b[1] - a[1]).map(([i]) => i)
   picked = Array.from(new Set(picked)).slice(0, n)
   const space = Array.isArray(data?.space) ? data.space.map((i) => Number(i) - 1).filter(valid) : []
-  if (n > 0 && space.length > 0 && !picked.some((i) => space.includes(i))) {
-    const best = space.reduce((a, b) => ((scores.get(b) ?? 0) > (scores.get(a) ?? 0) ? b : a))
-    picked = picked.length < n ? [...picked, best] : [...picked.slice(0, n - 1), best]
+  const missing = Math.min(minSpace, n) - picked.filter((i) => space.includes(i)).length
+  const extra = space.filter((i) => !picked.includes(i)).sort((a, b) => (scores.get(b) ?? 0) - (scores.get(a) ?? 0)).slice(0, Math.max(0, missing))
+  for (const index of extra) {
+    if (picked.length < n) {
+      picked.push(index)
+      continue
+    }
+    let last = picked.length - 1
+    while (last >= 0 && space.includes(picked[last])) last--
+    if (last >= 0) picked[last] = index
   }
   return { picked, scores }
 }
