@@ -51,7 +51,8 @@ jobs:
           docker logs blog
 
       - name: sharp container içinde yükleniyor (Alpine için libvips)
-        run: docker exec blog node -e "require('sharp')({ create: { width: 2, height: 2, channels: 3, background: '#000' } }).webp().toBuffer().then((b) => console.log('sharp ok', b.length))"
+        run: |
+          docker exec blog node -e "require('sharp')({ create: { width: 2, height: 2, channels: 3, background: '#000' } }).webp().toBuffer().then((b) => console.log('sharp ok', b.length))"
 
       - uses: actions/setup-node@v4
         with:
