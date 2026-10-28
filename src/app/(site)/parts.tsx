@@ -195,7 +195,7 @@ export const SkyIcon = ({ kind }: { kind: string }) => {
 }
 
 // Ana sayfadaki küçük gökyüzü kutusu: önümüzdeki birkaç olay
-export function SkyBox({ events }: { events: Array<{ id: number; date: string; time: string; kind: string; title: string }> }) {
+export function SkyBox({ events }: { events: Array<{ id: number; date: string; time: string; kind: string; rank: number; title: string }> }) {
   return (
     <section className="rounded-3xl border border-zinc-200 dark:border-ink-line bg-white/80 dark:bg-ink-card/80 p-6 md:p-8">
       <div className="flex items-center justify-between gap-3">
@@ -204,11 +204,11 @@ export function SkyBox({ events }: { events: Array<{ id: number; date: string; t
       </div>
       <ul className="mt-4 grid gap-4 sm:grid-cols-2">
         {events.map((e) => (
-          <li key={e.id} className="flex gap-3">
-            <span className="text-2xl leading-none"><SkyIcon kind={e.kind} /></span>
+          <li key={e.id} className={`flex gap-3 ${e.rank === 3 ? 'rounded-2xl border border-amber-400 bg-amber-400/10 p-3 sm:col-span-2' : ''}`}>
+            <span className={`${e.rank === 3 ? 'text-4xl' : 'text-2xl'} leading-none`}><SkyIcon kind={e.kind} /></span>
             <span>
-              <span className="block text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">{skyDay(e.date)}{e.time && ` · ${e.time}`}</span>
-              <span className="mt-0.5 block font-medium">{e.title}</span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">{skyDay(e.date)}{e.time && ` · ${e.time}`}{e.rank === 3 && ' · Kaçırma'}</span>
+              <span className={`mt-0.5 block ${e.rank >= 2 ? 'font-semibold' : 'font-medium'}`}>{e.title}</span>
             </span>
           </li>
         ))}

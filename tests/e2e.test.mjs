@@ -102,7 +102,7 @@ const fake = http.createServer((req, res) => {
         annotations = [cite(1)]
         const [from] = user.match(/\d{4}-\d{2}-\d{2}/)
         const day = (n) => new Date(Date.parse(from) + n * 86_400_000).toISOString().slice(0, 10)
-        content = JSON.stringify({ events: [{ date: day(2), time: '21:30', kind: 'yakinlasma', title: 'Ay ile Satürn yakınlaşıyor', detail: 'Güneydoğuya bak' }, { date: day(0), time: '', kind: 'meteor', title: 'Orionid <b>tepe</b>', detail: 'Gece yarısından sonra' }, { date: day(40), title: 'Aralık dışı' }] })
+        content = JSON.stringify({ events: [{ date: day(2), time: '21:30', kind: 'yakinlasma', title: 'Ay ile Satürn yakınlaşıyor', detail: 'Güneydoğuya bak' }, { date: day(0), time: '', kind: 'meteor', title: 'Orionid <b>tepe</b>', detail: 'Gece yarısından sonra' }, { date: day(1), time: '20:00', kind: 'ay-tutulmasi', title: 'Parçalı Ay tutulması', detail: 'Doğuya bak' }, { date: day(40), title: 'Aralık dışı' }] })
       }
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content, annotations } }], usage: { prompt_tokens: 1000, completion_tokens: 500 } }))
@@ -494,7 +494,7 @@ test('eğitim: iki seri sırayla ilerler, öğretilenler sonraki derse geçer', 
 
 test('gökyüzü takvimi', async () => {
   assert.match(await submit('/admin', 'Gökyüzü takvimini güncelle'), /araştırılıyor/)
-  await waitFor(async () => /Gökyüzü takvimi \(elle\): .* 2(<!-- -->)? olay/.test((await get('/admin')).html), 'gökyüzü')
+  await waitFor(async () => /Gökyüzü takvimi \(elle\): .* 3(<!-- -->)? olay/.test((await get('/admin')).html), 'gökyüzü')
   const saved = cookie
   cookie = ''
   try {
@@ -506,6 +506,8 @@ test('gökyüzü takvimi', async () => {
     assert.match(page, /href="#gun-\d{4}-\d{2}-\d{2}"[^>]*aria-label="[^"]*Orionid[\s\S]*Meteor yağmuru/)
     assert.match(page, /id="gun-[\s\S]*Orionid &lt;b&gt;tepe&lt;\/b&gt;[\s\S]*Gece yarısından sonra/)
     assert.match(page, /kaynakları[\s\S]*kaynak1/)
+    assert.match(page, /aria-label="Bu ayın öne çıkanları"[\s\S]*Kaçırma[\s\S]*Parçalı Ay tutulması[\s\S]*Öne çıkan[\s\S]*Orionid/, 'önemli olaylar takvimin üstünde, önem sırasıyla')
+    assert.match(page, /border-amber-400[^"]*"[^>]*>[\s\S]{0,400}Ay tutulması/, 'tutulma günü belirgin')
     const next = page.match(/href="\/gokyuzu\?ay=(\d{4}-\d{2})"[^>]*>[^<]*→/)[1]
     assert.equal((await get(`/gokyuzu?ay=${next}`)).status, 200, 'sonraki aya geçilir')
     assert.match((await get('/gokyuzu?ay=1999-01')).html, /Bu ay için kayıtlı olay yok/)
@@ -525,7 +527,23 @@ test('haftanın astronomi özeti', async () => {
   assert.match(body, /Haftanın astronomi ve fizik gündemi: 1 gelişme/)
   assert.match(body, /Kediler Neden Çok Uyur/, 'uzay yazısı girer')
   assert.match(body, /Bu haftanın dersleri[\s\S]*Kırınım ve Airy diski/)
-  assert.match(body, /Bu hafta gökyüzünde[\s\S]*Ay ile Satürn yakınlaşıyor[\s\S]*\/gokyuzu/)
+  assert.match(body, /Bu hafta gökyüzünde[\s\S]*\*\*Parçalı Ay tutulması \(kaçırma\)\*\*[\s\S]*Ay ile Satürn yakınlaşıyor[\s\S]*\/gokyuzu/)
+  assert.match(body, /href="https:\/\/blog\.example\.com\/astronomi-ozeti\/\d{4}-\d{2}-\d{2}" class="cta-button">Haftanın özetini sitede oku/)
+
+  // Sitede de: haftalık özet sayfası veriden kurulur
+  const saved = cookie
+  cookie = ''
+  try {
+    const list = (await get('/astronomi-ozeti')).html
+    assert.match(list, /Bu hafta · [\s\S]*Kediler Neden Çok Uyur/)
+    const week = list.match(/href="(\/astronomi-ozeti\/\d{4}-\d{2}-\d{2})"/)[1]
+    const page = (await get(week)).html
+    assert.match(page, /Bu haftanın gelişmeleri[\s\S]*Kediler Neden Çok Uyur[\s\S]*Bu haftanın dersleri[\s\S]*Kırınım ve Airy diski[\s\S]*Bu hafta gökyüzünde[\s\S]*Orionid/)
+    assert.equal((await get('/astronomi-ozeti/2099-01-05')).status, 404, 'gelecek hafta yok')
+    assert.equal((await get('/astronomi-ozeti/2026-10-28')).status, 404, 'pazartesi olmayan gün')
+  } finally {
+    cookie = saved
+  }
 })
 
 test('site içi arama', async () => {

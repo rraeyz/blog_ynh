@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { extractJson, markdownLinks, parseLesson, parseSelection, parseSkyEvents, searchScore, slugify, unlink } from '../src/lib/text.ts'
+import { addDays, mondayOf, extractJson, markdownLinks, parseLesson, parseSelection, parseSkyEvents, searchScore, slugify, unlink } from '../src/lib/text.ts'
 import { isPrivateIp, safeFetch } from '../src/lib/net.ts'
 import { levelRange, planLevels } from '../src/lib/levels.ts'
 import { compressImage } from '../src/lib/compress.ts'
@@ -233,11 +233,15 @@ test('ders seviyeleri: plan ve aralık', () => {
 })
 
 test('gökyüzü takvimi ve arama', () => {
-  const text = '{"events": [{"date": "2026-10-30", "time": "21:00", "kind": "yakinlasma", "title": "Ay ve Satürn", "detail": "Güneydoğu"}, {"date": "2026-10-28", "time": "gece", "kind": "uydurma", "title": "Orionid", "detail": ""}, {"date": "2026-11-20", "title": "Aralık dışı"}, {"date": "30 Ekim", "title": "Bozuk tarih"}, {"date": "2026-10-29", "title": ""}]}'
+  const text = '{"events": [{"date": "2026-10-30", "time": "21:00", "kind": "yakinlasma", "title": "Ay ve Satürn", "detail": "Güneydoğu"}, {"date": "2026-10-28", "time": "gece", "kind": "uydurma", "important": true, "title": "Orionid", "detail": ""}, {"date": "2026-11-20", "title": "Aralık dışı"}, {"date": "30 Ekim", "title": "Bozuk tarih"}, {"date": "2026-10-29", "title": ""}]}'
   assert.deepEqual(parseSkyEvents(text, '2026-10-27', '2026-11-02'), [
-    { date: '2026-10-28', time: '', kind: 'diger', title: 'Orionid', detail: '' },
-    { date: '2026-10-30', time: '21:00', kind: 'yakinlasma', title: 'Ay ve Satürn', detail: 'Güneydoğu' },
+    { date: '2026-10-28', time: '', kind: 'diger', rank: 2, title: 'Orionid', detail: '' },
+    { date: '2026-10-30', time: '21:00', kind: 'yakinlasma', rank: 1, title: 'Ay ve Satürn', detail: 'Güneydoğu' },
   ])
+  assert.equal(mondayOf('2026-10-28'), '2026-10-26', 'çarşambanın pazartesisi')
+  assert.equal(mondayOf('2026-11-01'), '2026-10-26', 'pazar haftanın son günü')
+  assert.equal(mondayOf('2026-10-26'), '2026-10-26')
+  assert.equal(addDays('2026-12-30', 3), '2027-01-02')
   assert.ok(searchScore('gokyuzu', 'Bu hafta Gökyüzünde', '') > 0, 'Türkçe harfsiz yazılan bulunur')
   assert.ok(searchScore('IRAF', '', 'iraf ile fotometri') > 0, 'büyük I ile i aynı')
   assert.ok(searchScore('ışık eğrisi', 'Işık Eğrisi Modelleme', '') > searchScore('ışık eğrisi', 'Modelleme', 'ışık eğrisi'), 'başlıkta geçen önde')

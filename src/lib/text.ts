@@ -1,5 +1,5 @@
 // Saf yardımcılar: tests/unit.test.ts
-import { skyKind, type SkyKind } from './skyKinds.ts'
+import { skyKind, skyRank, type SkyKind } from './skyKinds.ts'
 
 const TR: Record<string, string> = { ç: 'c', ğ: 'g', ı: 'i', İ: 'i', ö: 'o', ş: 's', ü: 'u', Ç: 'c', Ğ: 'g', Ö: 'o', Ş: 's', Ü: 'u' }
 
@@ -102,7 +102,7 @@ export const markdownLinks = (body: string) => Array.from(new Set(Array.from(bod
 export const unlink = (body: string, dead: Set<string>) =>
   body.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (all, label: string, url: string) => (dead.has(url) ? label : all))
 
-export type SkyEvent = { date: string; time: string; kind: SkyKind; title: string; detail: string }
+export type SkyEvent = { date: string; time: string; kind: SkyKind; rank: number; title: string; detail: string }
 
 // Gökyüzü takvimi yanıtı: yalnızca istenen aralıktaki, tarihi geçerli olaylar; tarih ve saate göre sıralı
 export function parseSkyEvents(text: string, from: string, to: string): SkyEvent[] {
@@ -112,6 +112,7 @@ export function parseSkyEvents(text: string, from: string, to: string): SkyEvent
       date: String(e.date ?? ''),
       time: /^\d{2}:\d{2}$/.test(String(e.time ?? '')) ? String(e.time) : '',
       kind: skyKind(e.kind),
+      rank: skyRank(skyKind(e.kind), e.important),
       title: String(e.title ?? '').trim().slice(0, 150),
       detail: String(e.detail ?? '').trim().slice(0, 800),
     }))
@@ -135,3 +136,11 @@ export function searchScore(query: string, title: string, text: string): number 
   }
   return score
 }
+
+// Takvim günleri ("2026-10-28"): saat dilimi kaymasın diye UTC öğlen üzerinden
+export function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+export const mondayOf = (date: string) => addDays(date, -((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7))

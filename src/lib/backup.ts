@@ -19,7 +19,7 @@ const FIELDS = {
   digests: ['id', 'createdAt', 'subject', 'body', 'status', 'sentAt', 'result'],
   series: ['id', 'slug', 'title', 'summary', 'track', 'level', 'position', 'planned', 'createdAt'],
   lessons: ['id', 'seriesId', 'position', 'slug', 'title', 'scope', 'sourceUrls', 'excerpt', 'body', 'sources', 'research', 'review', 'prerequisites', 'level', 'covers', 'status', 'error', 'publishedAt', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
-  skyEvents: ['date', 'time', 'kind', 'title', 'detail', 'createdAt'],
+  skyEvents: ['date', 'time', 'kind', 'rank', 'title', 'detail', 'createdAt'],
 } as const
 
 type Row = Record<string, unknown>
@@ -41,7 +41,7 @@ export async function createBackup() {
     prisma.digest.findMany({ orderBy: { id: 'asc' } }),
     prisma.series.findMany({ orderBy: { id: 'asc' } }),
     prisma.lesson.findMany({ orderBy: { id: 'asc' } }),
-    prisma.skyEvent.findMany({ orderBy: { date: 'asc' }, select: { date: true, time: true, kind: true, title: true, detail: true, createdAt: true } }),
+    prisma.skyEvent.findMany({ orderBy: { date: 'asc' }, select: { date: true, time: true, kind: true, rank: true, title: true, detail: true, createdAt: true } }),
   ])
   const images: Record<string, string> = {}
   for (const post of posts) {

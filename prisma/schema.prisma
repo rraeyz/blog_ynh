@@ -156,6 +156,7 @@ model SkyEvent {
   date      String // YYYY-MM-DD, Türkiye takvimi
   time      String   @default("") // SS:DD TSİ ya da boş
   kind      String   @default("diger") // lib/skyKinds.ts
+  rank      Int      @default(1) // 3 kaçırılmamalı, 2 öne çıkan, 1 olağan: takvimde belirginlik
   title     String
   detail    String   @default("")
   createdAt DateTime @default(now())

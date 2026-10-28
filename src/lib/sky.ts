@@ -18,9 +18,10 @@ yakınlaşmaları, gezegen kavuşumları, karşı konumlar ve en büyük uzanım
 parlak kuyruklu yıldızlar. Güvenilir kaynak kullan (in-the-sky.org, timeanddate.com, NASA, Sky & Telescope, EarthSky, gözlemevleri).
 Yalnızca kaynakla doğruladığın ve Türkiye'den gözlenebilen olayları yaz; aralık dışını yazma. Doğrulayamadığın ayrıntıyı hiç yazma;
 metinde araştırma sürecinden ya da kaynaklardan söz etme. Her olay için nasıl ve nereye bakılacağını 1-3 cümleyle anlat (yön, saat,
-çıplak göz/dürbün/teleskop). Türü şunlardan biri olsun: ${Object.keys(SKY_KINDS).join(', ')}.
+çıplak göz/dürbün/teleskop). Türü şunlardan biri olsun: ${Object.keys(SKY_KINDS).join(', ')}. Olağan türde ama olağanüstü bir olaysa
+(ör. çok yakın kavuşum, süper dolunay, yılın en iyi gezegen görünümü) "important": true yaz.
 Yanıtı yalnızca şu JSON biçiminde ver:
-{"events": [{"date": "YYYY-MM-DD", "time": "SS:DD ya da boş", "kind": "tür", "title": "Kısa başlık", "detail": "Nasıl gözlenir"}]}`
+{"events": [{"date": "YYYY-MM-DD", "time": "SS:DD ya da boş", "kind": "tür", "important": false, "title": "Kısa başlık", "detail": "Nasıl gözlenir"}]}`
 
 export async function skySources(): Promise<{ sources: Array<{ title: string; url: string }>; updatedAt: string } | null> {
   try {
