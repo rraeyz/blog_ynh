@@ -6,14 +6,25 @@ import { Notice } from '../../Notice'
 import { ConfirmButton } from '../../ConfirmButton'
 
 const STATUS: Record<string, string> = { new: 'Bekliyor', failed: 'Hata', skipped: 'Atlandı', written: 'Yazıldı' }
+const PAGE = 100
 
-export default async function PapersPage({ searchParams }: { searchParams: { mesaj?: string; durum?: string } }) {
+export default async function PapersPage({ searchParams }: { searchParams: { mesaj?: string; durum?: string; sayfa?: string } }) {
   const status = STATUS[searchParams.durum ?? ''] ? searchParams.durum! : 'new'
+  const page = Math.max(1, Math.floor(Number(searchParams.sayfa)) || 1)
   const [papers, counts] = await Promise.all([
-    prisma.paper.findMany({ where: { status }, orderBy: [{ score: 'desc' }, { publishedAt: 'desc' }], take: 100, include: { post: { select: { id: true, title: true } } } }),
+    prisma.paper.findMany({ where: { status }, orderBy: [{ score: 'desc' }, { publishedAt: 'desc' }], skip: (page - 1) * PAGE, take: PAGE, include: { post: { select: { id: true, title: true } } } }),
     prisma.paper.groupBy({ by: ['status'], _count: true }),
   ])
   const count = (key: string) => counts.find((row) => row.status === key)?._count ?? 0
+  const pages = Math.max(1, Math.ceil(count(status) / PAGE))
+  const pageLink = (n: number) => `/admin/makaleler?durum=${status}&sayfa=${n}`
+  const pager = pages > 1 && (
+    <nav aria-label="Sayfalar" className="flex flex-wrap items-center gap-3 my-4 text-sm">
+      {page > 1 ? <Link href={pageLink(page - 1)} className="btn whitespace-nowrap">← Önceki</Link> : <span className="btn whitespace-nowrap opacity-40">← Önceki</span>}
+      <span className="text-stone-500">Sayfa {page} / {pages} · {(page - 1) * PAGE + 1}–{Math.min(page * PAGE, count(status))} arası</span>
+      {page < pages ? <Link href={pageLink(page + 1)} className="btn whitespace-nowrap">Sonraki →</Link> : <span className="btn whitespace-nowrap opacity-40">Sonraki →</span>}
+    </nav>
+  )
   return (
     <>
       <Notice message={searchParams.mesaj} />
@@ -41,6 +52,7 @@ export default async function PapersPage({ searchParams }: { searchParams: { mes
           </ConfirmButton>
         </form>
       )}
+      {pager}
       {papers.length === 0 ? (
         <p className="text-sm text-stone-500">Bu listede makale yok.</p>
       ) : (
@@ -65,6 +77,7 @@ export default async function PapersPage({ searchParams }: { searchParams: { mes
           ))}
         </ul>
       )}
+      {pager}
     </>
   )
 }
