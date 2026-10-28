@@ -20,6 +20,7 @@ const openRouterRequests = []
 let aiCalls = 0
 const selectionCalls = []
 let lowFullTextChecks = 0 // bu kadar tam metin kontrolü düşük puan döner (yerine sıradakinin alınması)
+let repeatFullTextChecks = 0 // bu kadar tam metin kontrolü "son yazılanlarla aynı gelişme" der
 const fake = http.createServer((req, res) => {
   let body = ''
   req.on('data', (chunk) => { body += chunk })
@@ -42,7 +43,12 @@ const fake = http.createServer((req, res) => {
       const user = JSON.parse(body).messages[1].content
       const count = (user.match(/^\d+\. /gm) || []).length
       // İlk iki haber 7,8; kalanlar 5,5 (eşiğin altı). Son yazılanlardaki "Kediler"le aynı gelişme sayılan 3. haber tekrar
-      // Tam metin kontrolü (tek haber): istenirse 3,3 döner
+      // Tam metin kontrolü (tek haber): istenirse son yazılanların tekrarı ya da 3,3
+      if (count === 1 && repeatFullTextChecks > 0 && user.includes('Son yazılanlar')) {
+        repeatFullTextChecks--
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ choices: [{ message: { content: '1 | 4 | 4 | 4 | 4 | diğer | Y' } }], usage: { prompt_tokens: 100, completion_tokens: 10 } }))
+      }
       if (count === 1 && lowFullTextChecks > 0) {
         lowFullTextChecks--
         res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -624,9 +630,12 @@ test('günlük iş: büyük yığılmada bütün haberler parça parça puanlan�
 test('günlük iş: yer kaldıysa eşiğin hemen altındaki haberin tam metnine bakılır', async () => {
   // Kalan 7,8'likler (eşik 6,0) yazılır; yer kalınca 5,5'lik bir haberin tam metni 7,8 çıkar ve o da yazılır
   assert.match(await saveSettings('haberler', { postsPerDay: '15', fullTextPromote: '1' }), /Ayarlar kaydedildi/)
+  repeatFullTextChecks = 1 // ilk seçilen, o gün yazılanlardan biriyle aynı gelişme: yazılmaz, yerine sıradaki
   assert.match(await submit('/admin', 'Şimdi tara ve yazı üret'), /arka planda/)
   await waitFor(async () => /tam metinde eşiği geçti/.test((await get('/admin')).html), 'eşiğin altından yazı')
   const log = (await get('/admin')).html
   assert.match(log, /eşiğin altındaki haber \(ön puan 5,5\) tam metinde eşiği geçti, (taslak|yayımlandı) \(önem 7,8\)/)
   assert.equal((log.match(/eşiğin altındaki haber \(ön puan 5,5\) tam metinde/g) || []).length / 2, 1, 'günde en fazla 1 (ayar)')
+  assert.match(log, /son 7 günde yazılan bir haberle aynı gelişme \(ön puan 7,8\), yazılmadı; yerine sıradaki/)
+  assert.match((await get('/admin/makaleler?durum=skipped')).html, /Son 7 günde yazılan bir haberle aynı gelişme: yazılmadı/)
 })
