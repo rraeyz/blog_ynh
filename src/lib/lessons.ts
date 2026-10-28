@@ -143,7 +143,7 @@ async function ensureRoadmap(settings: Settings) {
   while ((await prisma.series.count({ where: { planned: false } })) < LOOKAHEAD) {
     const existing = await prisma.series.findMany({ where: { position: { gte: 0 } }, orderBy: { position: 'asc' }, include: { lessons: { select: { status: true } } } })
     const news = await prisma.post.findMany({
-      where: { status: 'published', category: { in: ['uzay', 'fizik'] }, importance: { gte: 7 }, publishedAt: { gte: new Date(Date.now() - 30 * 86_400_000) } },
+      where: { status: 'published', category: { in: ['uzay', 'fizik'] }, importance: { gte: 70 }, publishedAt: { gte: new Date(Date.now() - 30 * 86_400_000) } },
       orderBy: { importance: 'desc' },
       take: 20,
       select: { title: true },

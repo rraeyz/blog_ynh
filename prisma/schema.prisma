@@ -20,14 +20,20 @@ model Settings {
   aiBaseUrl         String   @default("") // yalnızca "custom" sağlayıcı için
   readMode          String   @default("abstract") // abstract | full (arXiv HTML tam metni)
   maxInputChars     Int      @default(8000) // makale başına modele gönderilecek en fazla karakter
-  postsPerDay       Int      @default(3)
+  // Günlük seçim (lib/text.ts pickDaily). Puanlar onda bir: 60 = 6,0/10
+  postsPerDay       Int      @default(10) // Günde en fazla kaç yazı (istisna puanlılar aşabilir)
+  postsMinPerDay    Int      @default(3) // Eşiği geçen azsa en iyilerle bu sayıya tamamlanır
+  scoreThreshold    Int      @default(60) // Ön puanı bu ve üstü olanlar yazılır
+  scoreExceptional  Int      @default(85) // Bu ve üstü en fazla sınırını aşar (en çok 15)
   spacePerDay       Int      @default(1) // Bunlardan en az kaçı astronomi/uzay (o gün o kadar uzay haberi varsa)
-  spaceMaxPerDay    Int      @default(4) // En fazla kaçı: kaynakların çoğu astronomi, diğer konular gölgede kalmasın
+  spaceNormalPerDay Int      @default(2) // Önemli değilse en fazla kaçı uzay: kaynakların çoğu astronomi, diğer konular gölgede kalmasın
+  spaceImportantScore Int    @default(75) // Bu ve üstü uzay haberi normal sınıra takılmaz
+  spaceMaxPerDay    Int      @default(4) // Önemlilerle birlikte en fazla kaçı uzay
   dailyHour         Int      @default(9) // günlük işin çalışacağı saat (sunucu saati)
   interests         String   @default("") // doluysa makaleler bu ilgi alanlarına göre seçilir
   monthlyTokenLimit Int      @default(0) // 0 = sınırsız; aşılınca otomatik üretim durur
   autoPublish       Boolean  @default(false) // kapalıyken yazılar taslak olarak bekler
-  autoFeature       Boolean  @default(true) // yayımlanan yazının önem puanı 8+ ise kendiliğinden öne çıkar
+  autoFeature       Boolean  @default(true) // yayımlanan yazının önem puanı 8,0+ ise kendiliğinden öne çıkar
   skyEnabled        Boolean  @default(true) // haftalık gökyüzü takvimi (ana sayfa, /gokyuzu, bülten)
   astroDigest       Boolean  @default(false) // haftanın astronomi özeti bülteni (abonelere e-posta gider)
   astroDigestWeekday Int     @default(0) // 0 = pazar: pazartesi dersinden önce
@@ -62,7 +68,8 @@ model Paper {
   title       String
   authors     String   @default("")
   abstract    String   @default("")
-  score       Int      @default(0) // Seçimin ön puanı (1-10, başlık ve özetten); 0 = henüz puanlanmadı
+  score       Int      @default(0) // Seçimin ön puanı, onda bir (74 = 7,4/10; başlık ve özetten); 0 = henüz puanlanmadı
+  space       Boolean  @default(false) // Puanlayan modele göre astronomi/uzay haberi (günlük uzay sınırları)
   imageUrl    String   @default("") // Beslemedeki görsel; yalnızca serbest lisanslı kurumlarınki gösterilir (lib/topics.ts freeImage)
   topic       String   @default("") // arXiv birincil kategorisi (cs.AI) ya da beslemenin sitesi (lib/topics.ts)
   url         String
@@ -82,7 +89,7 @@ model Post {
   excerpt      String    @default("") // Kısa gelişme metni: sitenin başında ve bültende görünür
   highlights   String    @default("") // "Kısaca" kutusu: satır başına bir madde
   category     String    @default("") // Konu sekmesi (lib/topics.ts CATEGORIES); yazan model seçer
-  importance   Int       @default(0) // Modelin önem puanı (1-10): bülten seçimi ve öne çıkarma önerisi
+  importance   Int       @default(0) // Modelin tam metinden önem puanı, onda bir (74 = 7,4/10): bülten seçimi ve öne çıkarma
   image        String    @default("") // Yapay zekâ kapağının dosya adı (lib/images.ts)
   featuredAt   DateTime? // Öne çıkanlarda (en fazla 10; yenisi eklenince en eskisi düşer)
   body         String // Markdown (lib/markdown.ts)

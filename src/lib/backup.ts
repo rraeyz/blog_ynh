@@ -2,19 +2,20 @@ import path from 'node:path'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { prisma } from '@/lib/prisma'
 import { IMAGE_DIR, IMAGE_NAME } from '@/lib/images'
+import { SCORES_TENTHS } from '@/lib/writer'
 
 // Tam yedek: ayarlar (API anahtarları dahil, yönetici şifresi hariç), kaynaklar, makaleler, yazılar, bültenler, dersler
 // ve yapay zekâ kapakları (base64; yeniden üretmek para tutar).
 // Geri yükleme hepsini yedektekiyle değiştirir; mevcut şifre ve oturum aynen kalır.
 
 export const BACKUP_FORMAT = 'blog-backup'
-const VERSION = 1
+const VERSION = 2 // 2: puanlar onda bir (74 = 7,4/10)
 
 // Geri yüklemede yalnızca bu alanlar alınır (yedek dosyası güvenilmeyen girdidir)
 const FIELDS = {
-  settings: ['siteTitle', 'siteDescription', 'siteUrl', 'aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'readMode', 'maxInputChars', 'postsPerDay', 'spacePerDay', 'spaceMaxPerDay', 'dailyHour', 'interests', 'monthlyTokenLimit', 'autoPublish', 'autoNewsletter', 'digestWeekday', 'kunyeUrl', 'kunyeToken', 'newsletterTag', 'imageApiKey', 'imageModel', 'lessonModel', 'lessonHelperModel', 'lessonWeekdays', 'lessonAutoPublish', 'autoFeature', 'skyEnabled', 'astroDigest', 'astroDigestWeekday'],
+  settings: ['siteTitle', 'siteDescription', 'siteUrl', 'aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'readMode', 'maxInputChars', 'postsPerDay', 'postsMinPerDay', 'scoreThreshold', 'scoreExceptional', 'spacePerDay', 'spaceNormalPerDay', 'spaceImportantScore', 'spaceMaxPerDay', 'dailyHour', 'interests', 'monthlyTokenLimit', 'autoPublish', 'autoNewsletter', 'digestWeekday', 'kunyeUrl', 'kunyeToken', 'newsletterTag', 'imageApiKey', 'imageModel', 'lessonModel', 'lessonHelperModel', 'lessonWeekdays', 'lessonAutoPublish', 'autoFeature', 'skyEnabled', 'astroDigest', 'astroDigestWeekday'],
   sources: ['id', 'url', 'enabled', 'lastFetchedAt', 'lastError', 'createdAt'],
-  papers: ['id', 'externalId', 'title', 'authors', 'abstract', 'score', 'imageUrl', 'topic', 'url', 'publishedAt', 'status', 'error', 'createdAt'],
+  papers: ['id', 'externalId', 'title', 'authors', 'abstract', 'score', 'space', 'imageUrl', 'topic', 'url', 'publishedAt', 'status', 'error', 'createdAt'],
   posts: ['id', 'slug', 'title', 'excerpt', 'highlights', 'category', 'importance', 'image', 'featuredAt', 'body', 'status', 'publishedAt', 'paperId', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
   digests: ['id', 'createdAt', 'subject', 'body', 'status', 'sentAt', 'result'],
   series: ['id', 'slug', 'title', 'summary', 'track', 'level', 'position', 'planned', 'createdAt'],
@@ -73,6 +74,10 @@ export async function restoreBackup(data: unknown) {
   const sources = rows(backup.sources, FIELDS.sources)
   const papers = rows(backup.papers, FIELDS.papers)
   const posts = rows(backup.posts, FIELDS.posts)
+  if (backup.formatVersion < 2) {
+    for (const post of posts) post.importance = Number(post.importance) * 10 || 0
+    for (const paper of papers) paper.score = paper.status === 'new' ? 0 : Number(paper.score) * 10 || 0
+  }
   const digests = rows(backup.digests, FIELDS.digests)
   // Eğitim bölümünden önceki yedeklerde bu alanlar yok
   const series = rows(backup.series ?? [], FIELDS.series)
@@ -100,6 +105,7 @@ export async function restoreBackup(data: unknown) {
     if (series.length) await tx.series.createMany({ data: series as never })
     if (lessons.length) await tx.lesson.createMany({ data: lessons as never })
     if (skyEvents.length) await tx.skyEvent.createMany({ data: skyEvents as never })
+    await tx.appState.upsert({ where: { key: SCORES_TENTHS }, update: {}, create: { key: SCORES_TENTHS, value: '1' } })
   })
   if (images.length) await mkdir(IMAGE_DIR, { recursive: true })
   for (const [name, data] of images) await writeFile(path.join(IMAGE_DIR, name), Buffer.from(data, 'base64'))

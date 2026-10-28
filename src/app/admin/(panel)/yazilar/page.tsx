@@ -5,6 +5,7 @@ import { coverMissingAction, deleteDraftsAction, deletePostAction, featurePostAc
 import { ConfirmButton } from '../../ConfirmButton'
 import { CATEGORIES, freeImage, topicLabel } from '@/lib/topics'
 import { FEATURE_SUGGESTION } from '@/lib/writer'
+import { formatScore } from '@/lib/text'
 
 type Filters = { mesaj?: string; durum?: string; konu?: string; onem?: string; sira?: string }
 
@@ -23,7 +24,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
   const paper = { select: { title: true, url: true, imageUrl: true } }
   const [posts, published] = await Promise.all([
     prisma.post.findMany({
-      where: { ...status, ...(category !== undefined ? { category } : {}), ...(minImportance ? { importance: { gte: minImportance } } : {}) },
+      where: { ...status, ...(category !== undefined ? { category } : {}), ...(minImportance ? { importance: { gte: minImportance * 10 } } : {}) },
       // Varsayılan: taslaklar üstte (onay bekleyenler), sonra en yeni
       orderBy: sort ? [...SORTS[sort]] : [{ status: 'asc' }, { createdAt: 'desc' }],
       take: 200,
@@ -77,7 +78,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
         {(filtered || sort) && <Link href="/admin/yazilar" className="btn">Temizle</Link>}
         <span className="ml-auto self-center text-stone-500">{`${posts.length} yazı`}</span>
       </form>
-      <p className="text-sm text-stone-500 mb-4">☆ ile yayındaki yazıyı ana sayfadaki Öne çıkanlara al (en fazla 10; yenisi eklenince en eskisi düşer). <span className="text-violet-700 dark:text-violet-300">Öneri</span> rozeti, yapay zekânın önem puanı {FEATURE_SUGGESTION}/10 ve üstü olanlarda görünür.</p>
+      <p className="text-sm text-stone-500 mb-4">☆ ile yayındaki yazıyı ana sayfadaki Öne çıkanlara al (en fazla 10; yenisi eklenince en eskisi düşer). <span className="text-violet-700 dark:text-violet-300">Öneri</span> rozeti, yapay zekânın önem puanı {formatScore(FEATURE_SUGGESTION)}/10 ve üstü olanlarda görünür.</p>
       {posts.length === 0 ? (
         <p className="text-sm text-stone-500">{filtered ? 'Bu süzgece uyan yazı yok.' : <>Henüz yazı yok. Makaleler sayfasından bir makaleyi yazıya dönüştür ya da Genel&apos;den günlük işi çalıştır.</>}</p>
       ) : (
@@ -91,7 +92,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
                 {post.title}
                 <span className="block truncate text-xs text-zinc-500">
                   {post.category ? topicLabel(post.category) : 'Konu yok'}
-                  {post.importance > 0 && ` · önem ${post.importance}/10`}
+                  {post.importance > 0 && ` · önem ${formatScore(post.importance)}/10`}
                   {post.paper && ` · Kaynak: ${post.paper.title}`}
                 </span>
               </Link>

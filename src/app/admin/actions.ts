@@ -99,7 +99,7 @@ const intIn = (value: string, min: number, max: number, fallback: number) => {
 const SETTINGS_SECTIONS: Record<string, string[]> = {
   site: ['siteTitle', 'siteDescription', 'siteUrl'],
   'yapay-zeka': ['aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'imageApiKey', 'monthlyTokenLimit'],
-  haberler: ['readMode', 'maxInputChars', 'interests', 'postsPerDay', 'spacePerDay', 'spaceMaxPerDay', 'dailyHour', 'autoPublish', 'autoFeature', 'imageModel', 'skyEnabled'],
+  haberler: ['readMode', 'maxInputChars', 'interests', 'postsPerDay', 'postsMinPerDay', 'scoreThreshold', 'scoreExceptional', 'spacePerDay', 'spaceNormalPerDay', 'spaceImportantScore', 'spaceMaxPerDay', 'dailyHour', 'autoPublish', 'autoFeature', 'imageModel', 'skyEnabled'],
   egitim: ['lessonModel', 'lessonHelperModel', 'lessonWeekdays', 'lessonAutoPublish'],
   bulten: ['kunyeUrl', 'kunyeToken', 'newsletterTag', 'digestWeekday', 'autoNewsletter', 'astroDigest', 'astroDigestWeekday'],
 }
@@ -119,6 +119,8 @@ export async function saveSettingsAction(form: FormData) {
   // Boş bırakılan gizli alanlar değişmez (sayfada gösterilmiyorlar)
   const secret = (name: 'aiApiKey' | 'kunyeToken' | 'imageApiKey') => text(form, name) || (form.get(`${name}Clear`) ? '' : current[name])
   const checked = (name: string) => form.get(name) === 'on'
+  // Puan alanı "6,5" ya da "6.5" → onda bir tam sayı (65)
+  const score = (name: 'scoreThreshold' | 'scoreExceptional' | 'spaceImportantScore') => intIn(String(Math.round(Number(text(form, name).replace(',', '.')) * 10)), 10, 100, current[name])
   const parse: Record<string, () => unknown> = {
     siteTitle: () => text(form, 'siteTitle').slice(0, 100) || current.siteTitle,
     siteDescription: () => text(form, 'siteDescription').slice(0, 300),
@@ -132,9 +134,14 @@ export async function saveSettingsAction(form: FormData) {
     readMode: () => (text(form, 'readMode') === 'full' ? 'full' : 'abstract'),
     maxInputChars: () => intIn(text(form, 'maxInputChars'), 500, 400_000, current.maxInputChars),
     interests: () => text(form, 'interests').slice(0, 1000),
-    postsPerDay: () => intIn(text(form, 'postsPerDay'), 0, 20, current.postsPerDay),
-    spacePerDay: () => intIn(text(form, 'spacePerDay'), 0, 20, current.spacePerDay),
-    spaceMaxPerDay: () => intIn(text(form, 'spaceMaxPerDay'), 0, 20, current.spaceMaxPerDay),
+    postsPerDay: () => intIn(text(form, 'postsPerDay'), 0, 15, current.postsPerDay),
+    postsMinPerDay: () => intIn(text(form, 'postsMinPerDay'), 0, 15, current.postsMinPerDay),
+    scoreThreshold: () => score('scoreThreshold'),
+    scoreExceptional: () => score('scoreExceptional'),
+    spacePerDay: () => intIn(text(form, 'spacePerDay'), 0, 15, current.spacePerDay),
+    spaceNormalPerDay: () => intIn(text(form, 'spaceNormalPerDay'), 0, 15, current.spaceNormalPerDay),
+    spaceImportantScore: () => score('spaceImportantScore'),
+    spaceMaxPerDay: () => intIn(text(form, 'spaceMaxPerDay'), 0, 15, current.spaceMaxPerDay),
     dailyHour: () => intIn(text(form, 'dailyHour'), 0, 23, current.dailyHour),
     autoPublish: () => checked('autoPublish'),
     autoFeature: () => checked('autoFeature'),
