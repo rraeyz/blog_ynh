@@ -17,13 +17,16 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 
 ## Eğitim bölümü
 - `/egitim`: seriler ve sıralı dersler (`lib/lessons.ts`). Yapay zekâ konu seçmez: istekler, sonra müfredat sırası; seri sırası gelince derslere bölünür, müfredat bitince yeni seri önerilir.
-- Ders seri seviyesindeki okura göre yazılır (`READERS`; "Ön bilgiler" bölümü bilinmeyen araçları öğretir, denetim anlaşılırlığı da sınar).
+- Seviyeler (`lib/levels.ts`): her seri konunun en temel noktasından başlar, dersler ilerledikçe yükselir (temel → orta → ileri, düşmez); tek derslik konu ve istekler "kapsamli" (tek derste temelden ileriye). Okur seviyeyi her yerde görür, `/egitim?seviye=` ile süzer.
+- Süreklilik: her ders "Öğretilenler" satırını `covers`'a yazar; serinin sonraki dersi bunları "okurun bildikleri"nde alır. Bilinmeyen araçlar "Ön bilgiler"de öğretilir, denetim anlaşılırlığı da sınar.
+- Sıra (`nextLesson`): önce istekler, sonra aynı anda yürüyen `ACTIVE`=2 seriden son dersi en eski yazılanınki.
 - Ders üç aşama (`writeLesson`): araştırma (OpenRouter `openrouter:web_search`; en az 3 doğrulanmış kaynak şart) → yalnızca notlardan yazım → notlarla karşılaştırmalı denetim (JSON bulgular). Ciddi bulgu yoksa ve `lessonAutoPublish` açıksa yayımlanır, yoksa taslak + `review`. Açılmayan linkler metne döner.
 - Müfredat: `ensureRoadmap` hep en az 2 bölünmemiş seri tutar; azalınca yapay zekâ alan (TRACKS), seviye ve son 30 günün önemli uzay/fizik haberlerine bakarak seri önerir.
 - Formül ($...$, $$...$$) ve `:::cozum` blokları yalnızca derslerde açılır (`renderMarkdown(body, { math: true })`): haberlerde $ para birimi olabilir.
 
 ## Diğer
-- Gökyüzü takvimi (`lib/sky.ts`): haftalık, sonuç AppState `sky.week`; bülten gününde tazelenir.
+- Gökyüzü takvimi (`lib/sky.ts`): haftada bir (bülten gününde) önümüzdeki 35 gün araştırılır, `SkyEvent` tablosunda o aralık yenilenir; geçmiş aylar kalır. `/gokyuzu?ay=YYYY-MM` aylık takvim, türler, simgeler ve önem derecesi (`rank`: 3 kaçırma, 2 öne çıkan) `lib/skyKinds.ts`.
+- Haftalık astronomi özeti sitede (`/astronomi-ozeti`, `lib/weekly.ts`): kaydedilmez, pazartesi–pazar haftası için veriden kurulur; e-postadaki özet o haftanın sayfasına bağlanır.
 - Arama (`/ara`): yayımlananlar bellekte taranır (`searchScore`); büyürse FTS5.
 - Ayarlar sekmeli; `saveSettingsAction` yalnızca `SETTINGS_SECTIONS[section]` alanlarını yazar. Yeni ayar: şema + bölüm listesi + `parse` + `backup.ts` FIELDS.
 

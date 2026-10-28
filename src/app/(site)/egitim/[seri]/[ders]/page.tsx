@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { isAdmin } from '@/lib/auth'
 import { headings, renderMarkdown } from '@/lib/markdown'
 import { readingMinutes, topicHue } from '@/lib/topics'
+import { isLevel, LEVELS } from '@/lib/levels'
 import { coverStyle } from '../../../parts'
 import { ReadingProgress } from '../../../yazi/[slug]/ReadingProgress'
 
@@ -53,7 +54,10 @@ export default async function LessonPage({ params }: { params: { seri: string; d
       <header className="mt-4 overflow-hidden rounded-3xl p-7 md:p-12 text-white" style={coverStyle(lesson.series.slug, lesson.slug)}>
         <p className="text-sm text-white/75">{lesson.series.title} · Ders {lesson.position}</p>
         <h1 className="mt-2 text-3xl md:text-5xl font-semibold leading-tight drop-shadow-sm">{lesson.title}</h1>
-        <p className="mt-4 text-sm text-white/80">{readingMinutes(lesson.body)} dk okuma</p>
+        <p className="mt-4 text-sm text-white/80">
+          {isLevel(lesson.level) && <span title={LEVELS[lesson.level].hint} className="mr-2 rounded-full bg-white/20 px-2.5 py-0.5 font-medium">{LEVELS[lesson.level].label}</span>}
+          {readingMinutes(lesson.body)} dk okuma
+        </p>
       </header>
 
       <div className="mx-auto mt-10 max-w-4xl lg:grid lg:grid-cols-[minmax(0,1fr)_13rem] lg:gap-14">

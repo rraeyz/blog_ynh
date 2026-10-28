@@ -55,8 +55,8 @@ const fake = http.createServer((req, res) => {
       const cite = (n) => ({ type: 'url_citation', url_citation: { url: `${FAKE}/kaynak${n}`, title: `Ders notu ${n}` } })
       let content = ''
       let annotations = []
-      if (system.includes('ders serisi planlıyorsun')) {
-        content = 'Araştırdım. ' + JSON.stringify({ lessons: [{ title: 'Kırınım ve Airy diski', scope: 'Airy diski' }, { title: 'Seeing', scope: 'Atmosfer' }, { title: 'Zernike polinomları', scope: 'Dalga cephesi' }] })
+      if (system.includes('dersleri planlıyorsun')) {
+        content = 'Araştırdım. ' + JSON.stringify({ lessons: [{ title: 'Kırınım ve Airy diski', scope: 'Airy diski', level: 'temel' }, { title: 'Seeing', scope: 'Atmosfer', level: 'orta' }, { title: 'Zernike polinomları', scope: 'Dalga cephesi', level: 'ileri' }] })
       } else if (system.includes('araştırma asistanısın')) {
         if (!user.includes('Ders: Kaynaksız')) {
           annotations = [cite(1), cite(2), cite(3)]
@@ -67,6 +67,7 @@ const fake = http.createServer((req, res) => {
           'Önce notları okudum.',
           'Özet: Airy diski, dairesel bir açıklıktan geçen ışığın kırınım deseninin merkezidir.',
           'Önkoşul: 1',
+          'Öğretilenler: kırınım, Airy diski',
           '',
           '## Nedir?',
           `Çözünürlük sınırı $\\theta = 1.22 \\lambda / D$ ile verilir.${user.includes('Ders: Denetimli') ? ' DENETIM-HATASI' : ''}`,
@@ -101,7 +102,7 @@ const fake = http.createServer((req, res) => {
         annotations = [cite(1)]
         const [from] = user.match(/\d{4}-\d{2}-\d{2}/)
         const day = (n) => new Date(Date.parse(from) + n * 86_400_000).toISOString().slice(0, 10)
-        content = JSON.stringify({ events: [{ date: day(2), time: '21:30', title: 'Ay ile Satürn yakınlaşıyor', detail: 'Güneydoğuya bak' }, { date: day(0), time: '', title: 'Orionid <b>tepe</b>', detail: 'Gece yarısından sonra' }, { date: day(30), title: 'Aralık dışı' }] })
+        content = JSON.stringify({ events: [{ date: day(2), time: '21:30', kind: 'yakinlasma', title: 'Ay ile Satürn yakınlaşıyor', detail: 'Güneydoğuya bak' }, { date: day(0), time: '', kind: 'meteor', title: 'Orionid <b>tepe</b>', detail: 'Gece yarısından sonra' }, { date: day(1), time: '20:00', kind: 'ay-tutulmasi', title: 'Parçalı Ay tutulması', detail: 'Doğuya bak' }, { date: day(40), title: 'Aralık dışı' }] })
       }
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content, annotations } }], usage: { prompt_tokens: 1000, completion_tokens: 500 } }))
@@ -435,7 +436,10 @@ test('eğitim: araştırma → yazım → denetim, otomatik yayın', async () =>
     assert.ok(!page.includes(`${FAKE}/yok`) && page.includes('ölü kaynak'), 'açılmayan link metne döner')
     assert.match(page, /Bu dersin kaynakları[\s\S]*Ders notu 2[\s\S]*kaynak4/)
     assert.doesNotMatch(page, /Başlamadan önce/, 'önkoşul dersi yayında değilse kutu yok')
-    assert.match((await get('/egitim')).html, /Optik ve Görüntü Oluşumu[\s\S]*1(<!-- -->)? \/ (<!-- -->)?3(<!-- -->)? ders yayında/)
+    const education = (await get('/egitim')).html
+    assert.match(education, /Optik ve enstrümantasyon<\/h2>[\s\S]*Optik ve Görüntü Oluşumu[\s\S]*Temel → İleri[\s\S]*1(<!-- -->)? \/ (<!-- -->)?3(<!-- -->)? ders yayında/, 'alan başlığı, seviye aralığı')
+    assert.match(page, /Temel<\/span>/, 'ders sayfasında seviye')
+    assert.match((await get(preview.split('/').slice(0, 3).join('/'))).html, /Kırınım ve Airy diski[\s\S]*Temel[\s\S]*Seeing[\s\S]*Orta[\s\S]*Zernike polinomları[\s\S]*İleri/, 'seri sayfasında ders seviyeleri')
   } finally {
     cookie = saved
   }
@@ -460,6 +464,11 @@ test('eğitim: denetimde sorun çıkan ders taslak kalır, önkoşul kutusu', as
     cookie = ''
     // Önkoşul listesinde 1 numara yayındaki "Kırınım ve Airy diski"
     assert.match((await get(preview)).html, /Başlamadan önce[\s\S]*href="\/egitim\/optik-ve-goruntu-olusumu\/kirinim-ve-airy-diski"/)
+    const education = (await get('/egitim')).html
+    assert.match(education, /Tek derslik konular[\s\S]*Denetimli ders[\s\S]*Temelden ileriye/, 'istenen ders tek derslik konu, kapsamlı seviye')
+    const temel = (await get('/egitim?seviye=temel')).html
+    assert.match(temel, /Temel dersler[\s\S]*Kırınım ve Airy diski/)
+    assert.doesNotMatch(temel, /Denetimli ders/, 'seviye süzgeci')
   } finally {
     cookie = saved
   }
@@ -470,18 +479,39 @@ test('eğitim: denetimde sorun çıkan ders taslak kalır, önkoşul kutusu', as
   await waitFor(async () => /Yazılamayan dersler[\s\S]*Kaynaksız ders[\s\S]*doğrulanmış kaynak/.test((await get('/admin/egitim')).html), 'kaynaksız ders reddi')
 })
 
+test('eğitim: iki seri sırayla ilerler, öğretilenler sonraki derse geçer', async () => {
+  const before = openRouterRequests.length
+  assert.match(await submit('/admin/egitim', 'Sıradaki dersi şimdi yaz'), /araştırılıp yazılıyor/)
+  await waitFor(async () => /Ders: (&quot;|")Kırınım ve Airy diski(&quot;|") yayımlandı[\s\S]*(&quot;|")Uyarlamalı Optik ve Koronagraflar(&quot;|") serisi 3 derse bölündü/.test((await get('/admin')).html), 'ikinci seri')
+  assert.match((await get('/admin/egitim')).html, /Yürüyor[\s\S]*Yürüyor/, 'iki seri yürüyor')
+  assert.match(await submit('/admin/egitim', 'Sıradaki dersi şimdi yaz'), /araştırılıp yazılıyor/)
+  await waitFor(async () => /Ders: (&quot;|")Seeing(&quot;|") yayımlandı/.test((await get('/admin')).html), 'birinci serinin ikinci dersi')
+  const writes = openRouterRequests.slice(before).filter((r) => r.body.messages[0].content.includes('öğretim üyesisin'))
+  assert.equal(writes.length, 2)
+  assert.doesNotMatch(writes[0].body.messages[1].content, /önceki derslerinde öğrendikleri/, 'yeni serinin ilk dersi')
+  assert.match(writes[1].body.messages[1].content, /Bu dersin seviyesi: Orta[\s\S]*serinin önceki derslerinde öğrendikleri: kırınım, Airy diski/)
+})
+
 test('gökyüzü takvimi', async () => {
   assert.match(await submit('/admin', 'Gökyüzü takvimini güncelle'), /araştırılıyor/)
-  await waitFor(async () => /Gökyüzü takvimi \(elle\): .* 2(<!-- -->)? olay/.test((await get('/admin')).html), 'gökyüzü')
+  await waitFor(async () => /Gökyüzü takvimi \(elle\): .* 3(<!-- -->)? olay/.test((await get('/admin')).html), 'gökyüzü')
   const saved = cookie
   cookie = ''
   try {
     const home = (await get('/')).html
-    assert.match(home, /Bu hafta gökyüzünde[\s\S]*Orionid &lt;b&gt;tepe&lt;\/b&gt;[\s\S]*Ay ile Satürn yakınlaşıyor/, 'tarih sırasıyla, kaçışlı')
+    assert.match(home, /Bu hafta gökyüzünde[\s\S]*🌠[\s\S]*Orionid &lt;b&gt;tepe&lt;\/b&gt;[\s\S]*✨[\s\S]*Ay ile Satürn yakınlaşıyor/, 'tarih sırasıyla, simgeli, kaçışlı')
     assert.doesNotMatch(home, /Aralık dışı/)
+    // Bugün her zaman bu ayın takviminde: gün hücresi simgeli ve olayın ayrıntısına bağlı
     const page = (await get('/gokyuzu')).html
-    assert.match(page, /21:30[\s\S]*Güneydoğuya bak/)
-    assert.match(page, /Kaynaklar[\s\S]*kaynak1/)
+    assert.match(page, /href="#gun-\d{4}-\d{2}-\d{2}"[^>]*aria-label="[^"]*Orionid[\s\S]*Meteor yağmuru/)
+    assert.match(page, /id="gun-[\s\S]*Orionid &lt;b&gt;tepe&lt;\/b&gt;[\s\S]*Gece yarısından sonra/)
+    assert.match(page, /kaynakları[\s\S]*kaynak1/)
+    assert.match(page, /aria-label="Bu ayın öne çıkanları"[\s\S]*Kaçırma[\s\S]*Parçalı Ay tutulması[\s\S]*Öne çıkan[\s\S]*Orionid/, 'önemli olaylar takvimin üstünde, önem sırasıyla')
+    assert.match(page, /border-amber-400[^"]*"[^>]*>[\s\S]{0,400}Ay tutulması/, 'tutulma günü belirgin')
+    const next = page.match(/href="\/gokyuzu\?ay=(\d{4}-\d{2})"[^>]*>[^<]*→/)[1]
+    assert.equal((await get(`/gokyuzu?ay=${next}`)).status, 200, 'sonraki aya geçilir')
+    assert.match((await get('/gokyuzu?ay=1999-01')).html, /Bu ay için kayıtlı olay yok/)
+    assert.equal((await get('/gokyuzu?ay=bozuk')).status, 200, 'bozuk ay bu aya döner')
   } finally {
     cookie = saved
   }
@@ -497,7 +527,23 @@ test('haftanın astronomi özeti', async () => {
   assert.match(body, /Haftanın astronomi ve fizik gündemi: 1 gelişme/)
   assert.match(body, /Kediler Neden Çok Uyur/, 'uzay yazısı girer')
   assert.match(body, /Bu haftanın dersleri[\s\S]*Kırınım ve Airy diski/)
-  assert.match(body, /Bu hafta gökyüzünde[\s\S]*Ay ile Satürn yakınlaşıyor[\s\S]*\/gokyuzu/)
+  assert.match(body, /Bu hafta gökyüzünde[\s\S]*\*\*Parçalı Ay tutulması \(kaçırma\)\*\*[\s\S]*Ay ile Satürn yakınlaşıyor[\s\S]*\/gokyuzu/)
+  assert.match(body, /href="https:\/\/blog\.example\.com\/astronomi-ozeti\/\d{4}-\d{2}-\d{2}" class="cta-button">Haftanın özetini sitede oku/)
+
+  // Sitede de: haftalık özet sayfası veriden kurulur
+  const saved = cookie
+  cookie = ''
+  try {
+    const list = (await get('/astronomi-ozeti')).html
+    assert.match(list, /Bu hafta · [\s\S]*Kediler Neden Çok Uyur/)
+    const week = list.match(/href="(\/astronomi-ozeti\/\d{4}-\d{2}-\d{2})"/)[1]
+    const page = (await get(week)).html
+    assert.match(page, /Bu haftanın gelişmeleri[\s\S]*Kediler Neden Çok Uyur[\s\S]*Bu haftanın dersleri[\s\S]*Kırınım ve Airy diski[\s\S]*Bu hafta gökyüzünde[\s\S]*Orionid/)
+    assert.equal((await get('/astronomi-ozeti/2099-01-05')).status, 404, 'gelecek hafta yok')
+    assert.equal((await get('/astronomi-ozeti/2026-10-28')).status, 404, 'pazartesi olmayan gün')
+  } finally {
+    cookie = saved
+  }
 })
 
 test('site içi arama', async () => {

@@ -13,6 +13,7 @@ import { autoFeature, featurePost, writePost } from '@/lib/writer'
 import { generateCover, removeImage } from '@/lib/images'
 import { createWeeklyDigest, digestBody, sendDigest } from '@/lib/newsletter'
 import { CATEGORIES } from '@/lib/topics'
+import { isLevel } from '@/lib/levels'
 import { addLesson, addSeries, lessonTask, planSeries, requestLesson, seedStarterSeries, writeLesson } from '@/lib/lessons'
 import { astroDigestTask, dailyTask, isJobRunning, runExclusive, weeklyTask } from '@/lib/jobs'
 import { skyTask } from '@/lib/sky'
@@ -442,7 +443,8 @@ export async function addLessonAction(form: FormData) {
   const seriesId = id(form)
   const title = text(form, 'title').slice(0, 200)
   if (!title) back(seriesPath(seriesId), 'Ders başlığı gir')
-  await addLesson(seriesId, title, text(form, 'scope').slice(0, 1000), sourceList(text(form, 'sourceUrls')))
+  const level = text(form, 'level')
+  await addLesson(seriesId, title, text(form, 'scope').slice(0, 1000), sourceList(text(form, 'sourceUrls')), undefined, isLevel(level) ? level : 'kapsamli')
   await prisma.series.update({ where: { id: seriesId }, data: { planned: true } })
   back(seriesPath(seriesId), 'Ders eklendi')
 }
@@ -461,6 +463,7 @@ export async function saveLessonAction(form: FormData) {
       sourceUrls: sourceList(text(form, 'sourceUrls')),
       excerpt: text(form, 'excerpt').slice(0, 500),
       body: text(form, 'body'),
+      ...(isLevel(text(form, 'level')) ? { level: text(form, 'level') } : {}),
     },
   })
   back(lessonPath(lessonId), 'Kaydedildi')

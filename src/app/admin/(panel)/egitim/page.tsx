@@ -15,6 +15,8 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
   ])
   const days = settings.lessonWeekdays.split(',').filter(Boolean).map((d) => DAY_NAMES[Number(d)]).join(', ')
   const count = (lessons: Array<{ status: string }>, status: string) => lessons.filter((l) => l.status === status).length
+  // Yürüyen seriler: lib/lessons.ts nextLesson ile aynı kural (sırası en önde, bekleyen dersi olan ilk iki seri)
+  const running = series.filter((s) => s.position >= 0 && s.planned && count(s.lessons, 'planned') > 0).slice(0, 2).map((s) => s.id)
   return (
     <>
       <Notice message={searchParams.mesaj} />
@@ -23,12 +25,13 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
         Müfredattaki sıradaki ders {days ? `her ${days}` : 'hiçbir gün (Ayarlar → Eğitim)'} günlük işten sonra üç aşamada hazırlanır: web&apos;de
         araştırılır (en az 3 doğrulanmış kaynak yoksa yazılmaz), notlardan uzman seviyesinde yazılır, sonra notlarla karşılaştırılarak denetlenir.
         Denetim ciddi sorun bulmazsa {settings.lessonAutoPublish ? <b>kendiliğinden yayımlanır</b> : <>burada <b>taslak</b> olarak bekler</>}; bulursa
-        bulgularıyla taslak kalır. Önce istekler, sonra müfredat sırayla yazılır; sırada hep en az 2 seri tutulur, azalınca yapay zekâ alan dengesine,
-        seviyeye ve son haftaların önemli haberlerine bakarak yeni seri önerir (istemediğini silebilirsin).
+        bulgularıyla taslak kalır. Önce istekler yazılır; sonra aynı anda yürüyen iki seriden sırayla birer ders. Her seri konunun en temel noktasından
+        başlar, dersler ilerledikçe seviye yükselir; tek derslik konular kendi içinde temelden ileriye gider. Sırada hep en az 2 konu tutulur, azalınca
+        yapay zekâ alan dengesine ve son haftaların önemli haberlerine bakarak yenisini önerir (istemediğini silebilirsin).
       </p>
       <div className="card mb-6 text-sm space-y-1">
         <p><b>Model:</b> {settings.lessonModel} · <b>OpenRouter anahtarı:</b> {settings.imageApiKey ? 'girilmiş' : 'yok (Ayarlar → Yapay zekâ)'}</p>
-        <p className="text-zinc-500">Bir ders üç model çağrısı ve 10&apos;a kadar web araması kullanır; Sonnet ile yaklaşık 0,40–0,80 $.</p>
+        <p className="text-zinc-500">Bir ders üç model çağrısı ve 10&apos;a kadar web araması kullanır; Sonnet ile yaklaşık 1,0–1,5 $.</p>
       </div>
       <div className="flex flex-wrap gap-2 mb-8">
         <form action={runLessonAction}><button className="btn-primary">Sıradaki dersi şimdi yaz</button></form>
@@ -89,6 +92,7 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
                   {s.title}
                   {(s.track || s.level) && <span className="block text-xs font-normal text-zinc-500">{[s.track, s.level].filter(Boolean).join(' · ')}</span>}
                 </Link>
+                {running.includes(s.id) && <span className="text-xs rounded px-2 py-0.5 bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">Yürüyor</span>}
                 <span className="text-xs text-zinc-500">
                   {s.planned ? `${count(s.lessons, 'published')} yayında · ${count(s.lessons, 'draft')} taslak · ${count(s.lessons, 'planned')} sırada` : 'sırası gelince derslere bölünecek'}
                 </span>

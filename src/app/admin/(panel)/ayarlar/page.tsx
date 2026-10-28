@@ -95,7 +95,7 @@ function Section({ section, s }: { section: string; s: Settings }) {
       </Field>
       <Check name="autoPublish" checked={s.autoPublish}>Yazıları onaysız yayımla (kapalıyken taslak olarak bekler)</Check>
       <Check name="autoFeature" checked={s.autoFeature}>Önem puanı {FEATURE_SUGGESTION}/10 ve üstü olan yazıyı yayımlanınca kendiliğinden öne çıkar (öne çıkanlarda en fazla 10; en eskisi düşer)</Check>
-      <Check name="skyEnabled" checked={s.skyEnabled}>Gökyüzü takvimi: her hafta önümüzdeki 7 günün Türkiye&apos;den gözlenebilir gökyüzü olayları hazırlanır (ana sayfa, /gokyuzu, bülten). Haftada yaklaşık 0,05–0,10 $.</Check>
+      <Check name="skyEnabled" checked={s.skyEnabled}>Gökyüzü takvimi: her hafta önümüzdeki 5 haftanın Türkiye&apos;den gözlenebilir gökyüzü olayları araştırılır (aylık takvim /gokyuzu, ana sayfa, bülten). Haftada yaklaşık 0,10–0,20 $.</Check>
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="Haberin ne kadarı okunsun?" id="readMode">
           <select id="readMode" name="readMode" defaultValue={s.readMode} className="input">
@@ -116,7 +116,7 @@ function Section({ section, s }: { section: string; s: Settings }) {
     <>
       <p className="hint">
         Seçili günlerde günlük işten sonra sıradaki ders üç aşamada hazırlanır: web&apos;de araştırma, notlardan ders yazımı, notlarla karşılaştırmalı
-        denetim. Ders başına yaklaşık 0,40-0,80 $ (OpenRouter). Müfredat ve istekler Eğitim sayfasında.
+        denetim. Ders başına yaklaşık 1,0-1,5 $ (OpenRouter). Müfredat ve istekler Eğitim sayfasında.
       </p>
       <Field label="Ders modeli" id="lessonModel" hint="Araştırma, yazım ve denetimde kullanılır; doğruluk önemli olduğu için güçlü bir model (ör. anthropic/claude-sonnet-5.5).">
         <input id="lessonModel" name="lessonModel" defaultValue={s.lessonModel} className="input" />

@@ -1,4 +1,5 @@
 // Saf yardımcılar: tests/unit.test.ts
+import { skyKind, skyRank, type SkyKind } from './skyKinds.ts'
 
 const TR: Record<string, string> = { ç: 'c', ğ: 'g', ı: 'i', İ: 'i', ö: 'o', ş: 's', ü: 'u', Ç: 'c', Ğ: 'g', Ö: 'o', Ş: 's', Ü: 'u' }
 
@@ -82,15 +83,16 @@ export function parseSelection(text: string, count: number, n: number, minSpace 
 
 export const monthKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
-// Ders çıktısı: "Özet: ..." ve "Önkoşul: 3, 7" satırları ile ilk "## " başlığından başlayan gövde
+// Ders çıktısı: "Özet: ...", "Önkoşul: 3, 7" ve "Öğretilenler: ..." satırları ile ilk "## " başlığından başlayan gövde
 // (öncesindeki "araştırdım…" gibi sözler atılır). Önkoşul numaraları modele verilen ders listesindeki sıradır
-export function parseLesson(text: string): { excerpt: string; body: string; prerequisites: number[] } | null {
+export function parseLesson(text: string): { excerpt: string; body: string; prerequisites: number[]; covers: string } | null {
   const start = text.search(/^##\s/m)
   if (start < 0) return null
   const head = text.slice(0, start)
   const excerpt = head.match(/^\s*\**Özet:?\**:?\s*(.+)$/m)?.[1].trim() ?? ''
   const prerequisites = (head.match(/^\s*\**Önkoşul(?:lar)?:?\**:?\s*(.+)$/m)?.[1] ?? '').match(/\d+/g)?.map(Number) ?? []
-  return { excerpt: excerpt.slice(0, 500), body: text.slice(start).trim(), prerequisites }
+  const covers = head.match(/^\s*\**Öğretilenler:?\**:?\s*(.+)$/m)?.[1].trim() ?? ''
+  return { excerpt: excerpt.slice(0, 500), body: text.slice(start).trim(), prerequisites, covers: covers.slice(0, 1000) }
 }
 
 // Gövdedeki [metin](https://...) linkleri
@@ -100,7 +102,7 @@ export const markdownLinks = (body: string) => Array.from(new Set(Array.from(bod
 export const unlink = (body: string, dead: Set<string>) =>
   body.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (all, label: string, url: string) => (dead.has(url) ? label : all))
 
-export type SkyEvent = { date: string; time: string; title: string; detail: string }
+export type SkyEvent = { date: string; time: string; kind: SkyKind; rank: number; title: string; detail: string }
 
 // Gökyüzü takvimi yanıtı: yalnızca istenen aralıktaki, tarihi geçerli olaylar; tarih ve saate göre sıralı
 export function parseSkyEvents(text: string, from: string, to: string): SkyEvent[] {
@@ -109,12 +111,14 @@ export function parseSkyEvents(text: string, from: string, to: string): SkyEvent
     .map((e) => ({
       date: String(e.date ?? ''),
       time: /^\d{2}:\d{2}$/.test(String(e.time ?? '')) ? String(e.time) : '',
+      kind: skyKind(e.kind),
+      rank: skyRank(skyKind(e.kind), e.important),
       title: String(e.title ?? '').trim().slice(0, 150),
-      detail: String(e.detail ?? '').trim().slice(0, 400),
+      detail: String(e.detail ?? '').trim().slice(0, 800),
     }))
     .filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date) && e.date >= from && e.date <= to && e.title)
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-    .slice(0, 20)
+    .slice(0, 80)
 }
 
 // Arama için: küçük harf, Türkçe harfler ASCII karşılığına (okur "gokyuzu" da yazsa "Gökyüzü" bulunsun)
@@ -132,3 +136,11 @@ export function searchScore(query: string, title: string, text: string): number 
   }
   return score
 }
+
+// Takvim günleri ("2026-10-28"): saat dilimi kaymasın diye UTC öğlen üzerinden
+export function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+export const mondayOf = (date: string) => addDays(date, -((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7))

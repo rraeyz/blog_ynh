@@ -3,7 +3,8 @@ import { CATEGORIES, coverOf, periodLabel, readingMinutes, topicHue, topicLabel 
 import { prisma } from '@/lib/prisma'
 import { canSubscribe } from '@/lib/newsletter'
 import type { Settings } from '@/lib/state'
-import type { Sky } from '@/lib/sky'
+import { SKY_KINDS, skyKind } from '@/lib/skyKinds'
+import { isLevel, LEVELS, type Level } from '@/lib/levels'
 import { SubscribeForm } from './SubscribeForm'
 
 export type PostItem = {
@@ -185,25 +186,46 @@ export const TopicLink = ({ slug, label, active }: { slug: string; label: string
   </Link>
 )
 
-// "2026-10-28" → "28 Ekim Çar" (tarih Türkiye takviminden geldiği için saat dilimi kaydırmasın diye UTC öğlen)
+// "2026-10-28" → "28 Ekim Çarşamba" (tarih Türkiye takviminden geldiği için saat dilimi kaydırmasın diye UTC öğlen)
 export const skyDay = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'UTC' })
 
+export const SkyIcon = ({ kind }: { kind: string }) => {
+  const k = SKY_KINDS[skyKind(kind)]
+  return <span role="img" aria-label={k.label} title={k.label}>{k.icon}</span>
+}
+
 // Ana sayfadaki küçük gökyüzü kutusu: önümüzdeki birkaç olay
-export function SkyBox({ sky }: { sky: Sky }) {
+export function SkyBox({ events }: { events: Array<{ id: number; date: string; time: string; kind: string; rank: number; title: string }> }) {
   return (
     <section className="rounded-3xl border border-zinc-200 dark:border-ink-line bg-white/80 dark:bg-ink-card/80 p-6 md:p-8">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Bu hafta gökyüzünde</h2>
-        <Link href="/gokyuzu" className="text-sm font-medium text-violet-600 dark:text-violet-300 hover:underline">Nasıl gözlenir →</Link>
+        <Link href="/gokyuzu" className="text-sm font-medium text-violet-600 dark:text-violet-300 hover:underline">Takvim →</Link>
       </div>
       <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-        {sky.events.map((e, i) => (
-          <li key={i}>
-            <p className="text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">{skyDay(e.date)}{e.time && ` · ${e.time}`}</p>
-            <p className="mt-0.5 font-medium">{e.title}</p>
+        {events.map((e) => (
+          <li key={e.id} className={`flex gap-3 ${e.rank === 3 ? 'rounded-2xl border border-amber-400 bg-amber-400/10 p-3 sm:col-span-2' : ''}`}>
+            <span className={`${e.rank === 3 ? 'text-4xl' : 'text-2xl'} leading-none`}><SkyIcon kind={e.kind} /></span>
+            <span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">{skyDay(e.date)}{e.time && ` · ${e.time}`}{e.rank === 3 && ' · Kaçırma'}</span>
+              <span className={`mt-0.5 block ${e.rank >= 2 ? 'font-semibold' : 'font-medium'}`}>{e.title}</span>
+            </span>
           </li>
         ))}
       </ul>
     </section>
   )
+}
+
+const LEVEL_COLORS: Record<Level, string> = {
+  temel: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  orta: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  ileri: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+  kapsamli: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
+}
+
+// Dersin seviyesi: okur buna bakıp nereden başlayacağını seçer
+export function LevelBadge({ level }: { level: string }) {
+  if (!isLevel(level)) return null
+  return <span title={LEVELS[level].hint} className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${LEVEL_COLORS[level]}`}>{LEVELS[level].label}</span>
 }

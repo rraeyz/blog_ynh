@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { searchScore } from '@/lib/text'
-import { PAPER_FIELDS, RowPost } from '../parts'
+import { LevelBadge, PAPER_FIELDS, RowPost } from '../parts'
 
 export const metadata: Metadata = { title: 'Ara', robots: { index: false } }
 
@@ -33,7 +33,7 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
             {foundLessons.map((l) => (
               <li key={l.id}>
                 <Link href={`/egitim/${l.series.slug}/${l.slug}`} className="group block">
-                  <span className="font-semibold group-hover:text-violet-600 dark:group-hover:text-violet-300">{l.title}</span>
+                  <span className="font-semibold group-hover:text-violet-600 dark:group-hover:text-violet-300">{l.title}</span> <LevelBadge level={l.level} />
                   <span className="block text-sm text-zinc-500">{l.series.title}{l.excerpt && ` — ${l.excerpt}`}</span>
                 </Link>
               </li>

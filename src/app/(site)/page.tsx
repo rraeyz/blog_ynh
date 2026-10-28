@@ -97,7 +97,7 @@ export default async function HomePage({ searchParams }: { searchParams: { sayfa
         </section>
       )}
 
-      {first && settings.skyEnabled && sky && sky.events.length > 0 && <div className="mt-12"><SkyBox sky={sky} /></div>}
+      {first && settings.skyEnabled && sky.length > 0 && <div className="mt-12"><SkyBox events={sky} /></div>}
 
       {first && <div className="my-12"><SubscribeBox settings={settings} /></div>}
 

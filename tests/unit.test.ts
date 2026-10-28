@@ -3,8 +3,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { extractJson, markdownLinks, parseLesson, parseSelection, parseSkyEvents, searchScore, slugify, unlink } from '../src/lib/text.ts'
+import { addDays, mondayOf, extractJson, markdownLinks, parseLesson, parseSelection, parseSkyEvents, searchScore, slugify, unlink } from '../src/lib/text.ts'
 import { isPrivateIp, safeFetch } from '../src/lib/net.ts'
+import { levelRange, planLevels } from '../src/lib/levels.ts'
 import { compressImage } from '../src/lib/compress.ts'
 import { complete, RETRY_DELAYS } from '../src/lib/ai.ts'
 import http from 'node:http'
@@ -220,12 +221,27 @@ test('ders: numaralı liste, tablo, açılır çözüm', () => {
   assert.doesNotMatch(renderMarkdown('| <b>x</b> |\n|---|\n| y |'), /<b>/, 'tablo hücresi kaçışlanır')
 })
 
+test('ders seviyeleri: plan ve aralık', () => {
+  assert.deepEqual(planLevels(['ileri']), ['kapsamli'], 'tek ders kendi içinde temelden ileriye')
+  assert.deepEqual(planLevels(['temel', 'orta', 'temel', 'ileri', 'saçma']), ['temel', 'orta', 'orta', 'ileri', 'ileri'], 'seviye düşmez, bilinmeyen öncekini sürdürür')
+  assert.deepEqual(planLevels(['orta', 'ileri']), ['orta', 'ileri'], 'doğası gereği ileri konu ortadan başlayabilir')
+  assert.deepEqual(planLevels([undefined, 'orta']), ['temel', 'orta'])
+  assert.equal(levelRange(['temel', 'ileri', 'orta']), 'Temel → İleri')
+  assert.equal(levelRange(['orta', 'orta']), 'Orta')
+  assert.equal(levelRange(['kapsamli']), 'Temelden ileriye')
+  assert.equal(levelRange(['']), '')
+})
+
 test('gökyüzü takvimi ve arama', () => {
-  const text = '{"events": [{"date": "2026-10-30", "time": "21:00", "title": "Ay ve Satürn", "detail": "Güneydoğu"}, {"date": "2026-10-28", "time": "gece", "title": "Orionid", "detail": ""}, {"date": "2026-11-20", "title": "Aralık dışı"}, {"date": "30 Ekim", "title": "Bozuk tarih"}, {"date": "2026-10-29", "title": ""}]}'
+  const text = '{"events": [{"date": "2026-10-30", "time": "21:00", "kind": "yakinlasma", "title": "Ay ve Satürn", "detail": "Güneydoğu"}, {"date": "2026-10-28", "time": "gece", "kind": "uydurma", "important": true, "title": "Orionid", "detail": ""}, {"date": "2026-11-20", "title": "Aralık dışı"}, {"date": "30 Ekim", "title": "Bozuk tarih"}, {"date": "2026-10-29", "title": ""}]}'
   assert.deepEqual(parseSkyEvents(text, '2026-10-27', '2026-11-02'), [
-    { date: '2026-10-28', time: '', title: 'Orionid', detail: '' },
-    { date: '2026-10-30', time: '21:00', title: 'Ay ve Satürn', detail: 'Güneydoğu' },
+    { date: '2026-10-28', time: '', kind: 'diger', rank: 2, title: 'Orionid', detail: '' },
+    { date: '2026-10-30', time: '21:00', kind: 'yakinlasma', rank: 1, title: 'Ay ve Satürn', detail: 'Güneydoğu' },
   ])
+  assert.equal(mondayOf('2026-10-28'), '2026-10-26', 'çarşambanın pazartesisi')
+  assert.equal(mondayOf('2026-11-01'), '2026-10-26', 'pazar haftanın son günü')
+  assert.equal(mondayOf('2026-10-26'), '2026-10-26')
+  assert.equal(addDays('2026-12-30', 3), '2027-01-02')
   assert.ok(searchScore('gokyuzu', 'Bu hafta Gökyüzünde', '') > 0, 'Türkçe harfsiz yazılan bulunur')
   assert.ok(searchScore('IRAF', '', 'iraf ile fotometri') > 0, 'büyük I ile i aynı')
   assert.ok(searchScore('ışık eğrisi', 'Işık Eğrisi Modelleme', '') > searchScore('ışık eğrisi', 'Modelleme', 'ışık eğrisi'), 'başlıkta geçen önde')
@@ -234,7 +250,7 @@ test('gökyüzü takvimi ve arama', () => {
 })
 
 test('ders çıktısı, linkler ve iç ağ adresleri', () => {
-  assert.deepEqual(parseLesson('Araştırdım.\nÖzet: Airy diski kırınımdır.\nÖnkoşul: 3, 7\n\n## Nedir?\nMetin'), { excerpt: 'Airy diski kırınımdır.', body: '## Nedir?\nMetin', prerequisites: [3, 7] })
+  assert.deepEqual(parseLesson('Araştırdım.\nÖzet: Airy diski kırınımdır.\nÖnkoşul: 3, 7\nÖğretilenler: kırınım, Airy diski\n\n## Nedir?\nMetin'), { excerpt: 'Airy diski kırınımdır.', body: '## Nedir?\nMetin', prerequisites: [3, 7], covers: 'kırınım, Airy diski' })
   assert.deepEqual(parseLesson('Özet: X\nÖnkoşul: yok\n## Nedir?\nA')?.prerequisites, [])
   assert.equal(parseLesson('Başlıksız metin'), null)
   const body = 'Bak [ESO](https://eso.org/a) ve [yok](https://x.com/404) ve tekrar [ESO](https://eso.org/a)'
