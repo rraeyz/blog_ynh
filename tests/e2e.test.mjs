@@ -194,7 +194,7 @@ const SETTINGS = {
   site: { siteTitle: 'Test Blog', siteDescription: '', siteUrl: 'https://blog.example.com' },
   'yapay-zeka': { aiProvider: 'custom', aiModel: 'test-model', aiBaseUrl: `${FAKE}/v1`, aiApiKey: 'ai-anahtari', imageApiKey: 'or-anahtari', monthlyTokenLimit: '0' },
   haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', spacePerDay: '1', dailyHour: '9', autoFeature: 'on', skyEnabled: 'on', imageModel: 'test/gorsel' },
-  egitim: { lessonModel: 'test/ders-modeli', lessonDay: '1', lessonAutoPublish: 'on' },
+  egitim: { lessonModel: 'test/ders-modeli', lessonHelperModel: 'test/yardimci', lessonDay: '1', lessonAutoPublish: 'on' },
   bulten: { kunyeUrl: FAKE, kunyeToken: 'kunye-anahtari', newsletterTag: '', digestWeekday: '1', astroDigestWeekday: '0' },
 }
 const saveSettings = (section, changes = {}) => submit(`/admin/ayarlar?bolum=${section}`, `name="section" value="${section}"`, { ...SETTINGS[section], ...changes })
@@ -412,7 +412,8 @@ test('eğitim: araştırma → yazım → denetim, otomatik yayın', async () =>
   assert.match((await get('/admin')).html, /(&quot;|")Optik ve Görüntü Oluşumu(&quot;|") serisi 3 derse bölündü/)
   const calls = openRouterRequests.slice(before)
   assert.equal(calls.length, 4, 'plan, araştırma, yazım, denetim')
-  assert.ok(calls.every((r) => r.auth === 'Bearer or-anahtari' && r.body.model === 'test/ders-modeli'))
+  assert.ok(calls.every((r) => r.auth === 'Bearer or-anahtari'))
+  assert.deepEqual(calls.map((r) => r.body.model), ['test/yardimci', 'test/yardimci', 'test/ders-modeli', 'test/yardimci'], 'yalnızca yazım ders modeliyle; plan, araştırma, denetim yardımcıyla')
   assert.deepEqual(calls.map((r) => r.body.tools?.[0]?.type ?? '-'), ['openrouter:web_search', 'openrouter:web_search', '-', '-'], 'yalnızca plan ve araştırma web araması yapar')
   assert.match(calls[2].body.messages[1].content, /ARAŞTIRMA NOTLARI:\nNotlar: çözünürlük/, 'yazım notlardan')
   assert.match(calls[3].body.messages[1].content, /DERS:\n## Nedir\?/, 'denetim yazılan dersi görür')

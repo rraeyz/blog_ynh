@@ -100,7 +100,7 @@ const SETTINGS_SECTIONS: Record<string, string[]> = {
   site: ['siteTitle', 'siteDescription', 'siteUrl'],
   'yapay-zeka': ['aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'imageApiKey', 'monthlyTokenLimit'],
   haberler: ['readMode', 'maxInputChars', 'interests', 'postsPerDay', 'spacePerDay', 'dailyHour', 'autoPublish', 'autoFeature', 'imageModel', 'skyEnabled'],
-  egitim: ['lessonModel', 'lessonWeekdays', 'lessonAutoPublish'],
+  egitim: ['lessonModel', 'lessonHelperModel', 'lessonWeekdays', 'lessonAutoPublish'],
   bulten: ['kunyeUrl', 'kunyeToken', 'newsletterTag', 'digestWeekday', 'autoNewsletter', 'astroDigest', 'astroDigestWeekday'],
 }
 
@@ -140,6 +140,7 @@ export async function saveSettingsAction(form: FormData) {
     imageModel: () => text(form, 'imageModel').slice(0, 200) || current.imageModel,
     skyEnabled: () => checked('skyEnabled'),
     lessonModel: () => text(form, 'lessonModel').slice(0, 200) || current.lessonModel,
+    lessonHelperModel: () => text(form, 'lessonHelperModel').slice(0, 200) || current.lessonHelperModel,
     lessonWeekdays: () => form.getAll('lessonDay').map(String).filter((d) => /^[0-6]$/.test(d)).join(','),
     lessonAutoPublish: () => checked('lessonAutoPublish'),
     kunyeUrl: () => url('kunyeUrl'),
