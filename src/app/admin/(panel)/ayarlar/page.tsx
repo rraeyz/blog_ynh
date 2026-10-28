@@ -79,10 +79,13 @@ function Section({ section, s }: { section: string; s: Settings }) {
   )
   if (section === 'haberler') return (
     <>
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Field label="Günde kaç yazı" id="postsPerDay"><input id="postsPerDay" name="postsPerDay" type="number" min={0} max={20} defaultValue={s.postsPerDay} className="input" /></Field>
         <Field label="En az kaçı astronomi/uzay" id="spacePerDay" hint="O gün yeterli uzay haberi yoksa diğer konulardan tamamlanır.">
           <input id="spacePerDay" name="spacePerDay" type="number" min={0} max={20} defaultValue={s.spacePerDay} className="input" />
+        </Field>
+        <Field label="En fazla kaçı astronomi/uzay" id="spaceMaxPerDay" hint="Fazlası başka konuların en önemli haberleriyle değişir.">
+          <input id="spaceMaxPerDay" name="spaceMaxPerDay" type="number" min={0} max={20} defaultValue={s.spaceMaxPerDay} className="input" />
         </Field>
         <Field label="Günlük iş saati" id="dailyHour" hint="Türkiye saati.">
           <select id="dailyHour" name="dailyHour" defaultValue={s.dailyHour} className="input">

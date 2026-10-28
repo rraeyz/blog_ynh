@@ -201,6 +201,16 @@ test('seçimde her gün en az bir uzay haberi', () => {
   assert.deepEqual(parseSelection(`{"picked": [1, 2], ${scores}, "space": [4, 5]}`, 5, 2, 0).picked, [0, 1], '0 ise kural yok')
 })
 
+test('seçimde en fazla kaç uzay haberi', () => {
+  const scores = '"scores": {"1": 9, "2": 8, "3": 7, "4": 5, "5": 6, "6": 4}'
+  // 1, 2, 3 uzay; 4, 5, 6 diğer konular
+  assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [1, 2, 3]}`, 6, 3, 1, 2).picked, [0, 1, 4], 'en fazla 2: sondaki uzay, en yüksek puanlı diğer haberle (5) değişir')
+  assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [1, 2, 3]}`, 6, 3, 1, 1).picked, [0, 3, 4], 'en fazla 1: sondan başlayarak iki uzay değişir (en yüksek puanlı diğer haber en sona)')
+  assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [1, 2, 3, 4, 5, 6]}`, 6, 3, 1, 1).picked, [0, 1, 2], 'başka konu yoksa uzay haberleri kalır')
+  assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [1, 2, 3]}`, 6, 3, 2, 1).picked, [0, 1, 4], 'en az, en fazladan büyükse en az geçerli')
+  assert.deepEqual(parseSelection(`{"picked": [1, 4, 2], ${scores}, "space": [1, 2, 3]}`, 6, 3, 1, 2).picked, [0, 3, 1], 'sınırın altındaysa dokunulmaz')
+})
+
 test('ders: kod bloğu ve formüller', () => {
   const html = renderMarkdown('## Matematiği\nAiry diski: $\\theta = 1.22 \\lambda / D$ ve **kalın**.\n$$\nF = \\frac{a}{b}\n$$\n```python\nimport numpy as np\nx = 1 < 2\n```\n```iraf\nimexam <b>\n```', { math: true })
   assert.match(html, /class="katex"/, 'satır içi formül KaTeX ile')

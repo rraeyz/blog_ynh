@@ -99,7 +99,7 @@ const intIn = (value: string, min: number, max: number, fallback: number) => {
 const SETTINGS_SECTIONS: Record<string, string[]> = {
   site: ['siteTitle', 'siteDescription', 'siteUrl'],
   'yapay-zeka': ['aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'imageApiKey', 'monthlyTokenLimit'],
-  haberler: ['readMode', 'maxInputChars', 'interests', 'postsPerDay', 'spacePerDay', 'dailyHour', 'autoPublish', 'autoFeature', 'imageModel', 'skyEnabled'],
+  haberler: ['readMode', 'maxInputChars', 'interests', 'postsPerDay', 'spacePerDay', 'spaceMaxPerDay', 'dailyHour', 'autoPublish', 'autoFeature', 'imageModel', 'skyEnabled'],
   egitim: ['lessonModel', 'lessonHelperModel', 'lessonWeekdays', 'lessonAutoPublish'],
   bulten: ['kunyeUrl', 'kunyeToken', 'newsletterTag', 'digestWeekday', 'autoNewsletter', 'astroDigest', 'astroDigestWeekday'],
 }
@@ -134,6 +134,7 @@ export async function saveSettingsAction(form: FormData) {
     interests: () => text(form, 'interests').slice(0, 1000),
     postsPerDay: () => intIn(text(form, 'postsPerDay'), 0, 20, current.postsPerDay),
     spacePerDay: () => intIn(text(form, 'spacePerDay'), 0, 20, current.spacePerDay),
+    spaceMaxPerDay: () => intIn(text(form, 'spaceMaxPerDay'), 0, 20, current.spaceMaxPerDay),
     dailyHour: () => intIn(text(form, 'dailyHour'), 0, 23, current.dailyHour),
     autoPublish: () => checked('autoPublish'),
     autoFeature: () => checked('autoFeature'),

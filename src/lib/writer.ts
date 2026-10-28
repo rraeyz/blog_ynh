@@ -99,14 +99,15 @@ export async function writePost(paperId: number, settings: Settings, publish = s
   }
 }
 
-const selectPrompt = (minSpace: number) => `Bir bilim editörüsün. Verilen makale ve haberlerden en önemlilerini seç:
+const selectPrompt = (minSpace: number, maxSpace: number) => `Bir bilim editörüsün. Verilen makale ve haberlerden en önemlilerini seç:
 - yeni ve somut bir sonuç (keşif, icat, ölçüm, yeni yöntem) içerenler,
 - alanında ya da günlük hayatta etkisi büyük olanlar,
 - meraklı ama uzman olmayan bir okuru ilgilendirecek olanlar.
 Temel bilimde gerçek bir ilk (yeni bir ötegezegen ya da süpernova, yeni bir parçacık ya da kuantum olgusu, ilk kez yapılan bir ölçüm, yeni bir gözlem tekniği) teknik görünse bile önemlidir: okura anlatılabilir.
 Küçük iyileştirmeleri, birbirinin tekrarı olanları, kurum duyurularını (bütçe, atama, etkinlik) ve aynı alanda sıradan bir ek sonucu seçme; eşit önemdeyse farklı konulardan seç.
 Ayrıca listedeki HER makaleye bu ölçütlere göre 1-10 arası bir puan ver (cömert olma; çoğu 3-6 arasında olmalı).
-Seçtiklerinin en az ${minSpace} tanesi astronomi, astrofizik ya da uzay araştırması haberi olsun (listede o kadar somut uzay gelişmesi varsa).
+Seçtiklerinin en az ${minSpace}, en fazla ${maxSpace} tanesi astronomi, astrofizik ya da uzay araştırması haberi olsun (listede o kadar somut uzay gelişmesi varsa);
+kalanları fizik, yapay zekâ, teknoloji, sağlık, Dünya gibi başka konuların en önemli gelişmelerinden seç.
 "space" alanına listedeki bütün astronomi/astrofizik/uzay haberlerinin numaralarını yaz.
 Yanıtı yalnızca şu JSON biçiminde ver: {"picked": [seçtiğin numaralar önem sırasıyla], "scores": {"1": puan, "2": puan, ...}, "space": [uzay haberlerinin numaraları]}`
 
@@ -119,9 +120,9 @@ export async function selectPapers(candidates: Array<{ id: number; title: string
   const interests = settings.interests.trim()
     ? `Okurun öncelikli ilgi alanları (baştaki en öncelikli): ${settings.interests}\nBu alanlardaki somut ve yeni gelişmeleri, biraz daha az önemli olsalar bile öne al ve puanlarını buna göre ver; ama sıradan bir haberi yalnızca konusu uyuyor diye seçme.\n`
     : ''
-  const result = await complete(settings, selectPrompt(settings.spacePerDay), `${interests}Seçilecek sayı: ${n}\n\nMakaleler:\n${list}`)
+  const result = await complete(settings, selectPrompt(settings.spacePerDay, Math.max(settings.spaceMaxPerDay, settings.spacePerDay)), `${interests}Seçilecek sayı: ${n}\n\nMakaleler:\n${list}`)
   await addUsage(result.inputTokens, result.outputTokens)
-  const { picked, scores } = parseSelection(result.text, candidates.length, n, settings.spacePerDay)
+  const { picked, scores } = parseSelection(result.text, candidates.length, n, settings.spacePerDay, settings.spaceMaxPerDay)
   if (picked.length === 0) throw new Error('Seçim yanıtında geçerli makale yok')
   await prisma.$transaction(Array.from(scores).map(([index, score]) => prisma.paper.update({ where: { id: candidates[index].id }, data: { score } })))
   return picked.map((index) => candidates[index].id)
