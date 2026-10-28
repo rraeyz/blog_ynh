@@ -3,12 +3,29 @@ import { prisma } from '@/lib/prisma'
 import { Notice } from '../../Notice'
 import { coverMissingAction, deleteDraftsAction, deletePostAction, featurePostAction } from '../../actions'
 import { ConfirmButton } from '../../ConfirmButton'
-import { freeImage, topicLabel } from '@/lib/topics'
+import { CATEGORIES, freeImage, topicLabel } from '@/lib/topics'
 import { FEATURE_SUGGESTION } from '@/lib/writer'
 
-export default async function PostsPage({ searchParams }: { searchParams: { mesaj?: string } }) {
-  const posts = await prisma.post.findMany({ orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 200, include: { paper: { select: { title: true, url: true, imageUrl: true } } } })
-  const coverless = posts.filter((post) => post.status === 'published' && !post.image && !freeImage(post.paper)).length
+type Filters = { mesaj?: string; durum?: string; konu?: string; onem?: string; sira?: string }
+
+// Süzgeçler adreste (?durum=yayinda&konu=uzay&onem=7&sira=onem): sayfa yenilense de kalır, JavaScript gerekmez
+export default async function PostsPage({ searchParams }: { searchParams: Filters }) {
+  const status = { taslak: { status: 'draft' }, yayinda: { status: 'published' }, one: { featuredAt: { not: null } } }[searchParams.durum ?? ''] ?? {}
+  const category = searchParams.konu === 'yok' ? '' : CATEGORIES[searchParams.konu ?? ''] ? searchParams.konu : undefined
+  const minImportance = Math.min(10, Math.max(0, Number(searchParams.onem) || 0))
+  const byImportance = searchParams.sira === 'onem'
+  const paper = { select: { title: true, url: true, imageUrl: true } }
+  const [posts, published] = await Promise.all([
+    prisma.post.findMany({
+      where: { ...status, ...(category !== undefined ? { category } : {}), ...(minImportance ? { importance: { gte: minImportance } } : {}) },
+      orderBy: byImportance ? [{ importance: 'desc' }, { createdAt: 'desc' }] : [{ status: 'asc' }, { createdAt: 'desc' }],
+      take: 200,
+      include: { paper },
+    }),
+    prisma.post.findMany({ where: { status: 'published', image: '' }, select: { paper } }),
+  ])
+  const coverless = published.filter((post) => !freeImage(post.paper)).length
+  const filtered = !!(searchParams.durum || category !== undefined || minImportance)
   return (
     <>
       <Notice message={searchParams.mesaj} />
@@ -21,9 +38,37 @@ export default async function PostsPage({ searchParams }: { searchParams: { mesa
           <form action={deleteDraftsAction}><ConfirmButton question="Bütün taslaklar silinsin mi? Yayındaki yazılara dokunulmaz." className="btn">Taslakları sil</ConfirmButton></form>
         )}
       </div>
+      <form className="card mb-4 flex flex-wrap items-end gap-3 text-sm">
+        <label className="flex flex-col gap-1">Durum
+          <select name="durum" defaultValue={searchParams.durum ?? ''} className="input">
+            <option value="">Hepsi</option><option value="yayinda">Yayında</option><option value="taslak">Taslak</option><option value="one">Öne çıkanlar</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">Konu
+          <select name="konu" defaultValue={searchParams.konu ?? ''} className="input">
+            <option value="">Hepsi</option>
+            {Object.entries(CATEGORIES).map(([key, c]) => <option key={key} value={key}>{c.label}</option>)}
+            <option value="yok">Konu yok</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">En az önem
+          <select name="onem" defaultValue={String(minImportance || '')} className="input">
+            <option value="">Hepsi</option>
+            {[5, 6, 7, 8, 9].map((n) => <option key={n} value={n}>{`${n}/10 ve üstü`}</option>)}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">Sıralama
+          <select name="sira" defaultValue={byImportance ? 'onem' : ''} className="input">
+            <option value="">En yeni önce</option><option value="onem">En önemli önce</option>
+          </select>
+        </label>
+        <button className="btn-primary">Uygula</button>
+        {(filtered || byImportance) && <Link href="/admin/yazilar" className="btn">Temizle</Link>}
+        <span className="ml-auto self-center text-stone-500">{`${posts.length} yazı`}</span>
+      </form>
       <p className="text-sm text-stone-500 mb-4">☆ ile yayındaki yazıyı ana sayfadaki Öne çıkanlara al (en fazla 10; yenisi eklenince en eskisi düşer). <span className="text-violet-700 dark:text-violet-300">Öneri</span> rozeti, yapay zekânın önem puanı {FEATURE_SUGGESTION}/10 ve üstü olanlarda görünür.</p>
       {posts.length === 0 ? (
-        <p className="text-sm text-stone-500">Henüz yazı yok. Makaleler sayfasından bir makaleyi yazıya dönüştür ya da Genel&apos;den günlük işi çalıştır.</p>
+        <p className="text-sm text-stone-500">{filtered ? 'Bu süzgece uyan yazı yok.' : <>Henüz yazı yok. Makaleler sayfasından bir makaleyi yazıya dönüştür ya da Genel&apos;den günlük işi çalıştır.</>}</p>
       ) : (
         <ul className="space-y-2">
           {posts.map((post) => (

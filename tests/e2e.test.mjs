@@ -320,6 +320,10 @@ test('makale → taslak yazı → yayın', async () => {
   assert.match((await get('/')).html, /Okuma köşesi/)
   // Kaldırılınca öneri rozeti görünür, elle yeniden öne çıkarılabilir
   assert.match((await get('/admin/yazilar')).html, /önem 9\/10[\s\S]*Öneri/)
+  // Süzgeçler: konu, en az önem, durum, sıralama
+  assert.match((await get('/admin/yazilar?durum=yayinda&konu=uzay&onem=9&sira=onem')).html, /1 yazı[\s\S]*Kediler Neden Çok Uyur/)
+  assert.match((await get('/admin/yazilar?konu=saglik')).html, /Bu süzgece uyan yazı yok/)
+  assert.match((await get('/admin/yazilar?durum=taslak')).html, /Bu süzgece uyan yazı yok/)
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkar'), /Öne çıkarıldı/)
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkanlardan kaldır'), /kaldırıldı/)
 })
