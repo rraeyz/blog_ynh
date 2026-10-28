@@ -10,7 +10,7 @@ import { getSettings } from '@/lib/state'
 import { parseSourceUrl } from '@/lib/arxiv'
 import { addPaperFromUrl, hidePapers, readSource } from '@/lib/papers'
 import { autoFeature, featurePost, writePost } from '@/lib/writer'
-import { generateCover, removeImage } from '@/lib/images'
+import { coverMissing, generateCover, removeImage } from '@/lib/images'
 import { createWeeklyDigest, digestBody, sendDigest } from '@/lib/newsletter'
 import { CATEGORIES } from '@/lib/topics'
 import { isLevel } from '@/lib/levels'
@@ -258,6 +258,13 @@ export async function publishPostAction(form: FormData) {
   await prisma.post.update({ where: { id: post.id }, data: { status: publish ? 'published' : 'draft', publishedAt: publish ? post.publishedAt ?? new Date() : post.publishedAt, featuredAt: publish ? post.featuredAt : null } })
   if (publish && !post.featuredAt) await autoFeature(post, await getSettings())
   back(`/admin/yazilar/${post.id}`, publish ? 'Yayımlandı' : 'Yayından kaldırıldı')
+}
+
+export async function coverMissingAction() {
+  await requireAdmin()
+  const settings = await getSettings()
+  if (!settings.imageApiKey.trim()) back('/admin/yazilar', 'Önce Ayarlar → Yapay zekâ bölümüne OpenRouter anahtarını gir')
+  inBackground('/admin/yazilar', 'Eksik kapaklar', () => coverMissing(settings), 'Kapaklar çiziliyor; sonuç Genel → İş günlüğünde')
 }
 
 // Temsili kapak (OpenRouter); arka planda, sonuç günlükte

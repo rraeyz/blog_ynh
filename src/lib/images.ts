@@ -32,7 +32,7 @@ export async function generateCover(postId: number, settings: Settings): Promise
     signal: AbortSignal.timeout(180_000),
   })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(response.status === 401 ? 'OpenRouter anahtarı geçersiz' : response.status === 402 ? 'OpenRouter bakiyesi yetersiz' : data.error?.message || `OpenRouter yanıtı ${response.status}`)
+  if (!response.ok) throw new Error(response.status === 401 ? 'OpenRouter anahtarı geçersiz' : response.status === 402 ? `OpenRouter ödeme hatası (402): ${String(data.error?.message || 'bakiye ya da anahtarın harcama sınırı yetmiyor').slice(0, 150)}` : data.error?.message || `OpenRouter yanıtı ${response.status}`)
   const image = data.data?.[0]
   if (typeof image?.b64_json !== 'string' || !EXT[image.media_type ?? 'image/png']) throw new Error('OpenRouter görsel döndürmedi')
   const name = `${post.id}-${Date.now()}.webp`
@@ -49,4 +49,23 @@ export async function coverIfNeeded(postId: number, settings: Settings): Promise
   const post = await prisma.post.findUniqueOrThrow({ where: { id: postId }, include: { paper: true } })
   if (post.image || freeImage(post.paper)) return
   await generateCover(postId, settings).catch((error) => logJob(`Görsel üretilemedi ("${post.title.slice(0, 60)}"): ${String(error?.message || error).slice(0, 150)}`))
+}
+
+// Kapağı ve serbest görseli olmayan yayındaki yazılara toplu kapak (ör. bakiye bittiği için çizilemeyenler).
+// Ödeme hatasında durur: kalanlar da aynı hatayı verir
+export async function coverMissing(settings: Settings): Promise<string> {
+  const posts = await prisma.post.findMany({ where: { status: 'published', image: '' }, orderBy: { publishedAt: 'desc' }, include: { paper: true } })
+  const missing = posts.filter((post) => !freeImage(post.paper))
+  let drawn = 0
+  for (const post of missing) {
+    try {
+      await generateCover(post.id, settings)
+      drawn++
+    } catch (error) {
+      const message = String((error as Error).message || error).slice(0, 200)
+      if (message.includes('(402)')) return `${drawn}/${missing.length} kapak çizildi, durdu: ${message}`
+      await logJob(`Görsel üretilemedi ("${post.title.slice(0, 60)}"): ${message}`)
+    }
+  }
+  return `${drawn}/${missing.length} kapak çizildi`
 }

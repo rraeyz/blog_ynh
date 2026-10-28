@@ -1,18 +1,22 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { Notice } from '../../Notice'
-import { deleteDraftsAction, deletePostAction, featurePostAction } from '../../actions'
+import { coverMissingAction, deleteDraftsAction, deletePostAction, featurePostAction } from '../../actions'
 import { ConfirmButton } from '../../ConfirmButton'
-import { topicLabel } from '@/lib/topics'
+import { freeImage, topicLabel } from '@/lib/topics'
 import { FEATURE_SUGGESTION } from '@/lib/writer'
 
 export default async function PostsPage({ searchParams }: { searchParams: { mesaj?: string } }) {
-  const posts = await prisma.post.findMany({ orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 200, include: { paper: { select: { title: true } } } })
+  const posts = await prisma.post.findMany({ orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 200, include: { paper: { select: { title: true, url: true, imageUrl: true } } } })
+  const coverless = posts.filter((post) => post.status === 'published' && !post.image && !freeImage(post.paper)).length
   return (
     <>
       <Notice message={searchParams.mesaj} />
       <div className="flex items-center gap-2 mb-1">
         <h1 className="text-xl font-bold flex-1">Yazılar</h1>
+        {coverless > 0 && (
+          <form action={coverMissingAction}><ConfirmButton question={`Kapağı olmayan ${coverless} yayındaki yazıya yapay zekâyla kapak çizilsin mi? (yazı başına ~0,01 $)`} className="btn">{`Eksik kapakları çiz (${coverless})`}</ConfirmButton></form>
+        )}
         {posts.some((post) => post.status === 'draft') && (
           <form action={deleteDraftsAction}><ConfirmButton question="Bütün taslaklar silinsin mi? Yayındaki yazılara dokunulmaz." className="btn">Taslakları sil</ConfirmButton></form>
         )}
