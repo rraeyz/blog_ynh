@@ -19,6 +19,7 @@ const FIELDS = {
   digests: ['id', 'createdAt', 'subject', 'body', 'status', 'sentAt', 'result'],
   series: ['id', 'slug', 'title', 'summary', 'track', 'level', 'position', 'planned', 'createdAt'],
   lessons: ['id', 'seriesId', 'position', 'slug', 'title', 'scope', 'sourceUrls', 'excerpt', 'body', 'sources', 'research', 'review', 'prerequisites', 'level', 'covers', 'status', 'error', 'publishedAt', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
+  skyEvents: ['date', 'time', 'kind', 'title', 'detail', 'createdAt'],
 } as const
 
 type Row = Record<string, unknown>
@@ -32,7 +33,7 @@ const rows = (value: unknown, fields: readonly string[]) => {
 }
 
 export async function createBackup() {
-  const [settings, sources, papers, posts, digests, series, lessons] = await Promise.all([
+  const [settings, sources, papers, posts, digests, series, lessons, skyEvents] = await Promise.all([
     prisma.settings.findUnique({ where: { id: 1 } }),
     prisma.source.findMany({ orderBy: { id: 'asc' } }),
     prisma.paper.findMany({ orderBy: { id: 'asc' } }),
@@ -40,6 +41,7 @@ export async function createBackup() {
     prisma.digest.findMany({ orderBy: { id: 'asc' } }),
     prisma.series.findMany({ orderBy: { id: 'asc' } }),
     prisma.lesson.findMany({ orderBy: { id: 'asc' } }),
+    prisma.skyEvent.findMany({ orderBy: { date: 'asc' }, select: { date: true, time: true, kind: true, title: true, detail: true, createdAt: true } }),
   ])
   const images: Record<string, string> = {}
   for (const post of posts) {
@@ -58,6 +60,7 @@ export async function createBackup() {
     digests,
     series,
     lessons,
+    skyEvents,
     images,
   }
 }
@@ -74,6 +77,7 @@ export async function restoreBackup(data: unknown) {
   // Eğitim bölümünden önceki yedeklerde bu alanlar yok
   const series = rows(backup.series ?? [], FIELDS.series)
   const lessons = rows(backup.lessons ?? [], FIELDS.lessons)
+  const skyEvents = rows(backup.skyEvents ?? [], FIELDS.skyEvents)
   // Dosya adı denetlenir: yedekten gelen ad klasör dışına yazamasın
   const images = Object.entries((backup.images ?? {}) as Record<string, unknown>).filter(
     (entry): entry is [string, string] => IMAGE_NAME.test(entry[0]) && typeof entry[1] === 'string',
@@ -84,6 +88,7 @@ export async function restoreBackup(data: unknown) {
     await tx.post.deleteMany()
     await tx.series.deleteMany() // dersler seriyle birlikte silinir
     await tx.digest.deleteMany()
+    await tx.skyEvent.deleteMany()
     await tx.paper.deleteMany()
     await tx.source.deleteMany()
     await tx.settings.update({ where: { id: 1 }, data: settings })
@@ -94,6 +99,7 @@ export async function restoreBackup(data: unknown) {
     if (digests.length) await tx.digest.createMany({ data: digests as never })
     if (series.length) await tx.series.createMany({ data: series as never })
     if (lessons.length) await tx.lesson.createMany({ data: lessons as never })
+    if (skyEvents.length) await tx.skyEvent.createMany({ data: skyEvents as never })
   })
   if (images.length) await mkdir(IMAGE_DIR, { recursive: true })
   for (const [name, data] of images) await writeFile(path.join(IMAGE_DIR, name), Buffer.from(data, 'base64'))

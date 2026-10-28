@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { logJob, type Settings } from '@/lib/state'
 import { topicLabel } from '@/lib/topics'
 import { upcomingSky } from '@/lib/sky'
-import type { SkyEvent } from '@/lib/text'
+import { SKY_KINDS, skyKind } from '@/lib/skyKinds'
 
 // Bültene en fazla bu kadar yazı girer; fazlası varsa öne çıkanlar ve önem puanı yüksek olanlar seçilir
 export const DIGEST_MAX = 7
@@ -17,7 +17,7 @@ const escapeMail = (value: string) =>
 // Bülten metni Künye'nin e-posta biçiminde: paragraflar boş satırla, **kalın**, [link](url) ve ham HTML.
 // Her gelişme numaralı ve konusu renkli; okur hepsine göz gezdirir, merak ettiğine tıklar.
 // Dersler ve gökyüzü sonda küçük bölümler (detayını isteyen tıklar)
-type DigestExtras = { lessons?: Array<{ title: string; path: string }>; sky?: SkyEvent[]; intro?: string }
+type DigestExtras = { lessons?: Array<{ title: string; path: string }>; sky?: Array<{ date: string; time: string; kind: string; title: string }>; intro?: string }
 const heading = (text: string) => `<span style="color:#8b5cf6;font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase">${text}</span>`
 const skyDate = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'short', timeZone: 'UTC' })
 
@@ -43,7 +43,7 @@ export function digestBody(posts: DigestPost[], siteUrl: string, total = posts.l
     ? [heading(`Bu haftanın ${lessons.length > 1 ? 'dersleri' : 'dersi'}`), ...lessons.map((l) => `[${escapeMail(l.title)}](${base}${l.path})`)].join('\n')
     : ''
   const skyLine = sky.length
-    ? [heading('Bu hafta gökyüzünde'), ...sky.map((e) => `**${skyDate(e.date)}${e.time ? ` ${e.time}` : ''}** · ${escapeMail(e.title)}`), `[Nasıl gözlenir →](${base}/gokyuzu)`].join('\n')
+    ? [heading('Bu hafta gökyüzünde'), ...sky.map((e) => `${SKY_KINDS[skyKind(e.kind)].icon} **${skyDate(e.date)}${e.time ? ` ${e.time}` : ''}** · ${escapeMail(e.title)}`), `[Nasıl gözlenir →](${base}/gokyuzu)`].join('\n')
     : ''
   return [opening, ...items, lessonLine, skyLine, `<a href="${base}" class="cta-button">Bütün gelişmeleri sitede oku</a>`].filter(Boolean).join('\n\n')
 }
@@ -52,7 +52,7 @@ const weekAgo = () => new Date(Date.now() - 7 * 24 * 3600_000)
 const recentLessons = async () =>
   (await prisma.lesson.findMany({ where: { status: 'published', publishedAt: { gte: weekAgo() } }, orderBy: { publishedAt: 'asc' }, include: { series: { select: { slug: true } } } }))
     .map((l) => ({ title: l.title, path: `/egitim/${l.series.slug}/${l.slug}` }))
-const skyEvents = async (settings: Settings, limit: number) => (settings.skyEnabled ? (await upcomingSky(limit))?.events ?? [] : [])
+const skyEvents = async (settings: Settings, limit: number) => (settings.skyEnabled ? await upcomingSky(limit) : [])
 const dateLabel = () => new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })
 
 // Son 7 günde yayımlanan yazılardan taslak bülten (yazı yoksa null): önce öne çıkanlar, sonra önem puanı

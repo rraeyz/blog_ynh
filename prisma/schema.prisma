@@ -150,6 +150,19 @@ model Digest {
 }
 
 // İç durum: oturum anahtarı, işlerin son çalışma zamanı, aylık token kullanımı
+// Gökyüzü takvimi olayları (lib/sky.ts): haftalık araştırma önümüzdeki 5 haftayı yeniler, geçmiş aylar takvimde kalır
+model SkyEvent {
+  id        Int      @id @default(autoincrement())
+  date      String // YYYY-MM-DD, Türkiye takvimi
+  time      String   @default("") // SS:DD TSİ ya da boş
+  kind      String   @default("diger") // lib/skyKinds.ts
+  title     String
+  detail    String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}
+
 model AppState {
   key       String   @id
   value     String

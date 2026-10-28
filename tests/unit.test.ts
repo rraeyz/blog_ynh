@@ -233,10 +233,10 @@ test('ders seviyeleri: plan ve aralık', () => {
 })
 
 test('gökyüzü takvimi ve arama', () => {
-  const text = '{"events": [{"date": "2026-10-30", "time": "21:00", "title": "Ay ve Satürn", "detail": "Güneydoğu"}, {"date": "2026-10-28", "time": "gece", "title": "Orionid", "detail": ""}, {"date": "2026-11-20", "title": "Aralık dışı"}, {"date": "30 Ekim", "title": "Bozuk tarih"}, {"date": "2026-10-29", "title": ""}]}'
+  const text = '{"events": [{"date": "2026-10-30", "time": "21:00", "kind": "yakinlasma", "title": "Ay ve Satürn", "detail": "Güneydoğu"}, {"date": "2026-10-28", "time": "gece", "kind": "uydurma", "title": "Orionid", "detail": ""}, {"date": "2026-11-20", "title": "Aralık dışı"}, {"date": "30 Ekim", "title": "Bozuk tarih"}, {"date": "2026-10-29", "title": ""}]}'
   assert.deepEqual(parseSkyEvents(text, '2026-10-27', '2026-11-02'), [
-    { date: '2026-10-28', time: '', title: 'Orionid', detail: '' },
-    { date: '2026-10-30', time: '21:00', title: 'Ay ve Satürn', detail: 'Güneydoğu' },
+    { date: '2026-10-28', time: '', kind: 'diger', title: 'Orionid', detail: '' },
+    { date: '2026-10-30', time: '21:00', kind: 'yakinlasma', title: 'Ay ve Satürn', detail: 'Güneydoğu' },
   ])
   assert.ok(searchScore('gokyuzu', 'Bu hafta Gökyüzünde', '') > 0, 'Türkçe harfsiz yazılan bulunur')
   assert.ok(searchScore('IRAF', '', 'iraf ile fotometri') > 0, 'büyük I ile i aynı')

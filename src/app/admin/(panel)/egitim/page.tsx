@@ -31,7 +31,7 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
       </p>
       <div className="card mb-6 text-sm space-y-1">
         <p><b>Model:</b> {settings.lessonModel} · <b>OpenRouter anahtarı:</b> {settings.imageApiKey ? 'girilmiş' : 'yok (Ayarlar → Yapay zekâ)'}</p>
-        <p className="text-zinc-500">Bir ders üç model çağrısı ve 10&apos;a kadar web araması kullanır; Sonnet ile yaklaşık 0,40–0,80 $.</p>
+        <p className="text-zinc-500">Bir ders üç model çağrısı ve 10&apos;a kadar web araması kullanır; Sonnet ile yaklaşık 1,0–1,5 $.</p>
       </div>
       <div className="flex flex-wrap gap-2 mb-8">
         <form action={runLessonAction}><button className="btn-primary">Sıradaki dersi şimdi yaz</button></form>

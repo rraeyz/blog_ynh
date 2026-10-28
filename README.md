@@ -9,7 +9,7 @@ Bilim haberlerini ve makaleleri (RSS/arXiv) çeker, yapay zekâyla Türkçe anla
 3. **Yazı:** Model her haber için Türkçe bir yazı, konu (Uzay, Fizik, Teknoloji...) ve önem puanı üretir. Ana sayfada **Yeni gelişmeler** (en yeni 5), **Öne çıkanlar** (en fazla 10; önem puanı 8+ olanlar yayımlanınca kendiliğinden girer, ayardan kapatılabilir), konu sekmeleri ve `/konu/...` sayfaları var.
 4. **Görseller:** NASA, ESA, ESO, NOIRLab ve ALMA haberlerinde kaynağın serbest lisanslı görseli; diğerlerinde OpenRouter anahtarı girilmişse yapay zekâyla temsili kapak (WebP'ye küçültülür, "Temsili görsel" yazar).
 5. **Eğitim (`/egitim`):** Konunun en temel noktasından uzman seviyesine götüren, uzunluk sınırı olmayan ders serileri; her dersin seviyesi (Temel, Orta, İleri, tek derslik konularda Temelden ileriye) görünür ve sayfada seviyeye göre süzülebilir. Aynı anda iki seri sırayla ilerler; her ders öğrettiklerini kaydeder, sonraki ders bunları bilinen sayar. Bir ders: gerekiyorsa ön bilgiler, tanım, tarihçe, mantık, matematik, kullanım (konu gerektiriyorsa kod), çözülmüş örnek, sık hatalar, çözümlü alıştırmalar. Seçili günlerde sıradaki ders üç aşamada hazırlanır: **araştırma** (OpenRouter web araması; en az 3 doğrulanmış kaynak şart), notlardan **yazım**, notlarla karşılaştırmalı **denetim**. Denetim ciddi sorun bulmazsa ders kendiliğinden yayımlanır (ayardan kapatılabilir), bulursa bulgularıyla taslak kalır. Dersler "Başlamadan önce" önkoşul dersleri gösterir. Konu sırası: önce istekler, sonra müfredat; müfredatta hep en az 2 sıradaki seri tutulur, azalınca yapay zekâ alan dengesine, seviyeye ve son haftaların önemli haberlerine bakarak yeni seri ekler.
-6. **Gökyüzü takvimi (`/gokyuzu`):** Haftada bir, önümüzdeki 7 günde Türkiye'den gözlenebilecek olaylar (web araştırmasıyla, kaynaklı); ana sayfada kutu, bültende kısa bölüm.
+6. **Gökyüzü takvimi (`/gokyuzu`):** Aylık takvim (ileri/geri gezilir): Ay evreleri, tutulmalar, meteor yağmurları, yakınlaşmalar, gezegenler simgeleriyle işaretli, altında nasıl gözleneceği. Haftada bir önümüzdeki 5 hafta web'de araştırılır (kaynaklı); geçmiş aylar kalır. Ana sayfada bu haftanın olayları, bültende kısa bölüm.
 7. **Arama (`/ara`):** Yazılarda ve derslerde; Türkçe harf duyarsız ("gokyuzu" = "Gökyüzü").
 8. **Bülten:** Seçilen günde son 7 günün en önemli 7 yazısı (öne çıkanlar ve puan önce), o haftanın dersleri ve gökyüzü; Künye üzerinden blogun adıyla gönderilir. İsteğe bağlı ikinci bülten **Haftanın astronomi özeti**: yalnızca uzay ve fizik yazıları, dersler ve gökyüzü (ör. pazar, pazartesi dersinden önce). Önemli bir yazı "Abonelere gönder" ile hemen gönderilebilir.
 9. **Abonelik kutusu:** Ana sayfada ve her yazının altında. Kayıt ve onay e-postası Künye'de; blogdan gelen aboneler bülten etiketiyle (boşsa "Blog") işaretlenir.
@@ -20,8 +20,8 @@ Bilim haberlerini ve makaleleri (RSS/arXiv) çeker, yapay zekâyla Türkçe anla
 | İş | Sıklık | Yaklaşık |
 |---|---|---|
 | Haber yazıları (ör. Claude Haiku) | günde 5 | ayda 1-2 $ |
-| Ders (araştırma + yazım + denetim, ör. Claude Sonnet) | haftada 3 | ders başına 0,40-0,80 $ |
-| Gökyüzü takvimi | haftada 1 | 0,05-0,10 $ |
+| Ders (araştırma + yazım + denetim, ör. Claude Sonnet) | haftada 3 | ders başına 1,0-1,5 $ (ilk gerçek ders 1,49 $) |
+| Gökyüzü takvimi | haftada 1 | 0,10-0,20 $ |
 | Kapak görseli | serbest görseli olmayan yazı başına | 0,01 $ |
 
 ## Yapay zekâ

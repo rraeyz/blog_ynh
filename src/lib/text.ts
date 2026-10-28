@@ -1,4 +1,5 @@
 // Saf yardımcılar: tests/unit.test.ts
+import { skyKind, type SkyKind } from './skyKinds.ts'
 
 const TR: Record<string, string> = { ç: 'c', ğ: 'g', ı: 'i', İ: 'i', ö: 'o', ş: 's', ü: 'u', Ç: 'c', Ğ: 'g', Ö: 'o', Ş: 's', Ü: 'u' }
 
@@ -101,7 +102,7 @@ export const markdownLinks = (body: string) => Array.from(new Set(Array.from(bod
 export const unlink = (body: string, dead: Set<string>) =>
   body.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (all, label: string, url: string) => (dead.has(url) ? label : all))
 
-export type SkyEvent = { date: string; time: string; title: string; detail: string }
+export type SkyEvent = { date: string; time: string; kind: SkyKind; title: string; detail: string }
 
 // Gökyüzü takvimi yanıtı: yalnızca istenen aralıktaki, tarihi geçerli olaylar; tarih ve saate göre sıralı
 export function parseSkyEvents(text: string, from: string, to: string): SkyEvent[] {
@@ -110,12 +111,13 @@ export function parseSkyEvents(text: string, from: string, to: string): SkyEvent
     .map((e) => ({
       date: String(e.date ?? ''),
       time: /^\d{2}:\d{2}$/.test(String(e.time ?? '')) ? String(e.time) : '',
+      kind: skyKind(e.kind),
       title: String(e.title ?? '').trim().slice(0, 150),
-      detail: String(e.detail ?? '').trim().slice(0, 400),
+      detail: String(e.detail ?? '').trim().slice(0, 800),
     }))
     .filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date) && e.date >= from && e.date <= to && e.title)
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-    .slice(0, 20)
+    .slice(0, 80)
 }
 
 // Arama için: küçük harf, Türkçe harfler ASCII karşılığına (okur "gokyuzu" da yazsa "Gökyüzü" bulunsun)

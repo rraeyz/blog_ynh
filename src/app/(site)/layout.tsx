@@ -27,8 +27,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         </div>
       </header>
       {topics.length > 0 && (
-        // Konu sayfaları: yalnızca bir konuyu okumak isteyen için; telefonda yana kayar. Eğitimde haber konuları yok
-        <HideOn prefix="/egitim">
+        // Konu sayfaları: yalnızca bir konuyu okumak isteyen için; telefonda yana kayar. Eğitimde ve gökyüzünde haber konuları yok
+        <HideOn prefixes={['/egitim', '/gokyuzu']}>
           <nav aria-label="Konular" className="border-b border-zinc-200/70 dark:border-ink-line">
             <div className="mx-auto max-w-5xl px-4 py-2.5 flex gap-2 overflow-x-auto">
               {topics.map(([key, c]) => <TopicLink key={key} slug={key} label={c.label} />)}

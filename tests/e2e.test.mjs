@@ -102,7 +102,7 @@ const fake = http.createServer((req, res) => {
         annotations = [cite(1)]
         const [from] = user.match(/\d{4}-\d{2}-\d{2}/)
         const day = (n) => new Date(Date.parse(from) + n * 86_400_000).toISOString().slice(0, 10)
-        content = JSON.stringify({ events: [{ date: day(2), time: '21:30', title: 'Ay ile Satürn yakınlaşıyor', detail: 'Güneydoğuya bak' }, { date: day(0), time: '', title: 'Orionid <b>tepe</b>', detail: 'Gece yarısından sonra' }, { date: day(30), title: 'Aralık dışı' }] })
+        content = JSON.stringify({ events: [{ date: day(2), time: '21:30', kind: 'yakinlasma', title: 'Ay ile Satürn yakınlaşıyor', detail: 'Güneydoğuya bak' }, { date: day(0), time: '', kind: 'meteor', title: 'Orionid <b>tepe</b>', detail: 'Gece yarısından sonra' }, { date: day(40), title: 'Aralık dışı' }] })
       }
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content, annotations } }], usage: { prompt_tokens: 1000, completion_tokens: 500 } }))
@@ -499,11 +499,17 @@ test('gökyüzü takvimi', async () => {
   cookie = ''
   try {
     const home = (await get('/')).html
-    assert.match(home, /Bu hafta gökyüzünde[\s\S]*Orionid &lt;b&gt;tepe&lt;\/b&gt;[\s\S]*Ay ile Satürn yakınlaşıyor/, 'tarih sırasıyla, kaçışlı')
+    assert.match(home, /Bu hafta gökyüzünde[\s\S]*🌠[\s\S]*Orionid &lt;b&gt;tepe&lt;\/b&gt;[\s\S]*✨[\s\S]*Ay ile Satürn yakınlaşıyor/, 'tarih sırasıyla, simgeli, kaçışlı')
     assert.doesNotMatch(home, /Aralık dışı/)
+    // Bugün her zaman bu ayın takviminde: gün hücresi simgeli ve olayın ayrıntısına bağlı
     const page = (await get('/gokyuzu')).html
-    assert.match(page, /21:30[\s\S]*Güneydoğuya bak/)
-    assert.match(page, /Kaynaklar[\s\S]*kaynak1/)
+    assert.match(page, /href="#gun-\d{4}-\d{2}-\d{2}"[^>]*aria-label="[^"]*Orionid[\s\S]*Meteor yağmuru/)
+    assert.match(page, /id="gun-[\s\S]*Orionid &lt;b&gt;tepe&lt;\/b&gt;[\s\S]*Gece yarısından sonra/)
+    assert.match(page, /kaynakları[\s\S]*kaynak1/)
+    const next = page.match(/href="\/gokyuzu\?ay=(\d{4}-\d{2})"[^>]*>[^<]*→/)[1]
+    assert.equal((await get(`/gokyuzu?ay=${next}`)).status, 200, 'sonraki aya geçilir')
+    assert.match((await get('/gokyuzu?ay=1999-01')).html, /Bu ay için kayıtlı olay yok/)
+    assert.equal((await get('/gokyuzu?ay=bozuk')).status, 200, 'bozuk ay bu aya döner')
   } finally {
     cookie = saved
   }

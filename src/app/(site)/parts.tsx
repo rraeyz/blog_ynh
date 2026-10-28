@@ -3,7 +3,7 @@ import { CATEGORIES, coverOf, periodLabel, readingMinutes, topicHue, topicLabel 
 import { prisma } from '@/lib/prisma'
 import { canSubscribe } from '@/lib/newsletter'
 import type { Settings } from '@/lib/state'
-import type { Sky } from '@/lib/sky'
+import { SKY_KINDS, skyKind } from '@/lib/skyKinds'
 import { isLevel, LEVELS, type Level } from '@/lib/levels'
 import { SubscribeForm } from './SubscribeForm'
 
@@ -186,22 +186,30 @@ export const TopicLink = ({ slug, label, active }: { slug: string; label: string
   </Link>
 )
 
-// "2026-10-28" → "28 Ekim Çar" (tarih Türkiye takviminden geldiği için saat dilimi kaydırmasın diye UTC öğlen)
+// "2026-10-28" → "28 Ekim Çarşamba" (tarih Türkiye takviminden geldiği için saat dilimi kaydırmasın diye UTC öğlen)
 export const skyDay = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long', timeZone: 'UTC' })
 
+export const SkyIcon = ({ kind }: { kind: string }) => {
+  const k = SKY_KINDS[skyKind(kind)]
+  return <span role="img" aria-label={k.label} title={k.label}>{k.icon}</span>
+}
+
 // Ana sayfadaki küçük gökyüzü kutusu: önümüzdeki birkaç olay
-export function SkyBox({ sky }: { sky: Sky }) {
+export function SkyBox({ events }: { events: Array<{ id: number; date: string; time: string; kind: string; title: string }> }) {
   return (
     <section className="rounded-3xl border border-zinc-200 dark:border-ink-line bg-white/80 dark:bg-ink-card/80 p-6 md:p-8">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Bu hafta gökyüzünde</h2>
-        <Link href="/gokyuzu" className="text-sm font-medium text-violet-600 dark:text-violet-300 hover:underline">Nasıl gözlenir →</Link>
+        <Link href="/gokyuzu" className="text-sm font-medium text-violet-600 dark:text-violet-300 hover:underline">Takvim →</Link>
       </div>
       <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-        {sky.events.map((e, i) => (
-          <li key={i}>
-            <p className="text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">{skyDay(e.date)}{e.time && ` · ${e.time}`}</p>
-            <p className="mt-0.5 font-medium">{e.title}</p>
+        {events.map((e) => (
+          <li key={e.id} className="flex gap-3">
+            <span className="text-2xl leading-none"><SkyIcon kind={e.kind} /></span>
+            <span>
+              <span className="block text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">{skyDay(e.date)}{e.time && ` · ${e.time}`}</span>
+              <span className="mt-0.5 block font-medium">{e.title}</span>
+            </span>
           </li>
         ))}
       </ul>
