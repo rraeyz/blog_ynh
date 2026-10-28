@@ -4,7 +4,7 @@ import { safeFetch } from '@/lib/net'
 import { fetchText } from '@/lib/papers'
 import { htmlToText } from '@/lib/arxiv'
 import { addUsage, logJob, overBudget, type Settings } from '@/lib/state'
-import { extractJson, markdownLinks, parseLesson, slugify, unlink } from '@/lib/text'
+import { markdownLinks, parseIssues, parseLesson, parsePlan, parseProposal, slugify, unlink } from '@/lib/text'
 import { isLevel, LEVELS, planLevels, type Level } from '@/lib/levels'
 
 // Eğitim bölümü. Konu seçimi yapay zekâya bırakılmaz: önce elle istenen dersler, sonra müfredat sırası.
@@ -100,7 +100,9 @@ Dersler konunun en temel noktasından başlar ve ilerledikçe seviye yükselir: 
 Konu doğası gereği ileriyse (en temeli bile uzman işi) zor diye eleme ya da sulandırma: ilk dersler gereken temeli kursun; ilk ders "orta" ya da "ileri" olabilir.
 Okurun bilmediği bir matematik aracı (ör. Fourier dönüşümü, karmaşık sayılar, olasılık dağılımları) seride yoğun kullanılacaksa onu öğreten bir ders koy.
 Her ders tek bir kavramı ya da yöntemi eksiksiz anlatacak büyüklükte olsun. Popüler bilim değil, yöntem ve mantık öğreten dersler olsun.
-Yanıtı yalnızca şu JSON biçiminde ver: {"lessons": [{"title": "Kısa ders başlığı", "scope": "Bu derste neler anlatılacak, 1-3 cümle", "level": "temel"}]}`
+Yanıtta yalnızca ders satırları olsun, sırayla, her ders tek satırda (başlık satırı, numara, JSON yok):
+SEVİYE | Kısa ders başlığı | Bu derste neler anlatılacak, 1-3 cümle
+Örnek: temel | Işık bir dalgadır: kırınım ve girişim | Dalga boyu, faz ve girişim; yarıktan geçen ışığın deseni.`
 
 // Serinin ders listesini çıkarır (ders sayısına model, kapsama göre karar verir)
 export async function planSeries(seriesId: number, settings: Settings): Promise<number> {
@@ -110,13 +112,12 @@ export async function planSeries(seriesId: number, settings: Settings): Promise<
     settings,
     PLAN,
     `Konu: ${series.title}${series.level ? ` (giriş seviyesi: ${series.level})` : ''}\nKapsam: ${series.summary}\nMüfredattaki diğer seriler (onların konusunu tekrar etme): ${others.map((s) => s.title).join(', ') || '-'}`,
-    { ...webSearch(4), max_tokens: 4000 },
+    { ...webSearch(4), max_tokens: 16_000 },
   )
-  const data = extractJson(result.text) as { lessons?: Array<{ title?: unknown; scope?: unknown; level?: unknown }> }
-  const lessons = (Array.isArray(data.lessons) ? data.lessons : []).filter((l) => typeof l.title === 'string' && l.title.trim()).slice(0, 15)
+  const lessons = parsePlan(result.text)
   if (lessons.length === 0) throw new Error('Ders planı çıkarılamadı')
   const levels = planLevels(lessons.map((l) => l.level))
-  for (const [i, lesson] of lessons.entries()) await addLesson(series.id, String(lesson.title).trim().slice(0, 200), String(lesson.scope ?? '').trim().slice(0, 1000), '', i + 1, levels[i])
+  for (const [i, lesson] of lessons.entries()) await addLesson(series.id, lesson.title, lesson.scope, '', i + 1, levels[i])
   await prisma.series.update({ where: { id: series.id }, data: { planned: true } })
   return lessons.length
 }
@@ -127,7 +128,11 @@ Mevcut konulardan sonra gelmesi gereken, onlarla çakışmayan TEK bir yeni konu
 - önkoşulu olan konu, önkoşulunu öğreten konudan sonra gelsin; doğası gereği ileri bir konuyu zor diye eleme;
 - son haftaların önemli astronomi/fizik haberlerinde öne çıkan bir yöntem ya da kavram varsa (ör. kütleçekim dalgası tespiti, interferometri), onu öğreten bir seri iyi bir adaydır;
 - popüler bilim değil, bir astronomi öğrencisinin ya da araştırmacının bilmesi gereken yöntem, alet, yazılım ya da kuram olsun.
-Yanıtı yalnızca şu JSON biçiminde ver: {"title": "Seri adı", "summary": "Kapsam, 1-3 cümle", "track": "listedeki alanlardan biri", "level": "konunun giriş seviyesi: temel | orta | ileri"}`
+Yanıtta yalnızca şu dört satır olsun:
+Başlık: Seri adı
+Kapsam: 1-3 cümle
+Alan: listedeki alanlardan biri
+Seviye: konunun giriş seviyesi (temel, orta ya da ileri)`
 
 // Müfredat hep LOOKAHEAD kadar ileriyi görsün: sıradaki seriler azalınca yenisi önerilir
 async function ensureRoadmap(settings: Settings) {
@@ -151,12 +156,12 @@ async function ensureRoadmap(settings: Settings) {
         `Mevcut seriler (sırasıyla):\n${existing.map((s) => `- ${s.title} [${s.track || 'alan yok'}, ${s.level || 'seviye yok'}, ${s.lessons.filter((l) => l.status === 'published').length}/${s.lessons.length} ders yayında]: ${s.summary}`).join('\n')}`,
         `Son 30 günün önemli astronomi/fizik haberleri:\n${news.map((n) => `- ${n.title}`).join('\n') || '-'}`,
       ].join('\n\n'),
-      { max_tokens: 1500 },
+      { max_tokens: 8000 },
     )
-    const data = extractJson(result.text) as { title?: unknown; summary?: unknown; track?: unknown; level?: unknown }
-    if (typeof data.title !== 'string' || !data.title.trim()) throw new Error('Yeni seri önerilemedi')
-    if (existing.some((s) => slugify(s.title) === slugify(String(data.title)))) throw new Error(`Önerilen seri zaten var: ${data.title}`)
-    const series = await addSeries(data.title.trim().slice(0, 200), String(data.summary ?? '').trim().slice(0, 1000), undefined, String(data.track ?? '').slice(0, 100), String(data.level ?? '').slice(0, 20))
+    const data = parseProposal(result.text)
+    if (!data) throw new Error('Yeni seri önerilemedi')
+    if (existing.some((s) => slugify(s.title) === slugify(data.title))) throw new Error(`Önerilen seri zaten var: ${data.title}`)
+    const series = await addSeries(data.title, data.summary, undefined, data.track, data.level)
     await logJob(`Eğitim: müfredata yeni seri önerildi: "${series.title}" (${series.track || 'alan yok'}, ${series.level || 'seviye yok'})`)
   }
 }
@@ -249,8 +254,10 @@ Dersi notlarla karşılaştır ve yalnızca gerçek sorunları bul: yanlış ya 
 notlarda dayanağı olmayan önemli iddialar; çalışmayacak ya da yanlış API kullanan kod; çözümü hatalı alıştırmalar; eskimiş yöntemin tek doğru gibi sunulması.
 Sonra dersi yalnızca "okurun bildikleri"ni bilen birinin gözüyle oku: açıklanmadan kullanılan kavram, sembol ya da matematik aracı; okurun
 izleyemeyeceği atlanmış türetme adımı; seviyenin gerektirdiği derinliğe inmeyen bölüm; araştırma sürecine dair metin ("notlarda", "kaynaklar doğrulamadı" gibi).
-Üslup ve yazım tercihlerini sorun sayma. "major": okuru yanlış öğrenmeye götürür ya da okur bir bölümü hiç izleyemez; "minor": küçük eksik ya da belirsizlik.
-Yanıtı yalnızca şu JSON biçiminde ver: {"issues": [{"severity": "major", "where": "bölüm ya da alıntı", "problem": "...", "fix": "doğrusu"}]} (sorun yoksa boş dizi).`
+Üslup ve yazım tercihlerini sorun sayma.
+Yanıtta yalnızca sorun satırları olsun, her sorun tek satırda (JSON yok):
+ciddi ya da küçük | bölüm ya da kısa alıntı | sorun | doğrusu
+"ciddi": okuru yanlış öğrenmeye götürür ya da okur bir bölümü hiç izleyemez. Hiç sorun yoksa yalnızca SORUN YOK yaz.`
 
 // Yazım ve denetime giden seviye tarifi (okura görünen kısa adlar lib/levels.ts'te)
 const LEVEL_GUIDE: Record<Level, string> = {
@@ -275,8 +282,6 @@ async function linkWorks(url: string): Promise<boolean> {
     return false
   }
 }
-
-type Issue = { severity?: unknown; where?: unknown; problem?: unknown; fix?: unknown }
 
 // Dersi üç aşamada hazırlar. En az 3 doğrulanmış kaynak yoksa yazmaz (uydurma riskine karşı).
 // Denetim temizse ve ayar açıksa yayımlar; değilse bulgularıyla taslak bırakır
@@ -306,7 +311,7 @@ export async function writeLesson(lessonId: number, settings: Settings) {
       `Serinin sonraki dersleri (bunlara girme): ${lesson.series.lessons.slice(index + 1).map((l) => l.title).join('; ') || '-'}`,
     ].join('\n')
     await logJob(`Eğitim: "${lesson.title}" 1/3 araştırılıyor…`)
-    const research = await ask(settings, RESEARCH, [context, ...read.map((s, i) => `\nVerilen kaynak ${i + 1} (${s.url}) — önce bunu kullan:\n${s.text}`)].join('\n'), { ...webSearch(10), max_tokens: 16_000 }, LONG)
+    const research = await ask(settings, RESEARCH, [context, ...read.map((s, i) => `\nVerilen kaynak ${i + 1} (${s.url}) — önce bunu kullan:\n${s.text}`)].join('\n'), { ...webSearch(10), max_tokens: 32_000 }, LONG)
     const sources = new Map<string, string>([...read.map((s) => [s.url, s.url] as [string, string]), ...research.citations.map((c) => [c.url, c.title] as [string, string])])
     for (const url of markdownLinks(research.text.replace(/(https?:\/\/[^\s)\]]+)/g, '[k]($1)'))) if (!sources.has(url) && (await linkWorks(url))) sources.set(url, url)
     if (sources.size < 3) throw new Error(`Araştırmada yalnızca ${sources.size} doğrulanmış kaynak bulundu; ders yazılmadı (en az 3 gerekir)`)
@@ -334,11 +339,12 @@ export async function writeLesson(lessonId: number, settings: Settings) {
 
     // 3. Denetim: notlarla karşılaştırma; ciddi sorun varsa ders yayımlanmaz
     await logJob(`Eğitim: "${lesson.title}" 3/3 denetleniyor…`)
-    const check = await ask(settings, CHECK, `${reader}\n\nARAŞTIRMA NOTLARI:\n${research.text}\n\nDERS:\n${body}`, { max_tokens: 6000 }, LONG)
-    const issues = ((extractJson(check.text) as { issues?: Issue[] }).issues ?? []).filter((i) => typeof i?.problem === 'string')
-    const major = issues.filter((i) => i.severity === 'major').length
-    const review = issues.map((i) => `- **${i.severity === 'major' ? 'Ciddi' : 'Küçük'}** · ${String(i.where ?? '')}: ${String(i.problem)}${i.fix ? ` → ${String(i.fix)}` : ''}`).join('\n')
-    const publish = settings.lessonAutoPublish && major === 0
+    const check = await ask(settings, CHECK, `${reader}\n\nARAŞTIRMA NOTLARI:\n${research.text}\n\nDERS:\n${body}`, { max_tokens: 16_000 }, LONG)
+    const { issues, readable } = parseIssues(check.text)
+    const review = readable
+      ? issues.map((i) => `- **${i.major ? 'Ciddi' : 'Küçük'}** · ${i.where}: ${i.problem}${i.fix ? ` → ${i.fix}` : ''}`).join('\n')
+      : '- **Ciddi** · Denetim yanıtı okunamadı: yayımlamadan önce dersi elle kontrol et'
+    const publish = settings.lessonAutoPublish && readable && !issues.some((i) => i.major)
 
     return await prisma.lesson.update({
       where: { id: lesson.id },

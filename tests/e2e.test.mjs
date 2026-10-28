@@ -56,7 +56,8 @@ const fake = http.createServer((req, res) => {
       let content = ''
       let annotations = []
       if (system.includes('dersleri planlıyorsun')) {
-        content = 'Araştırdım. ' + JSON.stringify({ lessons: [{ title: 'Kırınım ve Airy diski', scope: 'Airy diski', level: 'temel' }, { title: 'Seeing', scope: 'Atmosfer', level: 'orta' }, { title: 'Zernike polinomları', scope: 'Dalga cephesi', level: 'ileri' }] })
+        // Kapsamdaki tırnak eskiden JSON'u bozuyordu
+        content = 'Araştırdım.\n1. temel | Kırınım ve Airy diski | "Airy diski" ve kırınım\n2. orta | Seeing | Atmosfer\n3. ileri | Zernike polinomları | Dalga cephesi'
       } else if (system.includes('araştırma asistanısın')) {
         if (!user.includes('Ders: Kaynaksız')) {
           annotations = [cite(1), cite(2), cite(3)]
@@ -96,8 +97,7 @@ const fake = http.createServer((req, res) => {
           `- [ölü kaynak](${FAKE}/yok)`,
         ].join('\n')
       } else if (system.includes('bilimsel editörüsün')) {
-        const issues = user.includes('DENETIM-HATASI') ? [{ severity: 'major', where: 'Nedir?', problem: 'Katsayı yanlış', fix: '1.22 olmalı' }] : []
-        content = JSON.stringify({ issues })
+        content = user.includes('DENETIM-HATASI') ? 'ciddi | Nedir? | Katsayı yanlış | 1.22 olmalı' : 'SORUN YOK'
       } else if (system.includes('gözlemsel astronomi editörüsün')) {
         annotations = [cite(1)]
         const [from] = user.match(/\d{4}-\d{2}-\d{2}/)

@@ -52,7 +52,7 @@ export async function skyTask(settings: Settings): Promise<string> {
     lessonSettings(settings),
     SKY,
     `Tarih aralığı: ${from} – ${to}`,
-    { tools: [{ type: 'openrouter:web_search', parameters: { max_uses: 5, max_total_results: 25 } }], max_tokens: 8000 },
+    { tools: [{ type: 'openrouter:web_search', parameters: { max_uses: 5, max_total_results: 25 } }], max_tokens: 32_000 },
     10 * 60_000,
   )
   await addUsage(result.inputTokens, result.outputTokens)
