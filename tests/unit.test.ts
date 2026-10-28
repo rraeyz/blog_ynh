@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { addDays, mondayOf, extractJson, markdownLinks, parseIssues, parseLesson, parsePlan, parseProposal, parseScores, parseSkyEvents, pickDaily, weightedScore, criteriaScore, cleanSummary, formatScore, DAILY_HARD_MAX, foldText, ftsQuery, slugify, unlink } from '../src/lib/text.ts'
+import { addDays, mondayOf, extractJson, markdownLinks, parseIssues, parseLesson, parsePlan, parseProposal, parseScores, parseSkyEvents, pickDaily, weightedScore, cleanSummary, formatScore, DAILY_HARD_MAX, foldText, ftsQuery, slugify, unlink } from '../src/lib/text.ts'
 import { isPrivateIp, safeFetch } from '../src/lib/net.ts'
 import { levelRange, planLevels } from '../src/lib/levels.ts'
 import { compressImage } from '../src/lib/compress.ts'
@@ -188,10 +188,6 @@ test('puan: dört ölçütün ağırlıklı toplamı, onda bir', () => {
   assert.ok(weightedScore({ yenilik: 3, etki: 5, kanit: 3, anlam: 3 }) > weightedScore({ yenilik: 5, etki: 3, kanit: 3, anlam: 3 }), 'etki yenilikten ağır')
   assert.equal(formatScore(65), '6,5')
   assert.equal(formatScore(80), '8,0')
-  assert.equal(criteriaScore({ yenilik: 4, etki: '3', kanit: 4, anlam: 3 }), 65)
-  assert.equal(criteriaScore({ yenilik: 4, etki: 3, kanit: 4 }), 0, 'eksik ölçüt: puansız')
-  assert.equal(criteriaScore({ yenilik: 9, etki: 3, kanit: 4, anlam: 3 }), 0, 'aralık dışı: puansız')
-  assert.equal(criteriaScore(undefined), 0)
 })
 
 test('ön puan yanıtı satır satır', () => {
