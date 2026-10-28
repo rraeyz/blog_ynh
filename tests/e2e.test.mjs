@@ -19,6 +19,7 @@ const subscribeRequests = []
 const openRouterRequests = []
 let aiCalls = 0
 const selectionCalls = []
+let lowFullTextChecks = 0 // bu kadar tam metin kontrolü düşük puan döner (yerine sıradakinin alınması)
 const fake = http.createServer((req, res) => {
   let body = ''
   req.on('data', (chunk) => { body += chunk })
@@ -41,6 +42,12 @@ const fake = http.createServer((req, res) => {
       const user = JSON.parse(body).messages[1].content
       const count = (user.match(/^\d+\. /gm) || []).length
       // İlk iki haber 7,8; kalanlar 5,5 (eşiğin altı). Son yazılanlardaki "Kediler"le aynı gelişme sayılan 3. haber tekrar
+      // Tam metin kontrolü (tek haber): istenirse 3,3 döner
+      if (count === 1 && lowFullTextChecks > 0) {
+        lowFullTextChecks--
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        return res.end(JSON.stringify({ choices: [{ message: { content: '1 | 2 | 2 | 2 | 2 | diğer | -' } }], usage: { prompt_tokens: 100, completion_tokens: 10 } }))
+      }
       const content = Array.from({ length: count }, (_, i) => `${i + 1} | ${i < 2 ? '4 | 4 | 4 | 4' : '3 | 3 | 3 | 3'} | diğer | ${i === 2 && user.includes('Son yazılanlar') ? 'Y' : '-'}`).join('\n')
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 100, completion_tokens: 50 } }))
@@ -48,7 +55,7 @@ const fake = http.createServer((req, res) => {
     if (req.url === '/v1/chat/completions') {
       aiCalls++
       // Başlıktan sonra boş satır yok (Gemini böyle yazıyordu); vurgu ve "Kısaca" maddeleri
-      const content = JSON.stringify({ title: 'Kediler Neden Çok Uyur?', brief: 'Kediler günde 15 saat uyuyor.', highlights: ['Uyku enerji saklar', 'Avcılık için gerekli'], body: 'Giriş.\n## Ne yaptılar?\n<script>alert(1)</script> **önemli**\n> Büyük bulgu', category: 'uzay', scores: { yenilik: 5, etki: 5, kanit: 4, anlam: 5 } })
+      const content = JSON.stringify({ title: 'Kediler Neden Çok Uyur?', brief: 'Kediler günde 15 saat uyuyor.', highlights: ['Uyku enerji saklar', 'Avcılık için gerekli'], body: 'Giriş.\n## Ne yaptılar?\n<script>alert(1)</script> **önemli**\n> Büyük bulgu', category: 'uzay' })
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content: `İşte yazı:\n${content}` } }], usage: { prompt_tokens: 100, completion_tokens: 50 } }))
     }
@@ -213,7 +220,7 @@ test('kurulum ve giriş', async () => {
 const SETTINGS = {
   site: { siteTitle: 'Test Blog', siteDescription: '', siteUrl: 'https://blog.example.com' },
   'yapay-zeka': { aiProvider: 'custom', aiModel: 'test-model', aiBaseUrl: `${FAKE}/v1`, aiApiKey: 'ai-anahtari', imageApiKey: 'or-anahtari', monthlyTokenLimit: '0' },
-  haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', postsMinPerDay: '1', scoreThreshold: '6', scoreExceptional: '9,5', spacePerDay: '1', spaceNormalPerDay: '2', spaceImportantScore: '7.5', spaceMaxPerDay: '4', dailyHour: '9', autoFeature: 'on', featureScore: '7,5', skyEnabled: 'on', imageModel: 'test/gorsel' },
+  haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', postsMinPerDay: '1', scoreThreshold: '6', scoreExceptional: '9,5', spacePerDay: '1', spaceNormalPerDay: '2', spaceImportantScore: '7.5', spaceMaxPerDay: '4', fullTextReplace: '5', fullTextPromote: '3', dailyHour: '9', autoFeature: 'on', featureScore: '7,5', skyEnabled: 'on', imageModel: 'test/gorsel' },
   egitim: { lessonModel: 'test/ders-modeli', lessonHelperModel: 'test/yardimci', lessonDay: '1', lessonAutoPublish: 'on' },
   bulten: { kunyeUrl: FAKE, kunyeToken: 'kunye-anahtari', newsletterTag: '', digestWeekday: '1', astroDigestWeekday: '0' },
 }
@@ -313,7 +320,7 @@ test('makale → taslak yazı → yayın', async () => {
   cookie = savedCookie
 
   const usage = (await get('/admin')).html
-  assert.match(usage, /150/, 'token kullanımı sayılmalı')
+  assert.match(usage, /300/, 'token kullanımı sayılmalı (tam metin puanı + yazım)')
 
   // Önem puanı 9: yayımlanınca kendiliğinden öne çıkar (ayar açık)
   cookie = ''
@@ -322,9 +329,9 @@ test('makale → taslak yazı → yayın', async () => {
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkanlardan kaldır'), /kaldırıldı/)
   assert.match((await get('/')).html, /Okuma köşesi/)
   // Kaldırılınca öneri rozeti görünür, elle yeniden öne çıkarılabilir
-  assert.match((await get('/admin/yazilar')).html, /önem 9,4\/10[\s\S]*Öneri/)
+  assert.match((await get('/admin/yazilar')).html, /önem 7,8\/10[\s\S]*Öneri/, 'önem puanı yazmadan önce tam metinden')
   // Süzgeçler: konu, en az önem, durum, sıralama
-  assert.match((await get('/admin/yazilar?durum=yayinda&konu=uzay&onem=9&sira=onem')).html, /1 yazı[\s\S]*Kediler Neden Çok Uyur/)
+  assert.match((await get('/admin/yazilar?durum=yayinda&konu=uzay&onem=7&sira=onem')).html, /1 yazı[\s\S]*Kediler Neden Çok Uyur/)
   assert.match((await get('/admin/yazilar?konu=saglik')).html, /Bu süzgece uyan yazı yok/)
   assert.match((await get('/admin/yazilar?durum=taslak')).html, /Bu süzgece uyan yazı yok/)
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkar'), /Öne çıkarıldı/)
@@ -595,6 +602,7 @@ test('site içi arama', async () => {
 
 test('günlük iş: büyük yığılmada bütün haberler parça parça puanlanır, eşiği geçenler yazılır', async () => {
   selectionCalls.length = 0
+  lowFullTextChecks = 2 // ilk puan ve çıtanın altında kalınca yapılan ikinci puan
   assert.match(await submit('/admin/kaynaklar', 'Kaynak ekle', { url: `${FAKE}/feed-cok.xml` }), /Eklendi/)
   assert.match(await submit('/admin', 'Şimdi tara ve yazı üret'), /arka planda/)
   await waitFor(async () => /Günlük iş \(elle\):/.test((await get('/admin')).html), 'günlük iş')
@@ -606,4 +614,19 @@ test('günlük iş: büyük yığılmada bütün haberler parça parça puanlan�
   assert.match(selectionCalls[0], /Son yazılanlar:\\n- Örnek Makale/, 'son 7 günde yazılanlar tekrar denetimi için gider')
   assert.match((await get('/admin/makaleler?durum=skipped')).html, /Son 7 günde yazılan bir haberin tekrarı/)
   assert.match((await get('/admin/makaleler?durum=new')).html, /ön puan (<!-- -->)?7,8(<!-- -->)?\/10/)
+  // İlk seçilenin tam metin puanı düşük: yazılmaz, yerine sıradaki; yine 2 yazı
+  assert.match(log, /tam metin puanı 3,3 \(ön puan 7,8\), yazılmadı; yerine sıradaki/)
+  assert.match(log, /Günlük iş \(elle\): 70\d yeni makale, 2 yazı (taslak|yayımlandı)/, 'yine 2 yazı')
+  assert.match(log, /Günlük iş: yazı 2 (yayımlandı|taslak) \(önem 7,8\)/)
+  assert.match((await get('/admin/makaleler?durum=skipped')).html, /Tam metin puanı 3,3, çıta 5,5: yazılmadı/)
+})
+
+test('günlük iş: yer kaldıysa eşiğin hemen altındaki haberin tam metnine bakılır', async () => {
+  // Kalan 7,8'likler (eşik 6,0) yazılır; yer kalınca 5,5'lik bir haberin tam metni 7,8 çıkar ve o da yazılır
+  assert.match(await saveSettings('haberler', { postsPerDay: '15', fullTextPromote: '1' }), /Ayarlar kaydedildi/)
+  assert.match(await submit('/admin', 'Şimdi tara ve yazı üret'), /arka planda/)
+  await waitFor(async () => /tam metinde eşiği geçti/.test((await get('/admin')).html), 'eşiğin altından yazı')
+  const log = (await get('/admin')).html
+  assert.match(log, /eşiğin altındaki haber \(ön puan 5,5\) tam metinde eşiği geçti, (taslak|yayımlandı) \(önem 7,8\)/)
+  assert.equal((log.match(/eşiğin altındaki haber \(ön puan 5,5\) tam metinde/g) || []).length / 2, 1, 'günde en fazla 1 (ayar)')
 })

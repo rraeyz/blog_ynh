@@ -99,7 +99,7 @@ const intIn = (value: string, min: number, max: number, fallback: number) => {
 const SETTINGS_SECTIONS: Record<string, string[]> = {
   site: ['siteTitle', 'siteDescription', 'siteUrl'],
   'yapay-zeka': ['aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'imageApiKey', 'monthlyTokenLimit'],
-  haberler: ['readMode', 'maxInputChars', 'interests', 'postsPerDay', 'postsMinPerDay', 'scoreThreshold', 'scoreExceptional', 'spacePerDay', 'spaceNormalPerDay', 'spaceImportantScore', 'spaceMaxPerDay', 'dailyHour', 'autoPublish', 'autoFeature', 'featureScore', 'imageModel', 'skyEnabled'],
+  haberler: ['readMode', 'maxInputChars', 'interests', 'postsPerDay', 'postsMinPerDay', 'scoreThreshold', 'scoreExceptional', 'spacePerDay', 'spaceNormalPerDay', 'spaceImportantScore', 'spaceMaxPerDay', 'fullTextReplace', 'fullTextPromote', 'dailyHour', 'autoPublish', 'autoFeature', 'featureScore', 'imageModel', 'skyEnabled'],
   egitim: ['lessonModel', 'lessonHelperModel', 'lessonWeekdays', 'lessonAutoPublish'],
   bulten: ['kunyeUrl', 'kunyeToken', 'newsletterTag', 'digestWeekday', 'autoNewsletter', 'astroDigest', 'astroDigestWeekday'],
 }
@@ -142,6 +142,8 @@ export async function saveSettingsAction(form: FormData) {
     spaceNormalPerDay: () => intIn(text(form, 'spaceNormalPerDay'), 0, 15, current.spaceNormalPerDay),
     spaceImportantScore: () => score('spaceImportantScore'),
     spaceMaxPerDay: () => intIn(text(form, 'spaceMaxPerDay'), 0, 15, current.spaceMaxPerDay),
+    fullTextReplace: () => intIn(text(form, 'fullTextReplace'), 0, 15, current.fullTextReplace),
+    fullTextPromote: () => intIn(text(form, 'fullTextPromote'), 0, 15, current.fullTextPromote),
     dailyHour: () => intIn(text(form, 'dailyHour'), 0, 23, current.dailyHour),
     autoPublish: () => checked('autoPublish'),
     autoFeature: () => checked('autoFeature'),

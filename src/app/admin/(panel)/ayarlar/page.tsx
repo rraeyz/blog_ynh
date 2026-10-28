@@ -105,6 +105,12 @@ function Section({ section, s }: { section: string; s: Settings }) {
         <Field label="Önemlilerle en fazla kaçı uzay" id="spaceMaxPerDay" hint="Önemli uzay haberi çok olan günde bile.">
           <input id="spaceMaxPerDay" name="spaceMaxPerDay" type="number" min={0} max={15} defaultValue={s.spaceMaxPerDay} className="input" />
         </Field>
+        <Field label="Tam metni zayıf çıkanın yerine sıradaki (günde en fazla)" id="fullTextReplace" hint="Seçilen haber yazılmadan önce tam metinden puanlanır; eşiğin 0,5 altında kalırsa yazılmaz, yerine sıradaki girer. 0 = kontrol yok.">
+          <input id="fullTextReplace" name="fullTextReplace" type="number" min={0} max={15} defaultValue={s.fullTextReplace} className="input" />
+        </Field>
+        <Field label="Eşiğin altından tam metnine bakılan (günde en fazla)" id="fullTextPromote" hint="O gün yer kaldıysa ön puanı eşiğin 1,0 altına kadar olanların tam metnine bakılır; eşiği geçen yazılır. 0 = kapalı.">
+          <input id="fullTextPromote" name="fullTextPromote" type="number" min={0} max={15} defaultValue={s.fullTextPromote} className="input" />
+        </Field>
         <Field label="Günlük iş saati" id="dailyHour" hint="Türkiye saati.">
           <select id="dailyHour" name="dailyHour" defaultValue={s.dailyHour} className="input">
             {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}

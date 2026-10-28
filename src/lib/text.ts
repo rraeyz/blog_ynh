@@ -60,14 +60,6 @@ export function weightedScore(c: Criteria): number {
   return Math.round((1 + ((average - 1) * 9) / 4) * 10)
 }
 
-// Yazarın JSON'undaki {"yenilik": 4, ...}; bir ölçüt eksik ya da bozuksa 0 (puansız)
-export function criteriaScore(value: unknown): number {
-  const data = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
-  const c = { yenilik: Number(data.yenilik), etki: Number(data.etki), kanit: Number(data.kanit), anlam: Number(data.anlam) }
-  if (!Object.values(c).every((n) => n >= 1 && n <= 5)) return 0
-  return weightedScore({ yenilik: Math.round(c.yenilik), etki: Math.round(c.etki), kanit: Math.round(c.kanit), anlam: Math.round(c.anlam) })
-}
-
 // Ön puan yanıtı satır satır: "NUMARA | yenilik | etki | kanit | anlam | uzay/diğer | tekrar" (numaralar listedeki sıra, 1'den).
 // tekrar: "-", "Y" (son yazılanlardan biriyle aynı gelişme) ya da listede önce geçen haberin numarası. Bozuk satır yalnızca kendisi düşer
 export type ScoreLine = { index: number; criteria: Criteria; space: boolean; repeat: number | 'written' | null }
