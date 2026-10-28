@@ -78,7 +78,9 @@ export async function fetchSources(): Promise<number> {
   let added = 0
   for (const source of sources) {
     try {
-      const count = await savePapers(await readSource(source.url))
+      // Bazı beslemeler bütün arşivini verir (AAS Nova ~600 yazı): eski haberler hiç eklenmez, 30 günlük temizlikten sonra da geri gelmez
+      const fresh = (await readSource(source.url)).filter((paper) => paper.publishedAt.getTime() > Date.now() - 7 * 86_400_000)
+      const count = await savePapers(fresh)
       added += count
       await prisma.source.update({ where: { id: source.id }, data: { lastFetchedAt: new Date(), lastError: '' } })
     } catch (error) {

@@ -4,7 +4,7 @@ Bilim haberlerini ve makaleleri (RSS/arXiv) çeker, yapay zekâyla Türkçe anla
 
 ## Nasıl çalışır
 
-1. **Kaynaklar:** İstediğin kadar kaynak: herhangi bir sitenin RSS/Atom beslemesi ya da arXiv kategori/arşiv linki (`https://arxiv.org/list/astro-ph.EP/new`). Her gün ayarlanan saatte (Türkiye saati) yeni haberler çekilir; daha önce görülenler tekrar eklenmez.
+1. **Kaynaklar:** İstediğin kadar kaynak: herhangi bir sitenin RSS/Atom beslemesi ya da arXiv kategori/arşiv linki (`https://arxiv.org/list/astro-ph.EP/new`). Her gün ayarlanan saatte (Türkiye saati) yeni haberler çekilir; daha önce görülenler ve 7 günden eski olanlar eklenmez (bazı beslemeler bütün arşivini verir).
 2. **Seçim:** Model bekleyen haberlerin başlık ve özetine bakıp en önemlilerini seçer ve hepsine 1-10 **ön puan** verir (Makaleler → Bekliyor bu puana göre sıralı). İlgi alanları öncelik verir; "en az kaçı astronomi/uzay" ayarı kodla garanti edilir. Ön puanı 3 ve altı olan seçilmeyenler hemen "Atlandı" olur; ötekiler 3 gün boyunca sonraki seçimlere yeniden girer. Atlanan, hatalı ve silinen kayıtlar 30 gün sonra temizlenir.
 3. **Yazı:** Model her haber için Türkçe bir yazı, konu (Uzay, Fizik, Teknoloji...) ve önem puanı üretir. Ana sayfada **Yeni gelişmeler** (en yeni 5), **Öne çıkanlar** (en fazla 10; önem puanı 8+ olanlar yayımlanınca kendiliğinden girer, ayardan kapatılabilir), konu sekmeleri ve `/konu/...` sayfaları var.
 4. **Görseller:** NASA, ESA, ESO, NOIRLab ve ALMA haberlerinde kaynağın serbest lisanslı görseli; diğerlerinde OpenRouter anahtarı girilmişse yapay zekâyla temsili kapak (WebP'ye küçültülür, "Temsili görsel" yazar).
