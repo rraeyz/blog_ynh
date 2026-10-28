@@ -29,6 +29,8 @@ model Settings {
   spaceNormalPerDay Int      @default(2) // Önemli değilse en fazla kaçı uzay: kaynakların çoğu astronomi, diğer konular gölgede kalmasın
   spaceImportantScore Int    @default(75) // Bu ve üstü uzay haberi normal sınıra takılmaz
   spaceMaxPerDay    Int      @default(4) // Önemlilerle birlikte en fazla kaçı uzay
+  fullTextReplace   Int      @default(5) // Tam metni zayıf çıkıp yerine sıradakine bakılacak en fazla haber (günde)
+  fullTextPromote   Int      @default(3) // Yer kaldıysa tam metnine bakılacak, eşiğin hemen altındaki en fazla haber (günde)
   dailyHour         Int      @default(9) // günlük işin çalışacağı saat (sunucu saati)
   interests         String   @default("") // doluysa makaleler bu ilgi alanlarına göre seçilir
   monthlyTokenLimit Int      @default(0) // 0 = sınırsız; aşılınca otomatik üretim durur

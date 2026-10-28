@@ -12,7 +12,7 @@ const MAX_FEATURED = 10
 const CHUNK = 100 // puanlamada modele bir seferde gösterilen en fazla haber (~16 bin token)
 const OLD_NEWS_DAYS = 14 // bundan eski haberin yeniliği en fazla 2
 const FULL_TEXT_MARGIN = 5 // tam metin puanı çıtanın 0,5 altına inmedikçe yazılır: puanların doğal oynaması iyi haberi elemesin
-const MAX_REPLACED = 5 // günde en fazla bu kadar haber tam metinden elenip yerine sıradaki alınır
+const PROMOTE_BAND = 10 // eşiğin bu kadar altındakilerin (1,0) tam metnine bakılır: özeti zayıf ama kendisi iyi haber kaçmasın
 
 // Ön puan (başlık + özetten, seçim için) ve önem puanı (tam metinden, yazarken) aynı ölçütlerle verilir
 const CRITERIA = `Dört ölçüt, her biri 1-5 arası tam sayı:
@@ -227,6 +227,7 @@ export async function writeDaily(settings: Settings): Promise<{ written: number;
   // Çıta eşik; eşiğin altından "en az" sayıyı tamamlamak için alınan haberde kendi ön puanı
   const done = new Set<number>()
   const replaced = new Set<number>()
+  const wrote = new Set<number>()
   for (;;) {
     const next = pickDaily(pool.filter((p) => !replaced.has(p.id)), options).find((p) => !done.has(p.id))
     if (!next) break
@@ -236,16 +237,50 @@ export async function writeDaily(settings: Settings): Promise<{ written: number;
       break
     }
     const step = `Günlük iş: yazı ${done.size - replaced.size}`
-    const floor = replaced.size < MAX_REPLACED ? Math.min(settings.scoreThreshold, next.score) - FULL_TEXT_MARGIN : 0
+    const floor = replaced.size < settings.fullTextReplace ? Math.min(settings.scoreThreshold, next.score) - FULL_TEXT_MARGIN : 0
     try {
       const post = await writePost(next.id, settings, settings.autoPublish, undefined, floor)
       summary.written++
+      wrote.add(next.id)
       await logJob(`${step} ${post.status === 'published' ? 'yayımlandı' : 'taslak'} (önem ${formatScore(post.importance)}): ${post.title.slice(0, 80)}`)
     } catch (error) {
       if (error instanceof LowScore) {
         replaced.add(next.id)
         summary.skipped++
         await logJob(`${step}: ${error.message}, yazılmadı; yerine sıradaki`)
+        continue
+      }
+      summary.failed++
+      await logJob(`${step} başarısız: ${String((error as Error).message || error).slice(0, 150)}`)
+    }
+  }
+  // Ters yön: o gün yer kaldıysa eşiğin hemen altındakilerin tam metnine bakılır, tam metinde eşiği geçen yazılır.
+  // Kotalar için aday eşikte sayılır: yazılanlarla birlikte pickDaily'nin seçeceği yere ve uzay sınırlarına sığmalı
+  const written = pool.filter((p) => wrote.has(p.id)).map((p) => ({ ...p, score: Math.max(p.score, settings.scoreThreshold) }))
+  const fits = (c: (typeof pool)[number]) =>
+    pickDaily([...written, { ...c, score: settings.scoreThreshold }], { ...options, min: 0, spaceMin: 0 }).some((p) => p.id === c.id)
+  const near = pool
+    .filter((p) => !done.has(p.id) && p.score < settings.scoreThreshold && p.score >= settings.scoreThreshold - PROMOTE_BAND)
+    .sort((a, b) => b.score - a.score)
+  let tries = 0
+  for (const candidate of near) {
+    if (summary.budget || tries >= settings.fullTextPromote) break
+    if (!fits(candidate)) continue
+    if (await overBudget(settings)) {
+      summary.budget = true
+      break
+    }
+    tries++
+    const step = `Günlük iş: eşiğin altındaki haber (ön puan ${formatScore(candidate.score)})`
+    try {
+      const post = await writePost(candidate.id, settings, settings.autoPublish, undefined, settings.scoreThreshold)
+      summary.written++
+      written.push({ ...candidate, score: settings.scoreThreshold })
+      await logJob(`${step} tam metinde eşiği geçti, ${post.status === 'published' ? 'yayımlandı' : 'taslak'} (önem ${formatScore(post.importance)}): ${post.title.slice(0, 80)}`)
+    } catch (error) {
+      if (error instanceof LowScore) {
+        summary.skipped++
+        await logJob(`${step}: ${error.message}, eşiğin altında kaldı`)
         continue
       }
       summary.failed++

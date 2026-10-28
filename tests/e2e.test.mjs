@@ -220,7 +220,7 @@ test('kurulum ve giriş', async () => {
 const SETTINGS = {
   site: { siteTitle: 'Test Blog', siteDescription: '', siteUrl: 'https://blog.example.com' },
   'yapay-zeka': { aiProvider: 'custom', aiModel: 'test-model', aiBaseUrl: `${FAKE}/v1`, aiApiKey: 'ai-anahtari', imageApiKey: 'or-anahtari', monthlyTokenLimit: '0' },
-  haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', postsMinPerDay: '1', scoreThreshold: '6', scoreExceptional: '9,5', spacePerDay: '1', spaceNormalPerDay: '2', spaceImportantScore: '7.5', spaceMaxPerDay: '4', dailyHour: '9', autoFeature: 'on', featureScore: '7,5', skyEnabled: 'on', imageModel: 'test/gorsel' },
+  haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', postsMinPerDay: '1', scoreThreshold: '6', scoreExceptional: '9,5', spacePerDay: '1', spaceNormalPerDay: '2', spaceImportantScore: '7.5', spaceMaxPerDay: '4', fullTextReplace: '5', fullTextPromote: '3', dailyHour: '9', autoFeature: 'on', featureScore: '7,5', skyEnabled: 'on', imageModel: 'test/gorsel' },
   egitim: { lessonModel: 'test/ders-modeli', lessonHelperModel: 'test/yardimci', lessonDay: '1', lessonAutoPublish: 'on' },
   bulten: { kunyeUrl: FAKE, kunyeToken: 'kunye-anahtari', newsletterTag: '', digestWeekday: '1', astroDigestWeekday: '0' },
 }
@@ -619,4 +619,14 @@ test('günlük iş: büyük yığılmada bütün haberler parça parça puanlan�
   assert.match(log, /Günlük iş \(elle\): 70\d yeni makale, 2 yazı (taslak|yayımlandı)/, 'yine 2 yazı')
   assert.match(log, /Günlük iş: yazı 2 (yayımlandı|taslak) \(önem 7,8\)/)
   assert.match((await get('/admin/makaleler?durum=skipped')).html, /Tam metin puanı 3,3, çıta 5,5: yazılmadı/)
+})
+
+test('günlük iş: yer kaldıysa eşiğin hemen altındaki haberin tam metnine bakılır', async () => {
+  // Kalan 7,8'likler (eşik 6,0) yazılır; yer kalınca 5,5'lik bir haberin tam metni 7,8 çıkar ve o da yazılır
+  assert.match(await saveSettings('haberler', { postsPerDay: '15', fullTextPromote: '1' }), /Ayarlar kaydedildi/)
+  assert.match(await submit('/admin', 'Şimdi tara ve yazı üret'), /arka planda/)
+  await waitFor(async () => /tam metinde eşiği geçti/.test((await get('/admin')).html), 'eşiğin altından yazı')
+  const log = (await get('/admin')).html
+  assert.match(log, /eşiğin altındaki haber \(ön puan 5,5\) tam metinde eşiği geçti, (taslak|yayımlandı) \(önem 7,8\)/)
+  assert.equal((log.match(/eşiğin altındaki haber \(ön puan 5,5\) tam metinde/g) || []).length / 2, 1, 'günde en fazla 1 (ayar)')
 })
