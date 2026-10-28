@@ -21,8 +21,8 @@ export default async function PapersPage({ searchParams }: { searchParams: { mes
       <p className="text-sm text-zinc-500 mb-4">
         Kaynaklardan çekilen ham makaleler. Günlük iş her yeni habere başlık, tarih ve özetten bir kez <b>ön puan</b> verir (liste bu puana
         göre sıralı, puanlanmamışlar en sonda) ve eşiği geçenleri yazıya dönüştürür. O gün sınır dolduğu için kalanlar 3 gün boyunca
-        sonraki günlerin seçimine aynı puanla girer, sonra <b>Atlandı</b>&apos;ya geçer. Atlanan, hatalı ve silinen makaleler 30 gün sonra
-        kendiliğinden temizlenir; silinen bir makale kaynağında dursa da geri gelmez. İstediğini elle de dönüştürebilir ya da aşağıya tek bir makale linki ekleyebilirsin.
+        sonraki günlerin seçimine aynı puanla girer, sonra <b>Atlandı</b>&apos;ya geçer. Atlanan ve hatalı makaleler 30 gün sonra
+        listeden kalkar; kaydı (yalnızca adres ve başlık) kalır, böylece kaynağında dursa da bir daha gelmez. Sildiğin makaleler de geri gelmez. İstediğini elle de dönüştürebilir ya da aşağıya tek bir makale linki ekleyebilirsin.
       </p>
       <form action={addPaperAction} className="card mb-6 flex flex-col sm:flex-row gap-2">
         <input name="url" type="url" required placeholder="https://arxiv.org/abs/2510.12345 ya da herhangi bir makale/yazı linki" className="input" />

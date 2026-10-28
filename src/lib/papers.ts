@@ -53,11 +53,13 @@ export async function addPaperFromUrl(input: string): Promise<{ id: number; titl
 export const hidePapers = (status: string, id?: number) =>
   prisma.paper.updateMany({ where: { status, ...(id ? { id } : {}), post: { is: null } }, data: { status: 'deleted', abstract: '', error: '' } })
 
-// Otomatik temizlik (günlük iş): 30 günden eski atlanan, hatalı ve silinen makaleler veritabanından tamamen silinir.
-// shortcut: 30 günden uzun süre beslemede kalan bir haber yeniden "Bekliyor"a düşer; olursa süreyi uzat
+// Otomatik temizlik (günlük iş): 30 günden eski atlanan ve hatalı makaleler gizlenir (hidePapers gibi: metni silinir, kaydı kalır).
+// Kayıt silinmez: arşiv beslemeleri (ör. AAS Nova'nın 600 eski haberi) hep aynı haberleri gösterir, silinen kayıt yeni diye geri gelirdi.
+// Kayıt başına ~0,4 KB (adres, başlık, durum); günde 300 haberde yılda ~40 MB
 export async function cleanupPapers(): Promise<number> {
-  const { count } = await prisma.paper.deleteMany({
-    where: { status: { in: ['skipped', 'failed', 'deleted'] }, createdAt: { lt: new Date(Date.now() - 30 * 86_400_000) }, post: { is: null } },
+  const { count } = await prisma.paper.updateMany({
+    where: { status: { in: ['skipped', 'failed'] }, createdAt: { lt: new Date(Date.now() - 30 * 86_400_000) }, post: { is: null } },
+    data: { status: 'deleted', abstract: '', error: '' },
   })
   return count
 }
