@@ -103,7 +103,7 @@ model Series {
   title     String
   summary   String   @default("") // Serinin kapsamı; ders planı buna göre çıkarılır
   track     String   @default("") // Alan (Gözlem teknikleri, Yıldız astrofiziği...): yeni seri önerirken denge için
-  level     String   @default("") // temel | orta | ileri
+  level     String   @default("") // Giriş seviyesi (temel | orta | ileri); dersler buradan yükselir
   position  Int      @default(0) // Müfredattaki sıra (küçük önce; "Tek dersler" -1)
   planned   Boolean  @default(false) // Ders listesi çıkarıldı mı
   createdAt DateTime @default(now())
@@ -125,6 +125,8 @@ model Lesson {
   research     String    @default("") // Araştırma aşamasının notları (yazım ve denetim bunlara dayanır; okura gösterilmez)
   review       String    @default("") // Denetim aşamasının bulguları; boşsa temiz
   prerequisites String   @default("") // Önce okunması gereken başka derslerin id'leri (virgüllü)
+  level        String    @default("") // temel | orta | ileri | kapsamli (tek derste temelden ileriye); lib/levels.ts
+  covers       String    @default("") // Bu derste öğretilenler: serinin sonraki derslerine "okur bunları biliyor" diye verilir
   status       String    @default("planned") // planned | draft | published | failed
   error        String    @default("")
   publishedAt  DateTime?

@@ -82,15 +82,16 @@ export function parseSelection(text: string, count: number, n: number, minSpace 
 
 export const monthKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
-// Ders çıktısı: "Özet: ..." ve "Önkoşul: 3, 7" satırları ile ilk "## " başlığından başlayan gövde
+// Ders çıktısı: "Özet: ...", "Önkoşul: 3, 7" ve "Öğretilenler: ..." satırları ile ilk "## " başlığından başlayan gövde
 // (öncesindeki "araştırdım…" gibi sözler atılır). Önkoşul numaraları modele verilen ders listesindeki sıradır
-export function parseLesson(text: string): { excerpt: string; body: string; prerequisites: number[] } | null {
+export function parseLesson(text: string): { excerpt: string; body: string; prerequisites: number[]; covers: string } | null {
   const start = text.search(/^##\s/m)
   if (start < 0) return null
   const head = text.slice(0, start)
   const excerpt = head.match(/^\s*\**Özet:?\**:?\s*(.+)$/m)?.[1].trim() ?? ''
   const prerequisites = (head.match(/^\s*\**Önkoşul(?:lar)?:?\**:?\s*(.+)$/m)?.[1] ?? '').match(/\d+/g)?.map(Number) ?? []
-  return { excerpt: excerpt.slice(0, 500), body: text.slice(start).trim(), prerequisites }
+  const covers = head.match(/^\s*\**Öğretilenler:?\**:?\s*(.+)$/m)?.[1].trim() ?? ''
+  return { excerpt: excerpt.slice(0, 500), body: text.slice(start).trim(), prerequisites, covers: covers.slice(0, 1000) }
 }
 
 // Gövdedeki [metin](https://...) linkleri

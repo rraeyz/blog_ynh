@@ -18,7 +18,7 @@ const FIELDS = {
   posts: ['id', 'slug', 'title', 'excerpt', 'highlights', 'category', 'importance', 'image', 'featuredAt', 'body', 'status', 'publishedAt', 'paperId', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
   digests: ['id', 'createdAt', 'subject', 'body', 'status', 'sentAt', 'result'],
   series: ['id', 'slug', 'title', 'summary', 'track', 'level', 'position', 'planned', 'createdAt'],
-  lessons: ['id', 'seriesId', 'position', 'slug', 'title', 'scope', 'sourceUrls', 'excerpt', 'body', 'sources', 'research', 'review', 'prerequisites', 'status', 'error', 'publishedAt', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
+  lessons: ['id', 'seriesId', 'position', 'slug', 'title', 'scope', 'sourceUrls', 'excerpt', 'body', 'sources', 'research', 'review', 'prerequisites', 'level', 'covers', 'status', 'error', 'publishedAt', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
 } as const
 
 type Row = Record<string, unknown>

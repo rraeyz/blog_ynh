@@ -2,10 +2,11 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
-import { coverStyle } from '../../parts'
+import { levelRange } from '@/lib/levels'
+import { coverStyle, LevelBadge } from '../../parts'
 
 const findSeries = (slug: string) =>
-  prisma.series.findUnique({ where: { slug }, include: { lessons: { orderBy: { position: 'asc' }, select: { id: true, slug: true, title: true, scope: true, status: true } } } })
+  prisma.series.findUnique({ where: { slug }, include: { lessons: { orderBy: { position: 'asc' }, select: { id: true, slug: true, title: true, scope: true, status: true, level: true } } } })
 
 export async function generateMetadata({ params }: { params: { seri: string } }): Promise<Metadata> {
   const series = await findSeries(params.seri)
@@ -23,6 +24,7 @@ export default async function SeriesPage({ params }: { params: { seri: string } 
         <p className="text-sm text-white/75">Ders serisi</p>
         <h1 className="mt-1 text-3xl md:text-4xl font-semibold">{series.title}</h1>
         <p className="mt-3 text-white/85">{series.summary}</p>
+        {levelRange(series.lessons.map((l) => l.level)) && <p className="mt-4 text-sm text-white/75">{series.lessons.length} ders · {levelRange(series.lessons.map((l) => l.level))}</p>}
       </header>
       <ol className="mt-8 space-y-3">
         {series.lessons.map((lesson, i) => {
@@ -31,7 +33,7 @@ export default async function SeriesPage({ params }: { params: { seri: string } 
             <>
               <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${open ? 'bg-violet-600 text-white' : 'bg-zinc-200 text-zinc-500 dark:bg-white/10'}`}>{i + 1}</span>
               <span className="min-w-0">
-                <span className={`block font-semibold ${open ? '' : 'text-zinc-500'}`}>{lesson.title}</span>
+                <span className="flex flex-wrap items-center gap-2"><span className={`font-semibold ${open ? '' : 'text-zinc-500'}`}>{lesson.title}</span><LevelBadge level={lesson.level} /></span>
                 <span className="block text-sm text-zinc-500 mt-0.5">{open ? lesson.scope : `Yakında · ${lesson.scope}`}</span>
               </span>
             </>

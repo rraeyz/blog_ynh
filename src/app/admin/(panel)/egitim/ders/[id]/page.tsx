@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { renderMarkdown } from '@/lib/markdown'
+import { LEVELS } from '@/lib/levels'
 import { Notice } from '../../../../Notice'
 import { ConfirmButton } from '../../../../ConfirmButton'
 import { deleteLessonAction, publishLessonAction, rewriteLessonAction, saveLessonAction } from '../../../../actions'
@@ -39,6 +40,7 @@ export default async function LessonAdminPage({ params, searchParams }: { params
         </div>
         <div><label className="label" htmlFor="scope">Kapsam (yazarken modele verilir)</label><textarea id="scope" name="scope" defaultValue={lesson.scope} rows={2} className="input" /></div>
         <div><label className="label" htmlFor="sourceUrls">Verilen kaynaklar (satır başına bir link; yazarken önce bunlar okunur)</label><textarea id="sourceUrls" name="sourceUrls" defaultValue={lesson.sourceUrls} rows={2} className="input" /></div>
+        <div><label className="label" htmlFor="level">Seviye (okura görünür; yazarken derinlik buna göre)</label><select id="level" name="level" defaultValue={lesson.level || 'kapsamli'} className="input">{Object.entries(LEVELS).map(([key, l]) => <option key={key} value={key}>{l.label}</option>)}</select></div>
         <div><label className="label" htmlFor="excerpt">Özet</label><textarea id="excerpt" name="excerpt" defaultValue={lesson.excerpt} rows={2} className="input" /></div>
         <div>
           <label className="label" htmlFor="body">Ders (Markdown)</label>

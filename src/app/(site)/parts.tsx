@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { canSubscribe } from '@/lib/newsletter'
 import type { Settings } from '@/lib/state'
 import type { Sky } from '@/lib/sky'
+import { isLevel, LEVELS, type Level } from '@/lib/levels'
 import { SubscribeForm } from './SubscribeForm'
 
 export type PostItem = {
@@ -206,4 +207,17 @@ export function SkyBox({ sky }: { sky: Sky }) {
       </ul>
     </section>
   )
+}
+
+const LEVEL_COLORS: Record<Level, string> = {
+  temel: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  orta: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  ileri: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+  kapsamli: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
+}
+
+// Dersin seviyesi: okur buna bakıp nereden başlayacağını seçer
+export function LevelBadge({ level }: { level: string }) {
+  if (!isLevel(level)) return null
+  return <span title={LEVELS[level].hint} className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${LEVEL_COLORS[level]}`}>{LEVELS[level].label}</span>
 }

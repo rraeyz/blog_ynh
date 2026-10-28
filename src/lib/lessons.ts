@@ -5,8 +5,11 @@ import { fetchText } from '@/lib/papers'
 import { htmlToText } from '@/lib/arxiv'
 import { addUsage, logJob, overBudget, type Settings } from '@/lib/state'
 import { extractJson, markdownLinks, parseLesson, slugify, unlink } from '@/lib/text'
+import { isLevel, LEVELS, planLevels, type Level } from '@/lib/levels'
 
 // Eğitim bölümü. Konu seçimi yapay zekâya bırakılmaz: önce elle istenen dersler, sonra müfredat sırası.
+// Her seri konunun en temel noktasından başlar, dersler ilerledikçe seviye yükselir (lib/levels.ts); tek derslik konu kendi içinde temelden
+// uzmanlığa gider. Aynı anda ACTIVE seri yürür, sırayla birer ders yazılır. Her ders öğrettiklerini kaydeder (covers); sonraki ders bunları bilinen sayar.
 // Müfredatta her zaman en az 2 "sıradaki seri" tutulur; azalınca yapay zekâ alan dengesine, seviye ilerlemesine ve son haftaların
 // önemli astronomi/fizik haberlerine bakarak yeni seri önerir (panelde görünür, silinebilir, sırası değiştirilebilir).
 // Her ders üç aşamada hazırlanır: web araştırması (notlar + kaynaklar) → notlardan yazım → notlarla karşılaştırmalı denetim.
@@ -39,6 +42,7 @@ export const STARTER_SERIES = [
 
 const REQUESTS_TITLE = 'Tek Dersler'
 const LOOKAHEAD = 2 // müfredatta bekleyen (henüz derslere bölünmemiş) en az seri sayısı
+const ACTIVE = 2 // aynı anda yürüyen seri: uzun seriler bitene kadar öteki alanlar aylarca beklemesin
 const LONG = 15 * 60_000 // uzman seviyesinde uzun ders yazımı dakikalar sürer
 
 // Dersler OpenRouter'da (Ayarlar → Yapay zekâ'daki anahtar) yazılır: web araması orada
@@ -69,9 +73,9 @@ export async function addSeries(title: string, summary: string, position?: numbe
   return prisma.series.create({ data: { title, summary, track, level, slug: await seriesSlug(title), position: position ?? (last?.position ?? 0) + 1 } })
 }
 
-export async function addLesson(seriesId: number, title: string, scope: string, sourceUrls = '', position?: number) {
+export async function addLesson(seriesId: number, title: string, scope: string, sourceUrls = '', position?: number, level: Level = 'kapsamli') {
   const last = await prisma.lesson.findFirst({ where: { seriesId }, orderBy: { position: 'desc' }, select: { position: true } })
-  return prisma.lesson.create({ data: { seriesId, title, scope, sourceUrls, slug: await lessonSlug(title), position: position ?? (last?.position ?? 0) + 1 } })
+  return prisma.lesson.create({ data: { seriesId, title, scope, sourceUrls, level, slug: await lessonSlug(title), position: position ?? (last?.position ?? 0) + 1 } })
 }
 
 export async function seedStarterSeries() {
@@ -83,15 +87,18 @@ export async function requestLesson(title: string, scope: string, sourceUrls: st
   const series =
     (await prisma.series.findFirst({ where: { title: REQUESTS_TITLE } })) ??
     (await prisma.series.create({ data: { title: REQUESTS_TITLE, summary: 'Müfredat dışında istenen konular.', slug: await seriesSlug(REQUESTS_TITLE), position: -1, planned: true } }))
-  return addLesson(series.id, title, scope, sourceUrls)
+  return addLesson(series.id, title, scope, sourceUrls, undefined, 'kapsamli')
 }
 
-const PLAN = `Bir astronomi ve astrofizik eğitimcisisin; lisans ve yüksek lisans öğrencilerine yönelik bir ders serisi planlıyorsun.
+const PLAN = `Bir astronomi ve astrofizik eğitimcisisin; bir konuyu baştan uzman seviyesine götüren dersleri planlıyorsun.
 Önce web'de araştır (ders kitapları, üniversite ders notları, gözlemevi ve yazılım belgeleri): konu bugün nasıl öğretiliyor, hangi alt başlıklar şart, hangi sırayla.
-Seriyi, konunun gerektirdiği sayıda derse böl (en az 4, en fazla 15). Her ders tek bir kavramı ya da yöntemi uzman seviyesine kadar götürecek
-büyüklükte olsun; sıra, önceki dersin bilgisini kullanan mantıklı bir ilerleme izlesin. Popüler bilim değil, yöntem ve mantık öğreten dersler olsun.
-Seri seviyesindeki okurun bilmediği bir matematik aracı (ör. Fourier dönüşümü, karmaşık sayılar, olasılık dağılımları) gerekiyorsa, onu kullanan dersten önce öğreten bir ders koy.
-Yanıtı yalnızca şu JSON biçiminde ver: {"lessons": [{"title": "Kısa ders başlığı", "scope": "Bu derste neler anlatılacak, 1-3 cümle"}]}`
+Konunun gerektirdiği sayıda ders çıkar (1 ile 15 arası): tek derste eksiksiz anlatılabilen konu tek ders olur, geniş konu seri olur.
+Dersler konunun en temel noktasından başlar ve ilerledikçe seviye yükselir: önce kavramlar ve sezgi, sonra matematik, sonra uygulama ve
+(konu gerektiriyorsa) kod, sonunda araştırmada kullanılan uzman seviyesi. Her derse seviye ver: "temel", "orta" ya da "ileri"; seviye sırayla düşmez.
+Konu doğası gereği ileriyse (en temeli bile uzman işi) zor diye eleme ya da sulandırma: ilk dersler gereken temeli kursun; ilk ders "orta" ya da "ileri" olabilir.
+Okurun bilmediği bir matematik aracı (ör. Fourier dönüşümü, karmaşık sayılar, olasılık dağılımları) seride yoğun kullanılacaksa onu öğreten bir ders koy.
+Her ders tek bir kavramı ya da yöntemi eksiksiz anlatacak büyüklükte olsun. Popüler bilim değil, yöntem ve mantık öğreten dersler olsun.
+Yanıtı yalnızca şu JSON biçiminde ver: {"lessons": [{"title": "Kısa ders başlığı", "scope": "Bu derste neler anlatılacak, 1-3 cümle", "level": "temel"}]}`
 
 // Serinin ders listesini çıkarır (ders sayısına model, kapsama göre karar verir)
 export async function planSeries(seriesId: number, settings: Settings): Promise<number> {
@@ -100,24 +107,25 @@ export async function planSeries(seriesId: number, settings: Settings): Promise<
   const result = await ask(
     settings,
     PLAN,
-    `Seri: ${series.title}${series.level ? ` (seviye: ${series.level})` : ''}\nKapsam: ${series.summary}\nMüfredattaki diğer seriler (onların konusunu tekrar etme): ${others.map((s) => s.title).join(', ') || '-'}`,
+    `Konu: ${series.title}${series.level ? ` (giriş seviyesi: ${series.level})` : ''}\nKapsam: ${series.summary}\nMüfredattaki diğer seriler (onların konusunu tekrar etme): ${others.map((s) => s.title).join(', ') || '-'}`,
     { ...webSearch(4), max_tokens: 4000 },
   )
-  const data = extractJson(result.text) as { lessons?: Array<{ title?: unknown; scope?: unknown }> }
+  const data = extractJson(result.text) as { lessons?: Array<{ title?: unknown; scope?: unknown; level?: unknown }> }
   const lessons = (Array.isArray(data.lessons) ? data.lessons : []).filter((l) => typeof l.title === 'string' && l.title.trim()).slice(0, 15)
-  if (lessons.length < 2) throw new Error('Ders planı çıkarılamadı')
-  for (const [i, lesson] of lessons.entries()) await addLesson(series.id, String(lesson.title).trim().slice(0, 200), String(lesson.scope ?? '').trim().slice(0, 1000), '', i + 1)
+  if (lessons.length === 0) throw new Error('Ders planı çıkarılamadı')
+  const levels = planLevels(lessons.map((l) => l.level))
+  for (const [i, lesson] of lessons.entries()) await addLesson(series.id, String(lesson.title).trim().slice(0, 200), String(lesson.scope ?? '').trim().slice(0, 1000), '', i + 1, levels[i])
   await prisma.series.update({ where: { id: series.id }, data: { planned: true } })
   return lessons.length
 }
 
 const PROPOSE = `Bir astronomi ve astrofizik bölümünün müfredatını yürütüyorsun (gözlemsel ve kuramsal astrofizik, enstrümantasyon, veri analizi).
-Mevcut serilerden sonra gelmesi gereken, onlarla çakışmayan TEK bir yeni ders serisi öner. Seçerken:
+Mevcut konulardan sonra gelmesi gereken, onlarla çakışmayan TEK bir yeni konu öner (kaç derse bölüneceğine sonra karar verilir: tek ders de olabilir uzun seri de). Seçerken:
 - alanlar arasında denge kur: en az işlenmiş alanlara öncelik ver;
-- seviye ilerlemesi gözet: temel konular bitmeden ileri konulara geçme; ileri seri, önkoşulu olan serilerden sonra gelsin;
+- önkoşulu olan konu, önkoşulunu öğreten konudan sonra gelsin; doğası gereği ileri bir konuyu zor diye eleme;
 - son haftaların önemli astronomi/fizik haberlerinde öne çıkan bir yöntem ya da kavram varsa (ör. kütleçekim dalgası tespiti, interferometri), onu öğreten bir seri iyi bir adaydır;
 - popüler bilim değil, bir astronomi öğrencisinin ya da araştırmacının bilmesi gereken yöntem, alet, yazılım ya da kuram olsun.
-Yanıtı yalnızca şu JSON biçiminde ver: {"title": "Seri adı", "summary": "Kapsam, 1-3 cümle", "track": "listedeki alanlardan biri", "level": "temel | orta | ileri"}`
+Yanıtı yalnızca şu JSON biçiminde ver: {"title": "Seri adı", "summary": "Kapsam, 1-3 cümle", "track": "listedeki alanlardan biri", "level": "konunun giriş seviyesi: temel | orta | ileri"}`
 
 // Müfredat hep LOOKAHEAD kadar ileriyi görsün: sıradaki seriler azalınca yenisi önerilir
 async function ensureRoadmap(settings: Settings) {
@@ -151,19 +159,30 @@ async function ensureRoadmap(settings: Settings) {
   }
 }
 
-// Sıradaki yazılacak ders: önce elle istenenler, sonra müfredat sırası. Gerekirse sıradaki seriyi derslere böler
+// Sıradaki yazılacak ders: önce elle istenenler, sonra yürüyen ACTIVE seriden son dersi en eski yazılanın sıradaki dersi.
+// Yürüyen seri azsa sıradaki seri derslere bölünür (bölünemezse yürüyenlerle devam edilir)
 export async function nextLesson(settings: Settings) {
   await ensureRoadmap(settings)
-  const queued = () =>
-    prisma.lesson.findFirst({ where: { status: 'planned', series: { planned: true } }, orderBy: [{ series: { position: 'asc' } }, { position: 'asc' }], include: { series: true } })
-  const ready = await queued()
-  if (ready) return ready
-  const unplanned = await prisma.series.findFirst({ where: { planned: false }, orderBy: { position: 'asc' } })
-  if (!unplanned) return null
-  const count = await planSeries(unplanned.id, settings)
-  await logJob(`Eğitim: "${unplanned.title}" serisi ${count} derse bölündü`)
-  await ensureRoadmap(settings)
-  return queued()
+  const request = await prisma.lesson.findFirst({ where: { status: 'planned', series: { position: { lt: 0 } } }, orderBy: { position: 'asc' }, include: { series: true } })
+  if (request) return request
+  const running = () => prisma.series.findMany({ where: { position: { gte: 0 }, planned: true, lessons: { some: { status: 'planned' } } }, orderBy: { position: 'asc' }, take: ACTIVE })
+  let active = await running()
+  const unplanned = active.length < ACTIVE && (await prisma.series.findFirst({ where: { planned: false }, orderBy: { position: 'asc' } }))
+  if (unplanned) {
+    try {
+      const count = await planSeries(unplanned.id, settings)
+      await logJob(`Eğitim: "${unplanned.title}" ${count > 1 ? `serisi ${count} derse bölündü` : 'tek ders olarak planlandı'}`)
+      await ensureRoadmap(settings)
+    } catch (error) {
+      if (active.length === 0) throw error
+      await logJob(`Eğitim: "${unplanned.title}" planlanamadı (${String((error as Error).message || error).slice(0, 120)}); yürüyen seriyle devam`)
+    }
+    active = await running()
+  }
+  if (active.length === 0) return null
+  const last = await Promise.all(active.map((series) => prisma.lesson.findFirst({ where: { seriesId: series.id, status: { not: 'planned' } }, orderBy: { updatedAt: 'desc' }, select: { updatedAt: true } })))
+  const turn = last.reduce((best, lesson, i) => ((lesson?.updatedAt.getTime() ?? 0) < (last[best]?.updatedAt.getTime() ?? 0) ? i : best), 0)
+  return prisma.lesson.findFirst({ where: { seriesId: active[turn].id, status: 'planned' }, orderBy: { position: 'asc' }, include: { series: true } })
 }
 
 const RESEARCH = `Bir astronomi ve astrofizik araştırma asistanısın. Bir dersin yazılmasından önce konuyu araştırıp eksiksiz notlar çıkaracaksın;
@@ -180,33 +199,37 @@ Notlarda bulunsun:
 Her bilginin sonunda hangi kaynaktan geldiğini [1], [2] diye belirt ve en sonda "Kaynaklar" başlığı altında numaralı listede [n] Başlık — URL yaz.
 Doğrulayamadığın hiçbir şeyi not etme.`
 
-const WRITE = `Sen astronomi ve astrofizik öğreten deneyimli bir öğretim üyesisin. Türkçe, uzman seviyesine kadar götüren, eksiksiz bir ders yazıyorsun.
-Amaç: dersi baştan sona okuyan, örnekleri deneyen ve alıştırmaları çözen kişi konuyu tamamen öğrensin; yöntemi kendisi uygulayabilsin, neden ve
-ne zaman kullanıldığını bilsin. Uzunluk sınırı yok: konu ne kadar gerektiriyorsa o kadar yaz, hiçbir adımı atlama.
+const WRITE = `Sen astronomi ve astrofizik öğreten deneyimli bir öğretim üyesisin. Türkçe, eksiksiz bir ders yazıyorsun.
+Amaç: dersi baştan sona okuyan, örnekleri deneyen ve alıştırmaları çözen kişi bu dersin konusunu tamamen öğrensin; neden ve ne zaman
+kullanıldığını bilsin. Uzunluk sınırı yok: konu ne kadar gerektiriyorsa o kadar yaz, hiçbir adımı atlama.
 
-OKUR: verilen "Okur" satırındaki kişi. Onun bilmediği hiçbir kavramı, sembolü ya da matematik aracını açıklamadan kullanma. Her formülü önce
-sözle ve sezgiyle anlat, sonra yaz; türetmede adım atlama ve her adımda ne yaptığını söyle. Okur uzmanlığa bu dersin sonunda ulaşmalı, başında değil.
+SEVİYE: "Bu dersin seviyesi" satırına göre derinliği ayarla. Konu doğası gereği ileriyse zor diye sulandırma: gereken her aracı öğret ve
+seviyenin istediği yere kadar götür.
+OKUR: "Okurun bildikleri" satırındakileri bilir; geri kalan her kavramı, sembolü ve matematik aracını açıklamadan kullanma. Serinin önceki
+derslerinde öğretileni yeniden anlatma, gerekirse bir cümleyle hatırlat. Her formülü önce sözle ve sezgiyle anlat, sonra yaz; türetmede adım
+atlama ve her adımda ne yaptığını söyle.
 
 Bilgiler yalnızca verilen araştırma notlarından gelir; notlarda olmayan sayı, tarih, isim, deney sonucu ya da fonksiyon adı ekleme. Temel
 matematik ve fizik araçlarının ders kitabı tanımları ve kendi yaptığın cebir bu sınırın dışındadır. Metinde araştırma sürecinden, notlardan,
 kaynakların neyi doğrulayıp doğrulamadığından ya da aralarındaki çelişkilerden söz etme: okur yalnızca dersi görür. Doğrulanmamış bilgiyi hiç yazma.
 
 BİÇİM: İlk satır "Özet: " ile başlayan tek cümle. İkinci satır "Önkoşul: " ve verilen ders listesinden önce okunması gereken derslerin
-numaraları (yoksa "Önkoşul: yok"). Sonra şu bölümler, bu başlıklarla ve bu sırayla:
-## Ön bilgiler
-(dersin kullandığı ve okurun bilmediği her kavram ve matematik aracı için kısa ama kendi başına yeten bir açıklama: sade bir tanım, neden
-gerektiği, küçük bir sayısal örnek. Örnek: karmaşık sayılar ve $e^{i\\phi}$, Fourier dönüşümü, Taylor açılımı, integralin anlamı, dalga ve faz.
-Sonunda dersteki sembollerin tablosu: | Sembol | Anlamı | Birimi |)
+numaraları (yoksa "Önkoşul: yok"). Üçüncü satır "Öğretilenler: " ve bu derste öğrettiğin kavram ve araçların virgüllü kısa listesi (sonraki
+dersler bunları bilinen sayar). Sonra şu bölümler, bu başlıklarla ve bu sırayla; köşeli parantezli olanları yalnızca dersin içeriği gerektiriyorsa yaz:
+[## Ön bilgiler]
+(okurun bilmediği ama dersin kullandığı her kavram ve matematik aracı için kendi başına yeten kısa bir açıklama: sade tanım, neden gerektiği,
+küçük bir sayısal örnek; ör. karmaşık sayılar ve $e^{i\\phi}$, Fourier dönüşümü, Taylor açılımı, integralin anlamı, dalga ve faz. Sonunda
+dersteki sembollerin tablosu: | Sembol | Anlamı | Birimi |)
 ## Nedir?
 ## Neden ortaya çıktı?
 ## Mantığı
-## Matematiği
+[## Matematiği]
 (formüllerin tam türetmesi; terimlerin anlamı ve birimleri)
-## Nasıl kullanılır?
-(adım adım yöntem; gerekli araçlar; çalışan, yorum satırlı kod)
+[## Nasıl kullanılır?]
+(adım adım yöntem ve araçlar; konu hesaplamaya ya da veri işlemeye dayanıyorsa çalışan, yorum satırlı kod)
 ## Uygulamalı örnek
-(gerçekçi verilerle baştan sona çözülmüş tam bir örnek: kod, beklenen çıktı ve sonucun yorumu)
-## Ne zaman kullanılır?
+(baştan sona çözülmüş tam bir örnek: kavramsal derste elle hesap ya da gerçek bir gözlem üzerinden; uygulamalı derste kod, beklenen çıktı ve yorumu)
+[## Ne zaman kullanılır?]
 (hangi gözlemde ve problemde; sınırları; alternatifleri ve aralarında nasıl seçim yapılır)
 ## Sık yapılan hatalar
 ## Alıştırmalar
@@ -219,20 +242,22 @@ KURALLAR: Formüller LaTeX: satır içi $...$, ayrı satırda $$...$$. Kod dil a
 [metin](https://...) biçiminde ve yalnızca notların kaynaklarından. Numaralı adımlar için "1. " listesi, karşılaştırma için "| a | b |" tablosu kullanabilirsin.
 Terimleri ilk geçtiklerinde açıkla, İngilizce karşılığını parantezde ver. Eskimiş bir yöntemi tek doğru yol gibi anlatma.`
 
-const CHECK = `Bir astronomi dersinin bilimsel editörüsün. Sana dersin okuru, araştırma notları (kaynaklı) ve yazılmış ders verilecek.
+const CHECK = `Bir astronomi dersinin bilimsel editörüsün. Sana dersin seviyesi, okurun bildikleri, araştırma notları (kaynaklı) ve yazılmış ders verilecek.
 Dersi notlarla karşılaştır ve yalnızca gerçek sorunları bul: yanlış ya da notlarla çelişen formül, katsayı, birim, sayı, isim ya da tarih;
 notlarda dayanağı olmayan önemli iddialar; çalışmayacak ya da yanlış API kullanan kod; çözümü hatalı alıştırmalar; eskimiş yöntemin tek doğru gibi sunulması.
-Sonra dersi o okurun gözüyle oku: açıklanmadan kullanılan kavram, sembol ya da matematik aracı; okurun izleyemeyeceği atlanmış türetme adımı;
-araştırma sürecine dair metin ("notlarda", "kaynaklar doğrulamadı" gibi).
+Sonra dersi yalnızca "okurun bildikleri"ni bilen birinin gözüyle oku: açıklanmadan kullanılan kavram, sembol ya da matematik aracı; okurun
+izleyemeyeceği atlanmış türetme adımı; seviyenin gerektirdiği derinliğe inmeyen bölüm; araştırma sürecine dair metin ("notlarda", "kaynaklar doğrulamadı" gibi).
 Üslup ve yazım tercihlerini sorun sayma. "major": okuru yanlış öğrenmeye götürür ya da okur bir bölümü hiç izleyemez; "minor": küçük eksik ya da belirsizlik.
 Yanıtı yalnızca şu JSON biçiminde ver: {"issues": [{"severity": "major", "where": "bölüm ya da alıntı", "problem": "...", "fix": "doğrusu"}]} (sorun yoksa boş dizi).`
 
-// Seri seviyesine göre okurun bildiği varsayılanlar; seviyesi olmayan seri (ör. istekler) en baştan anlatılır
-const READERS: Record<string, string> = {
-  temel: 'lise matematiği (cebir, trigonometri, türevin anlamı) ve giriş fiziği bilen birinci sınıf öğrencisi; karmaşık sayıları, integral hesabını, Fourier dönüşümünü, olasılık dağılımlarını ve programlamayı bilmediğini varsay',
-  orta: 'kalkülüs, temel olasılık ve biraz Python bilen lisans ikinci-üçüncü sınıf öğrencisi; karmaşık üstel, Fourier dönüşümü ve istatistik araçlarını kısa bir hatırlatmayla kullan',
-  ileri: 'lisansı bitirmiş, matematik araçlarını bilen yüksek lisans öğrencisi; alana özgü kavramları yine tanımla',
+// Yazım ve denetime giden seviye tarifi (okura görünen kısa adlar lib/levels.ts'te)
+const LEVEL_GUIDE: Record<Level, string> = {
+  temel: 'konuya ilk giriş: kavramlar, sezgi, tarihçe ve basit sayısal hesaplar; ağır türetme ve kod yalnızca konu gerçekten gerektiriyorsa',
+  orta: 'yöntemin matematiği ve uygulaması: türetmeler adım adım; konu uygulamalıysa çalışan kod ve gerçekçi örnek',
+  ileri: 'uzman seviyesi: tam türetmeler, gerçek veriyle uygulama, araştırmada kullanılan yöntemler, sınırlar ve güncel alternatifler',
+  kapsamli: 'tek derste temelden uzman seviyesine: önce sezgi ve temel kavramlar, sonra matematik, sonra uygulama (konu gerektiriyorsa kod); sonunda okur uzman seviyesine ulaşsın',
 }
+const BASELINE = 'lise matematiği (cebir, trigonometri, türevin anlamı) ve giriş fiziği'
 
 const SOURCE_CHARS = 12_000
 
@@ -254,7 +279,7 @@ type Issue = { severity?: unknown; where?: unknown; problem?: unknown; fix?: unk
 // Dersi üç aşamada hazırlar. En az 3 doğrulanmış kaynak yoksa yazmaz (uydurma riskine karşı).
 // Denetim temizse ve ayar açıksa yayımlar; değilse bulgularıyla taslak bırakır
 export async function writeLesson(lessonId: number, settings: Settings) {
-  const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId }, include: { series: { include: { lessons: { orderBy: { position: 'asc' }, select: { id: true, title: true } } } } } })
+  const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: lessonId }, include: { series: { include: { lessons: { orderBy: { position: 'asc' }, select: { id: true, title: true, covers: true } } } } } })
   try {
     // 1. Araştırma: elle verilen kaynaklar okunur, sonra web araması
     const given = lesson.sourceUrls.split('\n').map((l) => l.trim()).filter((l) => /^https?:\/\//.test(l)).slice(0, 3)
@@ -264,12 +289,18 @@ export async function writeLesson(lessonId: number, settings: Settings) {
       if (text) read.push({ url, text: text.slice(0, SOURCE_CHARS) })
     }
     const index = lesson.series.lessons.findIndex((l) => l.id === lesson.id)
+    const level: Level = isLevel(lesson.level) ? lesson.level : 'kapsamli'
+    const known = lesson.series.lessons.slice(0, index).map((l) => l.covers).filter(Boolean).join('; ')
+    const reader = [
+      `Bu dersin seviyesi: ${LEVELS[level].label} — ${LEVEL_GUIDE[level]}`,
+      `Okurun bildikleri: ${BASELINE}${known ? `; serinin önceki derslerinde öğrendikleri: ${known}` : ''}`,
+    ].join('\n')
     const context = [
       `Seri: ${lesson.series.title} — ${lesson.series.summary}`,
-      `Okur: ${READERS[lesson.series.level] ?? READERS.temel}`,
+      reader,
       `Ders: ${lesson.title}`,
       `Bu derste anlatılacaklar: ${lesson.scope || '-'}`,
-      `Serinin önceki dersleri (okur bunları biliyor): ${lesson.series.lessons.slice(0, index).map((l) => l.title).join('; ') || '-'}`,
+      `Serinin önceki dersleri: ${lesson.series.lessons.slice(0, index).map((l) => l.title).join('; ') || '-'}`,
       `Serinin sonraki dersleri (bunlara girme): ${lesson.series.lessons.slice(index + 1).map((l) => l.title).join('; ') || '-'}`,
     ].join('\n')
     await logJob(`Eğitim: "${lesson.title}" 1/3 araştırılıyor…`)
@@ -300,7 +331,7 @@ export async function writeLesson(lessonId: number, settings: Settings) {
 
     // 3. Denetim: notlarla karşılaştırma; ciddi sorun varsa ders yayımlanmaz
     await logJob(`Eğitim: "${lesson.title}" 3/3 denetleniyor…`)
-    const check = await ask(settings, CHECK, `OKUR: ${READERS[lesson.series.level] ?? READERS.temel}\n\nARAŞTIRMA NOTLARI:\n${research.text}\n\nDERS:\n${body}`, { max_tokens: 6000 }, LONG)
+    const check = await ask(settings, CHECK, `${reader}\n\nARAŞTIRMA NOTLARI:\n${research.text}\n\nDERS:\n${body}`, { max_tokens: 6000 }, LONG)
     const issues = ((extractJson(check.text) as { issues?: Issue[] }).issues ?? []).filter((i) => typeof i?.problem === 'string')
     const major = issues.filter((i) => i.severity === 'major').length
     const review = issues.map((i) => `- **${i.severity === 'major' ? 'Ciddi' : 'Küçük'}** · ${String(i.where ?? '')}: ${String(i.problem)}${i.fix ? ` → ${String(i.fix)}` : ''}`).join('\n')
@@ -311,6 +342,7 @@ export async function writeLesson(lessonId: number, settings: Settings) {
       data: {
         body,
         excerpt: parsed.excerpt,
+        covers: parsed.covers,
         research: research.text,
         review,
         prerequisites: prerequisites.join(','),
