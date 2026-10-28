@@ -16,6 +16,11 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
           </Link>
           <nav className="ml-auto flex items-center gap-1 text-sm">
             <Link href="/#yazilar" className="hidden sm:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Yazılar</Link>
+            <Link href="/egitim" className="rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Eğitim</Link>
+            {settings.skyEnabled && <Link href="/gokyuzu" className="hidden sm:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Gökyüzü</Link>}
+            <Link href="/ara" aria-label="Ara" title="Ara" className="rounded-full p-2 hover:bg-zinc-200/60 dark:hover:bg-white/5">
+              <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            </Link>
             {canSubscribe(settings) && <Link href="#abone" className="rounded-full bg-violet-600 text-white px-4 py-1.5 font-medium hover:bg-violet-500 transition">Abone ol</Link>}
           </nav>
         </div>

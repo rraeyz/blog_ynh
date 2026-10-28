@@ -56,5 +56,6 @@ export function tooManyFailures(ip: string): boolean {
   return recent.length >= 10
 }
 export function recordFailure(ip: string): void {
+  if (failures.size > 10_000) failures.clear()
   failures.set(ip, [...(failures.get(ip) ?? []), Date.now()])
 }

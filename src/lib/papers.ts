@@ -1,10 +1,11 @@
 import { prisma } from '@/lib/prisma'
+import { safeFetch } from '@/lib/net'
 import { apiUrl, htmlTitle, htmlToText, parseAtom, parseFeed, parseSourceUrl, safeImage, type PaperData } from '@/lib/arxiv'
 
 const USER_AGENT = 'blog_ynh (+https://github.com/rraeyz/blog_ynh)'
 
-async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(60_000), redirect: 'follow' })
+export async function fetchText(url: string): Promise<string> {
+  const response = await safeFetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(60_000) })
   if (!response.ok) throw new Error(`${new URL(url).host} yanıtı ${response.status}`)
   return response.text()
 }

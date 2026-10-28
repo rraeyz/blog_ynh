@@ -3,13 +3,14 @@ import { prisma } from '@/lib/prisma'
 import { getSettings } from '@/lib/state'
 import { canSubscribe } from '@/lib/newsletter'
 import { topicHue } from '@/lib/topics'
-import { activeTopics, Archive, CardPost, FeaturedPost, PAGE_SIZE, PAPER_FIELDS, postDate, SubscribeBox, TopicChip, TopicLink, topicOf, type PostItem } from './parts'
+import { upcomingSky } from '@/lib/sky'
+import { activeTopics, Archive, CardPost, FeaturedPost, PAGE_SIZE, PAPER_FIELDS, postDate, SkyBox, SubscribeBox, TopicChip, TopicLink, topicOf, type PostItem } from './parts'
 
 export default async function HomePage({ searchParams }: { searchParams: { sayfa?: string } }) {
   const page = Math.max(1, Number(searchParams.sayfa) || 1)
   const published = { status: 'published' }
   const include = { paper: PAPER_FIELDS }
-  const [settings, posts, latest, picked, topics, weekCount] = await Promise.all([
+  const [settings, posts, latest, picked, topics, weekCount, sky] = await Promise.all([
     getSettings(),
     prisma.post.findMany({
       where: published,
@@ -22,6 +23,7 @@ export default async function HomePage({ searchParams }: { searchParams: { sayfa
     prisma.post.findMany({ where: { ...published, featuredAt: { not: null } }, orderBy: { featuredAt: 'desc' }, take: 10, include }),
     activeTopics(),
     prisma.post.count({ where: { ...published, publishedAt: { gte: new Date(Date.now() - 7 * 86_400_000) } } }),
+    upcomingSky(4),
   ])
   const first = page === 1
   // Yeni gelişmeler hep en yeni 5 yazı: eskiler buradan düşer, arşivde ve sekmelerde kalır
@@ -94,6 +96,8 @@ export default async function HomePage({ searchParams }: { searchParams: { sayfa
           )}
         </section>
       )}
+
+      {first && settings.skyEnabled && sky && sky.events.length > 0 && <div className="mt-12"><SkyBox sky={sky} /></div>}
 
       {first && <div className="my-12"><SubscribeBox settings={settings} /></div>}
 

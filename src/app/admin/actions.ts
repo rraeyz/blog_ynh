@@ -9,11 +9,13 @@ import { clientIp, endSession, recordFailure, requireAdmin, startSession, tooMan
 import { getSettings } from '@/lib/state'
 import { parseSourceUrl } from '@/lib/arxiv'
 import { addPaperFromUrl, hidePapers, readSource } from '@/lib/papers'
-import { writePost } from '@/lib/writer'
+import { autoFeature, featurePost, writePost } from '@/lib/writer'
 import { generateCover, removeImage } from '@/lib/images'
 import { createWeeklyDigest, digestBody, sendDigest } from '@/lib/newsletter'
 import { CATEGORIES } from '@/lib/topics'
-import { dailyTask, isJobRunning, runExclusive, weeklyTask } from '@/lib/jobs'
+import { addLesson, addSeries, lessonTask, planSeries, requestLesson, seedStarterSeries, writeLesson } from '@/lib/lessons'
+import { astroDigestTask, dailyTask, isJobRunning, runExclusive, weeklyTask } from '@/lib/jobs'
+import { skyTask } from '@/lib/sky'
 import { PROVIDERS } from '@/lib/ai'
 
 // Her işlem sonunda sayfaya kısa bir mesajla dönülür (?mesaj=...)
@@ -52,7 +54,7 @@ export async function setupAction(form: FormData) {
   const host = headers().get('x-forwarded-host') || headers().get('host') || ''
   await prisma.settings.update({ where: { id: 1 }, data: { passwordHash, siteUrl: settings.siteUrl || (host ? `${proto}://${host}` : '') } })
   await startSession(passwordHash)
-  redirect('/admin/ayarlar?mesaj=' + encodeURIComponent('Kurulum tamam. Yapay zekâ ve Künye ayarlarını doldur.'))
+  redirect('/admin/ayarlar?bolum=yapay-zeka&mesaj=' + encodeURIComponent('Kurulum tamam. Yapay zekâ ve Künye ayarlarını doldur.'))
 }
 
 export async function loginAction(form: FormData) {
@@ -76,13 +78,13 @@ export async function logoutAction() {
 export async function changePasswordAction(form: FormData) {
   await requireAdmin()
   const settings = await getSettings()
-  if (!(await bcrypt.compare(String(form.get('current') ?? ''), settings.passwordHash))) back('/admin/ayarlar', 'Mevcut şifre hatalı')
+  if (!(await bcrypt.compare(String(form.get('current') ?? ''), settings.passwordHash))) back('/admin/ayarlar?bolum=guvenlik', 'Mevcut şifre hatalı')
   const password = String(form.get('password') ?? '')
-  if (password.length < 10) back('/admin/ayarlar', 'Yeni şifre en az 10 karakter olmalı')
+  if (password.length < 10) back('/admin/ayarlar?bolum=guvenlik', 'Yeni şifre en az 10 karakter olmalı')
   const passwordHash = await bcrypt.hash(password, 12)
   await prisma.settings.update({ where: { id: 1 }, data: { passwordHash } })
   await startSession(passwordHash) // diğer oturumlar kapanır, bu açık kalır
-  back('/admin/ayarlar', 'Şifre değişti')
+  back('/admin/ayarlar?bolum=guvenlik', 'Şifre değişti')
 }
 
 // --- Ayarlar ---
@@ -92,44 +94,63 @@ const intIn = (value: string, min: number, max: number, fallback: number) => {
   return Number.isInteger(n) && n >= min && n <= max ? n : fallback
 }
 
+// Ayarlar sekmeli: her sekme yalnızca kendi alanlarını gönderir ve kaydeder (diğer sekmelerin ayarları değişmez)
+const SETTINGS_SECTIONS: Record<string, string[]> = {
+  site: ['siteTitle', 'siteDescription', 'siteUrl'],
+  'yapay-zeka': ['aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'imageApiKey', 'monthlyTokenLimit'],
+  haberler: ['readMode', 'maxInputChars', 'interests', 'postsPerDay', 'spacePerDay', 'dailyHour', 'autoPublish', 'autoFeature', 'imageModel', 'skyEnabled'],
+  egitim: ['lessonModel', 'lessonWeekdays', 'lessonAutoPublish'],
+  bulten: ['kunyeUrl', 'kunyeToken', 'newsletterTag', 'digestWeekday', 'autoNewsletter', 'astroDigest', 'astroDigestWeekday'],
+}
+
 export async function saveSettingsAction(form: FormData) {
   await requireAdmin()
+  const section = text(form, 'section')
+  const fields = Object.hasOwn(SETTINGS_SECTIONS, section) ? SETTINGS_SECTIONS[section] : null
+  if (!fields) throw new Error('Geçersiz istek')
+  const path = `/admin/ayarlar?bolum=${section}`
   const current = await getSettings()
-  const provider = PROVIDERS[text(form, 'aiProvider')] ? text(form, 'aiProvider') : current.aiProvider
-  const url = (value: string) => (value === '' || /^https?:\/\/[^\s]+$/i.test(value) ? value.replace(/\/+$/, '') : null)
-  const siteUrl = url(text(form, 'siteUrl'))
-  const kunyeUrl = url(text(form, 'kunyeUrl'))
-  const aiBaseUrl = url(text(form, 'aiBaseUrl'))
-  if (siteUrl === null || kunyeUrl === null || aiBaseUrl === null) back('/admin/ayarlar', 'Adresler http:// ya da https:// ile başlamalı')
-  await prisma.settings.update({
-    where: { id: 1 },
-    data: {
-      siteTitle: text(form, 'siteTitle').slice(0, 100) || current.siteTitle,
-      siteDescription: text(form, 'siteDescription').slice(0, 300),
-      siteUrl,
-      aiProvider: provider,
-      aiModel: text(form, 'aiModel').slice(0, 200),
-      // Boş bırakılan gizli alanlar değişmez (sayfada gösterilmiyorlar)
-      aiApiKey: text(form, 'aiApiKey') || (form.get('aiApiKeyClear') ? '' : current.aiApiKey),
-      aiBaseUrl,
-      readMode: text(form, 'readMode') === 'full' ? 'full' : 'abstract',
-      maxInputChars: intIn(text(form, 'maxInputChars'), 500, 400_000, current.maxInputChars),
-      postsPerDay: intIn(text(form, 'postsPerDay'), 0, 20, current.postsPerDay),
-      spacePerDay: intIn(text(form, 'spacePerDay'), 0, 20, current.spacePerDay),
-      dailyHour: intIn(text(form, 'dailyHour'), 0, 23, current.dailyHour),
-      interests: text(form, 'interests').slice(0, 1000),
-      monthlyTokenLimit: intIn(text(form, 'monthlyTokenLimit'), 0, 1_000_000_000, current.monthlyTokenLimit),
-      autoPublish: form.get('autoPublish') === 'on',
-      autoNewsletter: form.get('autoNewsletter') === 'on',
-      digestWeekday: intIn(text(form, 'digestWeekday'), 0, 6, current.digestWeekday),
-      kunyeUrl,
-      kunyeToken: text(form, 'kunyeToken') || (form.get('kunyeTokenClear') ? '' : current.kunyeToken),
-      newsletterTag: text(form, 'newsletterTag').slice(0, 50),
-      imageApiKey: text(form, 'imageApiKey') || (form.get('imageApiKeyClear') ? '' : current.imageApiKey),
-      imageModel: text(form, 'imageModel').slice(0, 200) || current.imageModel,
-    },
-  })
-  back('/admin/ayarlar', 'Ayarlar kaydedildi')
+  const url = (name: string) => {
+    const value = text(form, name)
+    if (value !== '' && !/^https?:\/\/[^\s]+$/i.test(value)) back(path, 'Adresler http:// ya da https:// ile başlamalı')
+    return value.replace(/\/+$/, '')
+  }
+  // Boş bırakılan gizli alanlar değişmez (sayfada gösterilmiyorlar)
+  const secret = (name: 'aiApiKey' | 'kunyeToken' | 'imageApiKey') => text(form, name) || (form.get(`${name}Clear`) ? '' : current[name])
+  const checked = (name: string) => form.get(name) === 'on'
+  const parse: Record<string, () => unknown> = {
+    siteTitle: () => text(form, 'siteTitle').slice(0, 100) || current.siteTitle,
+    siteDescription: () => text(form, 'siteDescription').slice(0, 300),
+    siteUrl: () => url('siteUrl'),
+    aiProvider: () => (PROVIDERS[text(form, 'aiProvider')] ? text(form, 'aiProvider') : current.aiProvider),
+    aiModel: () => text(form, 'aiModel').slice(0, 200),
+    aiApiKey: () => secret('aiApiKey'),
+    aiBaseUrl: () => url('aiBaseUrl'),
+    imageApiKey: () => secret('imageApiKey'),
+    monthlyTokenLimit: () => intIn(text(form, 'monthlyTokenLimit'), 0, 1_000_000_000, current.monthlyTokenLimit),
+    readMode: () => (text(form, 'readMode') === 'full' ? 'full' : 'abstract'),
+    maxInputChars: () => intIn(text(form, 'maxInputChars'), 500, 400_000, current.maxInputChars),
+    interests: () => text(form, 'interests').slice(0, 1000),
+    postsPerDay: () => intIn(text(form, 'postsPerDay'), 0, 20, current.postsPerDay),
+    spacePerDay: () => intIn(text(form, 'spacePerDay'), 0, 20, current.spacePerDay),
+    dailyHour: () => intIn(text(form, 'dailyHour'), 0, 23, current.dailyHour),
+    autoPublish: () => checked('autoPublish'),
+    autoFeature: () => checked('autoFeature'),
+    imageModel: () => text(form, 'imageModel').slice(0, 200) || current.imageModel,
+    skyEnabled: () => checked('skyEnabled'),
+    lessonModel: () => text(form, 'lessonModel').slice(0, 200) || current.lessonModel,
+    lessonWeekdays: () => form.getAll('lessonDay').map(String).filter((d) => /^[0-6]$/.test(d)).join(','),
+    lessonAutoPublish: () => checked('lessonAutoPublish'),
+    kunyeUrl: () => url('kunyeUrl'),
+    kunyeToken: () => secret('kunyeToken'),
+    newsletterTag: () => text(form, 'newsletterTag').slice(0, 50),
+    digestWeekday: () => intIn(text(form, 'digestWeekday'), 0, 6, current.digestWeekday),
+    autoNewsletter: () => checked('autoNewsletter'),
+    astroDigest: () => checked('astroDigest'),
+    astroDigestWeekday: () => intIn(text(form, 'astroDigestWeekday'), 0, 6, current.astroDigestWeekday),
+  }
+  await prisma.settings.update({ where: { id: 1 }, data: Object.fromEntries(fields.map((field) => [field, parse[field]()])) })
+  back(path, 'Ayarlar kaydedildi')
 }
 
 // --- Kaynaklar ---
@@ -232,6 +253,7 @@ export async function publishPostAction(form: FormData) {
   const post = await prisma.post.findUniqueOrThrow({ where: { id: id(form) } })
   const publish = post.status !== 'published'
   await prisma.post.update({ where: { id: post.id }, data: { status: publish ? 'published' : 'draft', publishedAt: publish ? post.publishedAt ?? new Date() : post.publishedAt, featuredAt: publish ? post.featuredAt : null } })
+  if (publish && !post.featuredAt) await autoFeature(post, await getSettings())
   back(`/admin/yazilar/${post.id}`, publish ? 'Yayımlandı' : 'Yayından kaldırıldı')
 }
 
@@ -240,13 +262,10 @@ export async function coverPostAction(form: FormData) {
   await requireAdmin()
   const postId = id(form)
   const settings = await getSettings()
-  if (!settings.imageApiKey.trim()) back(`/admin/yazilar/${postId}`, 'Önce Ayarlar → Görseller bölümüne OpenRouter anahtarını gir')
+  if (!settings.imageApiKey.trim()) back(`/admin/yazilar/${postId}`, 'Önce Ayarlar → Yapay zekâ bölümüne OpenRouter anahtarını gir')
   inBackground(`/admin/yazilar/${postId}`, 'Görsel üretimi', async () => `Görsel hazır: ${await generateCover(postId, settings)}`, 'Görsel üretiliyor; bir dakika sonra sayfayı yenile')
 }
 
-const MAX_FEATURED = 10
-
-// Öne çıkanlara al ya da çıkar. En fazla 10: yenisi eklenince en eski öne çıkan düşer (yazı yayında kalır)
 export async function featurePostAction(form: FormData) {
   await requireAdmin()
   const post = await prisma.post.findUniqueOrThrow({ where: { id: id(form) } })
@@ -256,10 +275,8 @@ export async function featurePostAction(form: FormData) {
     back(path, 'Öne çıkanlardan kaldırıldı')
   }
   if (post.status !== 'published') back(path, 'Önce yazıyı yayımla')
-  await prisma.post.update({ where: { id: post.id }, data: { featuredAt: new Date() } })
-  const dropped = await prisma.post.findMany({ where: { featuredAt: { not: null } }, orderBy: { featuredAt: 'desc' }, skip: MAX_FEATURED, select: { id: true, title: true } })
-  await prisma.post.updateMany({ where: { id: { in: dropped.map((p) => p.id) } }, data: { featuredAt: null } })
-  back(path, dropped.length ? `Öne çıkarıldı; "${dropped[0].title}" öne çıkanlardan düştü` : 'Öne çıkarıldı')
+  const dropped = await featurePost(post.id)
+  back(path, dropped ? `Öne çıkarıldı; "${dropped}" öne çıkanlardan düştü` : 'Öne çıkarıldı')
 }
 
 // Eski biçimde yazılmış (ya da beğenilmeyen) yazıyı aynı makaleden yeniden yazdırır; adresi ve yayın durumu değişmez
@@ -347,4 +364,135 @@ export async function runDailyAction() {
 export async function runWeeklyAction() {
   await requireAdmin()
   inBackground('/admin', 'Haftalık bülten (elle)', weeklyTask, 'Haftalık bülten hazırlanıyor; sonuç aşağıdaki günlükte görünür')
+}
+
+export async function runAstroDigestAction() {
+  await requireAdmin()
+  inBackground('/admin', 'Astronomi özeti (elle)', astroDigestTask, 'Haftanın astronomi özeti hazırlanıyor; sonuç aşağıdaki günlükte görünür')
+}
+
+export async function runSkyAction() {
+  await requireAdmin()
+  const settings = await getSettings()
+  if (!settings.imageApiKey.trim()) back('/admin', 'Önce Ayarlar → Yapay zekâ bölümüne OpenRouter anahtarını gir')
+  inBackground('/admin', 'Gökyüzü takvimi (elle)', () => skyTask(settings), 'Gökyüzü takvimi araştırılıyor; bir iki dakika sürer')
+}
+
+// --- Eğitim ---
+
+const lessonPath = (lessonId: number) => `/admin/egitim/ders/${lessonId}`
+const seriesPath = (seriesId: number) => `/admin/egitim/seri/${seriesId}`
+const sourceList = (value: string) => value.split('\n').map((l) => l.trim()).filter((l) => /^https?:\/\/\S+$/.test(l)).slice(0, 5).join('\n')
+
+export async function runLessonAction() {
+  await requireAdmin()
+  const settings = await getSettings()
+  if (!settings.imageApiKey.trim()) back('/admin/egitim', 'Önce Ayarlar → Yapay zekâ bölümüne OpenRouter anahtarını gir (dersler de onu kullanır)')
+  inBackground('/admin/egitim', 'Ders', () => lessonTask(settings), 'Sıradaki ders araştırılıp yazılıyor; birkaç dakika sürer (sonuç Genel → İş günlüğünde)')
+}
+
+export async function seedSeriesAction() {
+  await requireAdmin()
+  if ((await prisma.series.count()) > 0) back('/admin/egitim', 'Müfredat zaten var')
+  await seedStarterSeries()
+  back('/admin/egitim', 'Başlangıç müfredatı eklendi')
+}
+
+export async function requestLessonAction(form: FormData) {
+  await requireAdmin()
+  const title = text(form, 'title').slice(0, 200)
+  if (!title) back('/admin/egitim', 'Ders başlığı gir')
+  await requestLesson(title, text(form, 'scope').slice(0, 1000), sourceList(text(form, 'sourceUrls')))
+  back('/admin/egitim', 'İstek sıranın en önüne eklendi')
+}
+
+export async function addSeriesAction(form: FormData) {
+  await requireAdmin()
+  const title = text(form, 'title').slice(0, 200)
+  if (!title) back('/admin/egitim', 'Seri adı gir')
+  const series = await addSeries(title, text(form, 'summary').slice(0, 1000))
+  back(seriesPath(series.id), 'Seri eklendi; ders listesi sırası gelince çıkarılır (ya da şimdi çıkar)')
+}
+
+export async function saveSeriesAction(form: FormData) {
+  await requireAdmin()
+  const seriesId = id(form)
+  const title = text(form, 'title').slice(0, 200)
+  if (!title) back(seriesPath(seriesId), 'Seri adı boş olamaz')
+  await prisma.series.update({ where: { id: seriesId }, data: { title, summary: text(form, 'summary').slice(0, 1000), position: Number.parseInt(text(form, 'position'), 10) || 0 } })
+  back(seriesPath(seriesId), 'Kaydedildi')
+}
+
+export async function deleteSeriesAction(form: FormData) {
+  await requireAdmin()
+  await prisma.series.deleteMany({ where: { id: id(form) } })
+  back('/admin/egitim', 'Seri ve dersleri silindi')
+}
+
+export async function planSeriesAction(form: FormData) {
+  await requireAdmin()
+  const seriesId = id(form)
+  if (await prisma.lesson.count({ where: { seriesId } })) back(seriesPath(seriesId), 'Bu serinin dersleri zaten var')
+  const settings = await getSettings()
+  inBackground(seriesPath(seriesId), 'Seri planı', async () => `${await planSeries(seriesId, settings)} ders planlandı`, 'Ders listesi araştırılıp çıkarılıyor; bir dakika sonra yenile')
+}
+
+export async function addLessonAction(form: FormData) {
+  await requireAdmin()
+  const seriesId = id(form)
+  const title = text(form, 'title').slice(0, 200)
+  if (!title) back(seriesPath(seriesId), 'Ders başlığı gir')
+  await addLesson(seriesId, title, text(form, 'scope').slice(0, 1000), sourceList(text(form, 'sourceUrls')))
+  await prisma.series.update({ where: { id: seriesId }, data: { planned: true } })
+  back(seriesPath(seriesId), 'Ders eklendi')
+}
+
+export async function saveLessonAction(form: FormData) {
+  await requireAdmin()
+  const lessonId = id(form)
+  const title = text(form, 'title').slice(0, 200)
+  if (!title) back(lessonPath(lessonId), 'Başlık boş olamaz')
+  await prisma.lesson.update({
+    where: { id: lessonId },
+    data: {
+      title,
+      position: Number.parseInt(text(form, 'position'), 10) || 0,
+      scope: text(form, 'scope').slice(0, 1000),
+      sourceUrls: sourceList(text(form, 'sourceUrls')),
+      excerpt: text(form, 'excerpt').slice(0, 500),
+      body: text(form, 'body'),
+    },
+  })
+  back(lessonPath(lessonId), 'Kaydedildi')
+}
+
+export async function publishLessonAction(form: FormData) {
+  await requireAdmin()
+  const lesson = await prisma.lesson.findUniqueOrThrow({ where: { id: id(form) } })
+  if (lesson.status !== 'published' && !lesson.body.trim()) back(lessonPath(lesson.id), 'Ders henüz yazılmadı')
+  const publish = lesson.status !== 'published'
+  await prisma.lesson.update({ where: { id: lesson.id }, data: { status: publish ? 'published' : 'draft', publishedAt: publish ? lesson.publishedAt ?? new Date() : lesson.publishedAt } })
+  back(lessonPath(lesson.id), publish ? 'Yayımlandı' : 'Yayından kaldırıldı')
+}
+
+export async function rewriteLessonAction(form: FormData) {
+  await requireAdmin()
+  const lessonId = id(form)
+  const settings = await getSettings()
+  if (!settings.imageApiKey.trim()) back(lessonPath(lessonId), 'Önce Ayarlar → Yapay zekâ bölümüne OpenRouter anahtarını gir')
+  inBackground(lessonPath(lessonId), 'Ders', async () => `"${(await writeLesson(lessonId, settings)).title}" yazıldı (taslak)`, 'Ders araştırılıp yazılıyor; birkaç dakika sonra yenile')
+}
+
+// Hata alan ders yeniden sıraya girer
+export async function retryLessonAction(form: FormData) {
+  await requireAdmin()
+  await prisma.lesson.updateMany({ where: { id: id(form), status: 'failed' }, data: { status: 'planned', error: '' } })
+  back('/admin/egitim', 'Ders yeniden sıraya alındı')
+}
+
+export async function deleteLessonAction(form: FormData) {
+  await requireAdmin()
+  const lesson = await prisma.lesson.findUnique({ where: { id: id(form) }, select: { seriesId: true } })
+  await prisma.lesson.deleteMany({ where: { id: id(form) } })
+  back(lesson ? seriesPath(lesson.seriesId) : '/admin/egitim', 'Ders silindi')
 }

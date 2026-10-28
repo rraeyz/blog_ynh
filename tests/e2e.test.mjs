@@ -1,5 +1,7 @@
 // Uçtan uca test: boş bir kuruluma karşı çalışır. Yapay zekâ ve Künye yerine sahte bir sunucu kullanır (token harcamaz).
-// Kullanım: npm run build && npm start (ayrı terminal), sonra BASE_URL=http://localhost:3000 node --test tests/e2e.test.mjs
+// Kullanım: npm run build, sonra sunucuyu sahte servislere izin vererek başlat:
+//   OPENROUTER_BASE_URL=http://127.0.0.1:3901/or/v1 BLOG_ALLOW_PRIVATE_URLS=1 npm start
+// ve BASE_URL=http://localhost:3000 node --test tests/e2e.test.mjs
 // Formlar JavaScript'siz yoldan (Next.js'in $ACTION_ID_ alanı) gönderilir; ek bağımlılık yok.
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
@@ -9,10 +11,12 @@ const B = process.env.BASE_URL || 'http://localhost:3000'
 const FAKE_PORT = 3901
 const FAKE = `http://127.0.0.1:${FAKE_PORT}`
 const PASSWORD = 'e2e-sifre-12345'
+const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
 
 // --- Sahte yapay zekâ (OpenAI uyumlu) + sahte Künye + örnek makale sayfası ---
 const kunyeRequests = []
 const subscribeRequests = []
+const openRouterRequests = []
 let aiCalls = 0
 const fake = http.createServer((req, res) => {
   let body = ''
@@ -32,6 +36,75 @@ const fake = http.createServer((req, res) => {
       const content = JSON.stringify({ title: 'Kediler Neden Çok Uyur?', brief: 'Kediler günde 15 saat uyuyor.', highlights: ['Uyku enerji saklar', 'Avcılık için gerekli'], body: 'Giriş.\n## Ne yaptılar?\n<script>alert(1)</script> **önemli**\n> Büyük bulgu', category: 'uzay', importance: 9 })
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content: `İşte yazı:\n${content}` } }], usage: { prompt_tokens: 100, completion_tokens: 50 } }))
+    }
+    if (/^\/kaynak\d$/.test(req.url)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      return res.end('<html><head><title>Kaynak</title></head><body><p>Airy diski ders notu.</p></body></html>')
+    }
+    // Sahte OpenRouter kapak görseli (1x1 PNG)
+    if (req.url === '/or/v1/images') {
+      openRouterRequests.push({ auth: req.headers.authorization, body: JSON.parse(body) })
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      return res.end(JSON.stringify({ data: [{ b64_json: PNG, media_type: 'image/png' }], usage: { cost: 0.01 } }))
+    }
+    // Sahte OpenRouter: ders planı, araştırma, yazım, denetim, gökyüzü
+    if (req.url === '/or/v1/chat/completions') {
+      const request = JSON.parse(body)
+      openRouterRequests.push({ auth: req.headers.authorization, body: request })
+      const [system, user] = request.messages.map((m) => m.content)
+      const cite = (n) => ({ type: 'url_citation', url_citation: { url: `${FAKE}/kaynak${n}`, title: `Ders notu ${n}` } })
+      let content = ''
+      let annotations = []
+      if (system.includes('ders serisi planlıyorsun')) {
+        content = 'Araştırdım. ' + JSON.stringify({ lessons: [{ title: 'Kırınım ve Airy diski', scope: 'Airy diski' }, { title: 'Seeing', scope: 'Atmosfer' }, { title: 'Zernike polinomları', scope: 'Dalga cephesi' }] })
+      } else if (system.includes('araştırma asistanısın')) {
+        if (!user.includes('Ders: Kaynaksız')) {
+          annotations = [cite(1), cite(2), cite(3)]
+          content = `Notlar: çözünürlük 1.22 λ/D [1].\nKaynaklar\n[4] Elle bulunan — ${FAKE}/kaynak4\n[5] Ölü — ${FAKE}/yok`
+        } else content = 'Bir şey bulamadım.'
+      } else if (system.includes('öğretim üyesisin')) {
+        content = [
+          'Önce notları okudum.',
+          'Özet: Airy diski, dairesel bir açıklıktan geçen ışığın kırınım deseninin merkezidir.',
+          'Önkoşul: 1',
+          '',
+          '## Nedir?',
+          `Çözünürlük sınırı $\\theta = 1.22 \\lambda / D$ ile verilir.${user.includes('Ders: Denetimli') ? ' DENETIM-HATASI' : ''}`,
+          '$$',
+          'I(\\theta) = I_0 \\left( \\frac{2 J_1(x)}{x} \\right)^2',
+          '$$',
+          '## Nasıl kullanılır?',
+          '1. Dalgaboyunu seç',
+          '2. Açıklığı ölç',
+          '',
+          '| Teleskop | D (m) |',
+          '|---|---|',
+          '| VLT | 8.2 |',
+          '```python',
+          'import numpy as np',
+          'theta = 1.22 * 500e-9 / 2.0',
+          '```',
+          '## Alıştırmalar',
+          '1 m açıklıkta çözünürlük nedir?',
+          ':::cozum',
+          'Yaklaşık 0.13 yay saniyesi.',
+          ':::',
+          '## İleri okuma',
+          `- [Ders notu](${FAKE}/kaynak1)`,
+          `- [Elle bulunan sayfa](${FAKE}/kaynak4)`,
+          `- [ölü kaynak](${FAKE}/yok)`,
+        ].join('\n')
+      } else if (system.includes('bilimsel editörüsün')) {
+        const issues = user.includes('DENETIM-HATASI') ? [{ severity: 'major', where: 'Nedir?', problem: 'Katsayı yanlış', fix: '1.22 olmalı' }] : []
+        content = JSON.stringify({ issues })
+      } else if (system.includes('gözlemsel astronomi editörüsün')) {
+        annotations = [cite(1)]
+        const [from] = user.match(/\d{4}-\d{2}-\d{2}/)
+        const day = (n) => new Date(Date.parse(from) + n * 86_400_000).toISOString().slice(0, 10)
+        content = JSON.stringify({ events: [{ date: day(2), time: '21:30', title: 'Ay ile Satürn yakınlaşıyor', detail: 'Güneydoğuya bak' }, { date: day(0), time: '', title: 'Orionid <b>tepe</b>', detail: 'Gece yarısından sonra' }, { date: day(30), title: 'Aralık dışı' }] })
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      return res.end(JSON.stringify({ choices: [{ message: { content, annotations } }], usage: { prompt_tokens: 1000, completion_tokens: 500 } }))
     }
     if (req.url === '/api/subscribe' && req.method === 'POST') {
       const ok = req.headers.authorization === 'Bearer kunye-anahtari'
@@ -115,30 +188,27 @@ test('kurulum ve giriş', async () => {
   cookie = saved
 })
 
-// Tarayıcı formdaki bütün alanları gönderir; test de öyle yapmalı (eksik alan boş sayılır)
+// Ayarlar sekme sekme kaydedilir; tarayıcı sekmedeki bütün alanları gönderir, test de öyle yapmalı (eksik alan boş sayılır)
 const SETTINGS = {
-  siteTitle: 'Test Blog',
-  siteUrl: 'https://blog.example.com',
-  aiProvider: 'custom',
-  aiModel: 'test-model',
-  aiBaseUrl: `${FAKE}/v1`,
-  aiApiKey: 'ai-anahtari',
-  readMode: 'abstract',
-  maxInputChars: '8000',
-  monthlyTokenLimit: '0',
-  postsPerDay: '2',
-  dailyHour: '9',
-  digestWeekday: '1',
-  kunyeUrl: FAKE,
-  kunyeToken: 'kunye-anahtari',
+  site: { siteTitle: 'Test Blog', siteDescription: '', siteUrl: 'https://blog.example.com' },
+  'yapay-zeka': { aiProvider: 'custom', aiModel: 'test-model', aiBaseUrl: `${FAKE}/v1`, aiApiKey: 'ai-anahtari', imageApiKey: 'or-anahtari', monthlyTokenLimit: '0' },
+  haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', spacePerDay: '1', dailyHour: '9', autoFeature: 'on', skyEnabled: 'on', imageModel: 'test/gorsel' },
+  egitim: { lessonModel: 'test/ders-modeli', lessonDay: '1', lessonAutoPublish: 'on' },
+  bulten: { kunyeUrl: FAKE, kunyeToken: 'kunye-anahtari', newsletterTag: '', digestWeekday: '1', astroDigestWeekday: '0' },
 }
+const saveSettings = (section, changes = {}) => submit(`/admin/ayarlar?bolum=${section}`, `name="section" value="${section}"`, { ...SETTINGS[section], ...changes })
 
 test('ayarlar', async () => {
-  const location = await submit('/admin/ayarlar', 'aiProvider', SETTINGS)
-  assert.match(location, /Ayarlar kaydedildi/)
-  const page = (await get('/admin/ayarlar')).html
-  assert.ok(!page.includes('ai-anahtari') && !page.includes('kunye-anahtari'), 'gizli anahtarlar sayfada görünmemeli')
-  assert.match(await submit('/admin/ayarlar', 'aiProvider', { ...SETTINGS, kunyeUrl: 'ftp://x' }), /http/)
+  for (const section of Object.keys(SETTINGS)) assert.match(await saveSettings(section), new RegExp(`bolum=${section}.*Ayarlar kaydedildi`))
+  for (const section of ['yapay-zeka', 'bulten']) {
+    const page = (await get(`/admin/ayarlar?bolum=${section}`)).html
+    assert.ok(!/ai-anahtari|kunye-anahtari|or-anahtari/.test(page), 'gizli anahtarlar sayfada görünmemeli')
+  }
+  assert.match((await get('/admin/ayarlar?bolum=haberler')).html, /name="autoFeature"[^>]*checked/)
+  assert.match(await saveSettings('bulten', { kunyeUrl: 'ftp://x' }), /http/)
+  // Bir sekmeyi kaydetmek ötekileri değiştirmez
+  assert.match((await get('/admin/ayarlar?bolum=site')).html, /value="Test Blog"/)
+  assert.match((await get('/admin/ayarlar?bolum=yapay-zeka')).html, /value="test-model"/)
 })
 
 test('abonelik kutusu (Künye üzerinden)', async () => {
@@ -194,6 +264,9 @@ test('makale → taslak yazı → yayın', async () => {
   cookie = savedCookie
 
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Yayımla'), /Yayımlandı/)
+  // Yeni yazının serbest görseli yok, OpenRouter anahtarı var: kapak kendiliğinden çizilir
+  await waitFor(async () => /src="\/gorsel\/\d+-\d+\.webp"/.test((await get(`/admin/yazilar/${postId}`)).html), 'kapak görseli')
+  assert.ok(openRouterRequests.some((r) => r.body.model === 'test/gorsel' && r.body.aspect_ratio === '16:9'))
   cookie = ''
   const page = await get('/yazi/kediler-neden-cok-uyur')
   assert.equal(page.status, 200)
@@ -217,14 +290,16 @@ test('makale → taslak yazı → yayın', async () => {
   const usage = (await get('/admin')).html
   assert.match(usage, /150/, 'token kullanımı sayılmalı')
 
-  // Yüksek puanlı yazı için öneri; öne çıkarılınca ana sayfada Öne çıkanlar
-  assert.match((await get('/admin/yazilar')).html, /önem 9\/10[\s\S]*Öneri/)
-  assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkar'), /Öne çıkarıldı/)
+  // Önem puanı 9: yayımlanınca kendiliğinden öne çıkar (ayar açık)
   cookie = ''
   assert.match((await get('/')).html, /Öne çıkanlar[\s\S]*★ Öne çıkan[\s\S]*Kediler Neden Çok Uyur/)
   cookie = savedCookie
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkanlardan kaldır'), /kaldırıldı/)
   assert.match((await get('/')).html, /Okuma köşesi/)
+  // Kaldırılınca öneri rozeti görünür, elle yeniden öne çıkarılabilir
+  assert.match((await get('/admin/yazilar')).html, /önem 9\/10[\s\S]*Öneri/)
+  assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkar'), /Öne çıkarıldı/)
+  assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkanlardan kaldır'), /kaldırıldı/)
 })
 
 test('yazıyı abonelere gönder (Künye)', async () => {
@@ -242,7 +317,7 @@ test('yazıyı abonelere gönder (Künye)', async () => {
   assert.match(await submit(digestPath, 'Sil'), /silindi/)
 
   // Yanlış anahtar: hata panelde görünür
-  await submit('/admin/ayarlar', 'aiProvider', { ...SETTINGS, aiApiKey: '', kunyeToken: 'yanlis' })
+  await saveSettings('bulten', { kunyeToken: 'yanlis' })
   const second = await submit('/admin/bultenler', 'Son 7 günden')
   const secondPath = second.match(/\/admin\/bultenler\/\d+/)[0]
   assert.match(await submit(secondPath, 'Abonelere gönder'), /API anahtarı geçersiz/)
@@ -283,6 +358,8 @@ test('tam yedek ve geri yükleme', async () => {
   assert.ok(backup.posts.length >= 1 && backup.papers.length >= 1 && backup.sources.length >= 1)
   assert.equal(backup.settings.aiModel, 'test-model')
   assert.ok(!('passwordHash' in backup.settings), 'şifre yedeğe girmez')
+  const image = backup.posts.find((p) => String(p.id) === postId).image
+  assert.ok(backup.images[image], 'yapay zekâ kapağı yedekte')
 
   const upload = async (content) => {
     const data = new FormData()
@@ -297,15 +374,18 @@ test('tam yedek ve geri yükleme', async () => {
   // Yazıyı sil, yedekten geri getir
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Sil'), /silindi/)
   assert.equal((await get(`/admin/yazilar/${postId}`)).status, 404)
-  assert.match(await upload(JSON.stringify(backup)), new RegExp(`Yedek yüklendi: ${backup.sources.length} kaynak, ${backup.papers.length} makale, ${backup.posts.length} yazı`))
+  assert.equal((await get(`/gorsel/${image}`)).status, 404, 'silinen yazının kapağı da silinir')
+  assert.match(await upload(JSON.stringify({ ...backup, images: { ...backup.images, '../../dev.db': 'eA==' } })), new RegExp(`Yedek yüklendi: ${backup.sources.length} kaynak, ${backup.papers.length} makale, ${backup.posts.length} yazı, .* 1 görsel`))
   assert.equal((await get(`/admin/yazilar/${postId}`)).status, 200, 'yazı geri gelmeli')
+  const restored = await fetch(`${B}/gorsel/${image}`)
+  assert.equal(restored.status, 200, 'kapak geri gelmeli')
+  assert.match(restored.headers.get('content-type') || '', /image\/webp/)
   assert.equal((await get('/admin')).status, 200, 'oturum açık kalmalı')
 })
 
 test('görsel adresi yalnızca üretilen dosyaları verir', async () => {
   assert.equal((await get('/gorsel/..%2F..%2Fdev.db')).status, 404)
   assert.equal((await get('/gorsel/1-1.jpg')).status, 404)
-  assert.match((await get(`/admin/yazilar/${postId}`)).html, /Kapak görseli[\s\S]*renkli kapak/)
 })
 
 test('yetkisiz form gönderimi reddedilir', async () => {
@@ -320,4 +400,115 @@ test('yetkisiz form gönderimi reddedilir', async () => {
   cookie = saved
   assert.equal((await get(`/admin/yazilar/${postId}`)).status, 200, 'yazı silinmemeli')
   assert.ok(aiCalls >= 1)
+})
+
+test('eğitim: araştırma → yazım → denetim, otomatik yayın', async () => {
+  const before = openRouterRequests.length
+  assert.match(await submit('/admin/egitim', 'Sıradaki dersi şimdi yaz'), /araştırılıp yazılıyor/)
+  await waitFor(async () => /Ders: (&quot;|")Kırınım ve Airy diski(&quot;|") yayımlandı \(denetim temiz\)/.test((await get('/admin')).html), 'ders yazımı')
+  const admin = (await get('/admin/egitim')).html
+  assert.match(admin, /Optik ve Görüntü Oluşumu[\s\S]*Optik ve enstrümantasyon · temel[\s\S]*Görüntü İşleme ve OpenCV/, 'başlangıç müfredatı alan ve seviyesiyle eklendi')
+  assert.match((await get('/admin')).html, /(&quot;|")Optik ve Görüntü Oluşumu(&quot;|") serisi 3 derse bölündü/)
+  const calls = openRouterRequests.slice(before)
+  assert.equal(calls.length, 4, 'plan, araştırma, yazım, denetim')
+  assert.ok(calls.every((r) => r.auth === 'Bearer or-anahtari' && r.body.model === 'test/ders-modeli'))
+  assert.deepEqual(calls.map((r) => r.body.tools?.[0]?.type ?? '-'), ['openrouter:web_search', 'openrouter:web_search', '-', '-'], 'yalnızca plan ve araştırma web araması yapar')
+  assert.match(calls[2].body.messages[1].content, /ARAŞTIRMA NOTLARI:\nNotlar: çözünürlük/, 'yazım notlardan')
+  assert.match(calls[3].body.messages[1].content, /DERS:\n## Nedir\?/, 'denetim yazılan dersi görür')
+
+  const lessonId = (await get('/admin/egitim/seri/1')).html.match(/href="\/admin\/egitim\/ders\/(\d+)"/)[1]
+  const lessonAdmin = (await get(`/admin/egitim/ders/${lessonId}`)).html
+  assert.match(lessonAdmin, /Denetim sorun bulmadı/)
+  assert.match(lessonAdmin, /Araştırma notları[\s\S]*çözünürlük/)
+  const preview = lessonAdmin.match(/href="(\/egitim\/[^"]+)"/)[1]
+  const saved = cookie
+  cookie = ''
+  try {
+    const page = (await get(preview)).html
+    assert.match(page, /class="katex"/, 'formüller KaTeX ile')
+    assert.match(page, /hljs language-python/, 'kod bloğu renkli')
+    assert.match(page, /<ol><li>Dalgaboyunu seç<\/li>/)
+    assert.match(page, /<div class="table"><table>/)
+    assert.match(page, /<details class="solution"><summary>Çözümü göster/)
+    assert.match(page, /href="http:\/\/127\.0\.0\.1:3901\/kaynak1"/)
+    assert.match(page, /href="http:\/\/127\.0\.0\.1:3901\/kaynak4"/, 'araştırmada bulunan, açılan link kalır')
+    assert.ok(!page.includes(`${FAKE}/yok`) && page.includes('ölü kaynak'), 'açılmayan link metne döner')
+    assert.match(page, /Bu dersin kaynakları[\s\S]*Ders notu 2[\s\S]*kaynak4/)
+    assert.doesNotMatch(page, /Başlamadan önce/, 'önkoşul dersi yayında değilse kutu yok')
+    assert.match((await get('/egitim')).html, /Optik ve Görüntü Oluşumu[\s\S]*1(<!-- -->)? \/ (<!-- -->)?3(<!-- -->)? ders yayında/)
+  } finally {
+    cookie = saved
+  }
+})
+
+test('eğitim: denetimde sorun çıkan ders taslak kalır, önkoşul kutusu', async () => {
+  assert.match(await submit('/admin/egitim', 'Sıraya ekle', { title: 'Denetimli ders', scope: '', sourceUrls: '' }), /sıranın en önüne/)
+  assert.match(await submit('/admin/egitim', 'Sıradaki dersi şimdi yaz'), /araştırılıp yazılıyor/)
+  await waitFor(async () => /Ders: (&quot;|")Denetimli ders(&quot;|") taslak: denetim sorun buldu/.test((await get('/admin')).html), 'denetim')
+  const admin = (await get('/admin/egitim')).html
+  assert.match(admin, /İnceleme bekleyen dersler[\s\S]*Denetimli ders/)
+  const lessonId = admin.match(/href="\/admin\/egitim\/ders\/(\d+)"[^>]*>Denetimli ders/)[1]
+  const lessonAdmin = (await get(`/admin/egitim/ders/${lessonId}`)).html
+  assert.match(lessonAdmin, /<strong>Ciddi<\/strong> · Nedir\?: Katsayı yanlış → 1\.22 olmalı/)
+  const preview = lessonAdmin.match(/href="(\/egitim\/[^"]+)"/)[1]
+  const saved = cookie
+  cookie = ''
+  try {
+    assert.equal((await get(preview)).status, 404, 'taslak herkese kapalı')
+    cookie = saved
+    assert.match(await submit(`/admin/egitim/ders/${lessonId}`, 'Yayımla'), /Yayımlandı/)
+    cookie = ''
+    // Önkoşul listesinde 1 numara yayındaki "Kırınım ve Airy diski"
+    assert.match((await get(preview)).html, /Başlamadan önce[\s\S]*href="\/egitim\/optik-ve-goruntu-olusumu\/kirinim-ve-airy-diski"/)
+  } finally {
+    cookie = saved
+  }
+
+  // Yeterli kaynağı olmayan ders yazılmaz, hata listesine düşer
+  assert.match(await submit('/admin/egitim', 'Sıraya ekle', { title: 'Kaynaksız ders', scope: '', sourceUrls: '' }), /sıranın en önüne/)
+  assert.match(await submit('/admin/egitim', 'Sıradaki dersi şimdi yaz'), /araştırılıp yazılıyor/)
+  await waitFor(async () => /Yazılamayan dersler[\s\S]*Kaynaksız ders[\s\S]*doğrulanmış kaynak/.test((await get('/admin/egitim')).html), 'kaynaksız ders reddi')
+})
+
+test('gökyüzü takvimi', async () => {
+  assert.match(await submit('/admin', 'Gökyüzü takvimini güncelle'), /araştırılıyor/)
+  await waitFor(async () => /Gökyüzü takvimi \(elle\): .* 2(<!-- -->)? olay/.test((await get('/admin')).html), 'gökyüzü')
+  const saved = cookie
+  cookie = ''
+  try {
+    const home = (await get('/')).html
+    assert.match(home, /Bu hafta gökyüzünde[\s\S]*Orionid &lt;b&gt;tepe&lt;\/b&gt;[\s\S]*Ay ile Satürn yakınlaşıyor/, 'tarih sırasıyla, kaçışlı')
+    assert.doesNotMatch(home, /Aralık dışı/)
+    const page = (await get('/gokyuzu')).html
+    assert.match(page, /21:30[\s\S]*Güneydoğuya bak/)
+    assert.match(page, /Kaynaklar[\s\S]*kaynak1/)
+  } finally {
+    cookie = saved
+  }
+})
+
+test('haftanın astronomi özeti', async () => {
+  assert.match(await submit('/admin', 'Astronomi özetini şimdi hazırla'), /hazırlanıyor/)
+  await waitFor(async () => /Astronomi özeti \(elle\): taslak özet hazır/.test((await get('/admin')).html), 'astronomi özeti')
+  const list = (await get('/admin/bultenler')).html
+  const digestId = list.match(/href="\/admin\/bultenler\/(\d+)"[^>]*>Haftanın astronomi özeti/)?.[1]
+  assert.ok(digestId, 'özet bültenler listesinde')
+  const body = unescapeHtml((await get(`/admin/bultenler/${digestId}`)).html)
+  assert.match(body, /Haftanın astronomi ve fizik gündemi: 1 gelişme/)
+  assert.match(body, /Kediler Neden Çok Uyur/, 'uzay yazısı girer')
+  assert.match(body, /Bu haftanın dersleri[\s\S]*Kırınım ve Airy diski/)
+  assert.match(body, /Bu hafta gökyüzünde[\s\S]*Ay ile Satürn yakınlaşıyor[\s\S]*\/gokyuzu/)
+})
+
+test('site içi arama', async () => {
+  const saved = cookie
+  cookie = ''
+  try {
+    assert.match((await get('/ara?q=KEDİLER')).html, /Yazılar[\s\S]*href="\/yazi\/kediler-neden-cok-uyur"/)
+    assert.match((await get('/ara?q=airy%20kirinim')).html, /Dersler[\s\S]*Kırınım ve Airy diski/, 'Türkçe harfsiz de bulur')
+    const none = (await get('/ara?q=%3Cscript%3Ezzz')).html
+    assert.match(none, /&lt;script&gt;zzz(&quot;|")? için sonuç yok/)
+  } finally {
+    cookie = saved
+  }
 })

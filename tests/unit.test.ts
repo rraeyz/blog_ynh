@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { extractJson, parseSelection, slugify } from '../src/lib/text.ts'
+import { extractJson, markdownLinks, parseLesson, parseSelection, parseSkyEvents, searchScore, slugify, unlink } from '../src/lib/text.ts'
+import { isPrivateIp, safeFetch } from '../src/lib/net.ts'
 import { compressImage } from '../src/lib/compress.ts'
 import { complete, RETRY_DELAYS } from '../src/lib/ai.ts'
 import http from 'node:http'
@@ -195,4 +196,73 @@ test('seçimde her gün en az bir uzay haberi', () => {
   assert.deepEqual(parseSelection(`{"picked": [1, 4, 2], ${scores}, "space": [3, 4, 5]}`, 5, 3, 2).picked, [0, 3, 2], 'en az 2: sondaki uzay olmayan, kalan en yüksek puanlı uzayla değişir')
   assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [5]}`, 5, 3, 3).picked, [0, 1, 4], 'yeterli uzay haberi yoksa olanlarla yetinilir')
   assert.deepEqual(parseSelection(`{"picked": [1, 2], ${scores}, "space": [4, 5]}`, 5, 2, 0).picked, [0, 1], '0 ise kural yok')
+})
+
+test('ders: kod bloğu ve formüller', () => {
+  const html = renderMarkdown('## Matematiği\nAiry diski: $\\theta = 1.22 \\lambda / D$ ve **kalın**.\n$$\nF = \\frac{a}{b}\n$$\n```python\nimport numpy as np\nx = 1 < 2\n```\n```iraf\nimexam <b>\n```', { math: true })
+  assert.match(html, /class="katex"/, 'satır içi formül KaTeX ile')
+  assert.match(html, /<div class="math"><span class="katex-display">/, 'ayrı satırdaki formül')
+  assert.match(html, /<pre><code class="hljs language-python">[\s\S]*hljs-keyword[\s\S]*&lt;/, 'bilinen dil renklenir, kaçışlanır')
+  assert.match(html, /<code class="hljs language-iraf">imexam &lt;b&gt;/, 'bilinmeyen dil düz ama kaçışlı')
+  assert.match(html, /<strong>kalın<\/strong>/)
+  // Haber yazılarında $ para birimi: formül açılmaz
+  assert.doesNotMatch(renderMarkdown('Fiyatı $5 ile $10 arası'), /katex/)
+  assert.match(renderMarkdown('```\nkapanmamış blok'), /<pre><code class="hljs">kapanmamış blok<\/code><\/pre>/)
+  assert.doesNotMatch(renderMarkdown('$<img src=x onerror=alert(1)>$', { math: true }), /<img/, 'formül içi HTML çalışmaz')
+})
+
+test('ders: numaralı liste, tablo, açılır çözüm', () => {
+  const html = renderMarkdown('1. Bias çıkar\n2. Flat ile böl\n\n| Filtre | λ (nm) |\n|---|---|\n| V | **551** |\n\n## Alıştırmalar\nSoru\n:::cozum\nCevap $x=2$\n:::\nSonra', { math: true })
+  assert.match(html, /<ol><li>Bias çıkar<\/li><li>Flat ile böl<\/li><\/ol>/)
+  assert.match(html, /<div class="table"><table><thead><tr><th>Filtre<\/th><th>λ \(nm\)<\/th><\/tr><\/thead><tbody><tr><td>V<\/td><td><strong>551<\/strong><\/td><\/tr><\/tbody><\/table><\/div>/)
+  assert.match(html, /<details class="solution"><summary>Çözümü göster<\/summary>\s*<p>Cevap <span class="katex">[\s\S]*<\/p>\s*<\/details>\s*<p>Sonra/)
+  assert.doesNotMatch(renderMarkdown(':::cozum\nA\n:::'), /<details/, 'haberlerde çözüm bloğu yok')
+  assert.doesNotMatch(renderMarkdown('| <b>x</b> |\n|---|\n| y |'), /<b>/, 'tablo hücresi kaçışlanır')
+})
+
+test('gökyüzü takvimi ve arama', () => {
+  const text = '{"events": [{"date": "2026-10-30", "time": "21:00", "title": "Ay ve Satürn", "detail": "Güneydoğu"}, {"date": "2026-10-28", "time": "gece", "title": "Orionid", "detail": ""}, {"date": "2026-11-20", "title": "Aralık dışı"}, {"date": "30 Ekim", "title": "Bozuk tarih"}, {"date": "2026-10-29", "title": ""}]}'
+  assert.deepEqual(parseSkyEvents(text, '2026-10-27', '2026-11-02'), [
+    { date: '2026-10-28', time: '', title: 'Orionid', detail: '' },
+    { date: '2026-10-30', time: '21:00', title: 'Ay ve Satürn', detail: 'Güneydoğu' },
+  ])
+  assert.ok(searchScore('gokyuzu', 'Bu hafta Gökyüzünde', '') > 0, 'Türkçe harfsiz yazılan bulunur')
+  assert.ok(searchScore('IRAF', '', 'iraf ile fotometri') > 0, 'büyük I ile i aynı')
+  assert.ok(searchScore('ışık eğrisi', 'Işık Eğrisi Modelleme', '') > searchScore('ışık eğrisi', 'Modelleme', 'ışık eğrisi'), 'başlıkta geçen önde')
+  assert.equal(searchScore('koronagraf spektrum', 'Koronagraf', 'yok'), 0, 'her kelime geçmeli')
+  assert.equal(searchScore('   ', 'A', 'B'), 0)
+})
+
+test('ders çıktısı, linkler ve iç ağ adresleri', () => {
+  assert.deepEqual(parseLesson('Araştırdım.\nÖzet: Airy diski kırınımdır.\nÖnkoşul: 3, 7\n\n## Nedir?\nMetin'), { excerpt: 'Airy diski kırınımdır.', body: '## Nedir?\nMetin', prerequisites: [3, 7] })
+  assert.deepEqual(parseLesson('Özet: X\nÖnkoşul: yok\n## Nedir?\nA')?.prerequisites, [])
+  assert.equal(parseLesson('Başlıksız metin'), null)
+  const body = 'Bak [ESO](https://eso.org/a) ve [yok](https://x.com/404) ve tekrar [ESO](https://eso.org/a)'
+  assert.deepEqual(markdownLinks(body), ['https://eso.org/a', 'https://x.com/404'])
+  assert.equal(unlink(body, new Set(['https://x.com/404'])), 'Bak [ESO](https://eso.org/a) ve yok ve tekrar [ESO](https://eso.org/a)')
+  for (const ip of ['127.0.0.1', '10.1.2.3', '192.168.1.5', '172.20.0.1', '169.254.169.254', '::1', '::ffff:127.0.0.1', 'fd00::1', '0.0.0.0']) assert.ok(isPrivateIp(ip), ip)
+  for (const ip of ['8.8.8.8', '172.32.0.1', '2606:4700::1111']) assert.ok(!isPrivateIp(ip), ip)
+})
+
+test('safeFetch: iç ağ engellenir, yönlendirmeler denetlenir', async () => {
+  const server = http.createServer((req, res) => {
+    if (req.url === '/yonlendir') return res.writeHead(302, { Location: '/hedef' }).end()
+    if (req.url === '/dongu') return res.writeHead(302, { Location: '/dongu' }).end()
+    res.writeHead(200).end('tamam')
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+  try {
+    delete process.env.BLOG_ALLOW_PRIVATE_URLS
+    await assert.rejects(safeFetch(`${base}/hedef`), /iç ağ/, '127.0.0.1 engellenir')
+    await assert.rejects(safeFetch('http://[::1]:1/'), /iç ağ/)
+    await assert.rejects(safeFetch('file:///etc/passwd'), /http/)
+    process.env.BLOG_ALLOW_PRIVATE_URLS = '1'
+    const response = await safeFetch(`${base}/yonlendir`)
+    assert.equal(await response.text(), 'tamam', 'yönlendirme izlenir')
+    await assert.rejects(safeFetch(`${base}/dongu`), /yönlendirme/)
+  } finally {
+    delete process.env.BLOG_ALLOW_PRIVATE_URLS
+    server.close()
+  }
 })

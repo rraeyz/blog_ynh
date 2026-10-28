@@ -42,6 +42,7 @@ jobs:
           # host ağı: testteki sahte yapay zekâ/Künye sunucusuna (127.0.0.1:3901) container içinden ulaşılsın
           docker run -d --name blog --network host \
             --env-file "$RUNNER_TEMP/data/.env" \
+            -e OPENROUTER_BASE_URL=http://127.0.0.1:3901/or/v1 -e BLOG_ALLOW_PRIVATE_URLS=1 \
             -v "$RUNNER_TEMP/data/prisma:/app/prisma" \
             blog-ci
           for i in $(seq 1 60); do

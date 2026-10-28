@@ -8,6 +8,7 @@ const NAV = [
   ['/admin/makaleler', 'Makaleler'],
   ['/admin/kaynaklar', 'Kaynaklar'],
   ['/admin/bultenler', 'Bültenler'],
+  ['/admin/egitim', 'Eğitim'],
   ['/admin/ayarlar', 'Ayarlar'],
 ]
 
