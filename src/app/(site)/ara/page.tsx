@@ -1,24 +1,19 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
-import { searchScore } from '@/lib/text'
+import { inOrder, searchIds } from '@/lib/search'
 import { LevelBadge, PAPER_FIELDS, RowPost } from '../parts'
 
 export const metadata: Metadata = { title: 'Ara', robots: { index: false } }
 
-// shortcut: yayımlanan her şey bellekte taranır (Türkçe harf duyarsız); binlerce yazıda yavaşlarsa SQLite FTS5'e geç
 export default async function SearchPage({ searchParams }: { searchParams: { q?: string } }) {
   const q = String(searchParams.q ?? '').trim().slice(0, 100)
-  const [posts, lessons] = q
-    ? await Promise.all([
-        prisma.post.findMany({ where: { status: 'published' }, include: { paper: PAPER_FIELDS } }),
-        prisma.lesson.findMany({ where: { status: 'published' }, include: { series: { select: { slug: true, title: true } } } }),
-      ])
-    : [[], []]
-  const rank = <T,>(items: T[], score: (item: T) => number, take: number) =>
-    items.map((item) => ({ item, score: score(item) })).filter((r) => r.score > 0).sort((a, b) => b.score - a.score).slice(0, take).map((r) => r.item)
-  const foundPosts = rank(posts, (p) => searchScore(q, p.title, `${p.excerpt}\n${p.body}`), 40)
-  const foundLessons = rank(lessons, (l) => searchScore(q, l.title, `${l.excerpt}\n${l.series.title}\n${l.body}`), 20)
+  const ids = await searchIds(q, 40, 20)
+  const [posts, lessons] = await Promise.all([
+    prisma.post.findMany({ where: { id: { in: ids.posts } }, include: { paper: PAPER_FIELDS } }),
+    prisma.lesson.findMany({ where: { id: { in: ids.lessons } }, include: { series: { select: { slug: true, title: true } } } }),
+  ])
+  const [foundPosts, foundLessons] = [inOrder(ids.posts, posts), inOrder(ids.lessons, lessons)]
   return (
     <div className="mx-auto max-w-3xl px-4">
       <form action="/ara" className="py-10 flex gap-2" role="search">

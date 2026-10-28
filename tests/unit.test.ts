@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { addDays, mondayOf, extractJson, markdownLinks, parseIssues, parseLesson, parsePlan, parseProposal, parseSelection, parseSkyEvents, searchScore, slugify, unlink } from '../src/lib/text.ts'
+import { addDays, mondayOf, extractJson, markdownLinks, parseIssues, parseLesson, parsePlan, parseProposal, parseScores, parseSkyEvents, pickDaily, weightedScore, criteriaScore, cleanSummary, formatScore, DAILY_HARD_MAX, foldText, ftsQuery, slugify, unlink } from '../src/lib/text.ts'
 import { isPrivateIp, safeFetch } from '../src/lib/net.ts'
 import { levelRange, planLevels } from '../src/lib/levels.ts'
 import { compressImage } from '../src/lib/compress.ts'
@@ -181,34 +181,72 @@ test('geçici sağlayıcı hatasında yeniden denenir', async () => {
   }
 })
 
-test('seçim yanıtı: seçilenler ve ön puanlar', () => {
-  const ok = parseSelection('Seçimim:\n{"picked": [3, 1, 3, 9], "scores": {"1": 8, "2": 3, "3": 9.4, "4": 15, "9": 7, "x": 5}}', 4, 2)
-  assert.deepEqual(ok.picked, [2, 0], 'tekrar ve liste dışı numara atlanır, n kadar alınır')
-  assert.deepEqual(Array.from(ok.scores), [[0, 8], [1, 3], [2, 9], [3, 10]], 'puan yuvarlanır, 10\'a sıkıştırılır, liste dışı atlanır')
-  const fallback = parseSelection('{"scores": {"1": 2, "2": 9, "3": 6}}', 3, 2)
-  assert.deepEqual(fallback.picked, [1, 2], 'seçilenler yoksa en yüksek puanlılar')
-  assert.deepEqual(parseSelection('{"picked": [2]}', 3, 2), { picked: [1], scores: new Map() })
+test('puan: dört ölçütün ağırlıklı toplamı, onda bir', () => {
+  assert.equal(weightedScore({ yenilik: 5, etki: 5, kanit: 5, anlam: 5 }), 100)
+  assert.equal(weightedScore({ yenilik: 1, etki: 1, kanit: 1, anlam: 1 }), 10)
+  assert.equal(weightedScore({ yenilik: 4, etki: 3, kanit: 4, anlam: 3 }), 65)
+  assert.ok(weightedScore({ yenilik: 3, etki: 5, kanit: 3, anlam: 3 }) > weightedScore({ yenilik: 5, etki: 3, kanit: 3, anlam: 3 }), 'etki yenilikten ağır')
+  assert.equal(formatScore(65), '6,5')
+  assert.equal(formatScore(80), '8,0')
+  assert.equal(criteriaScore({ yenilik: 4, etki: '3', kanit: 4, anlam: 3 }), 65)
+  assert.equal(criteriaScore({ yenilik: 4, etki: 3, kanit: 4 }), 0, 'eksik ölçüt: puansız')
+  assert.equal(criteriaScore({ yenilik: 9, etki: 3, kanit: 4, anlam: 3 }), 0, 'aralık dışı: puansız')
+  assert.equal(criteriaScore(undefined), 0)
 })
 
-test('seçimde her gün en az bir uzay haberi', () => {
-  const scores = '"scores": {"1": 9, "2": 8, "3": 7, "4": 5, "5": 6}'
-  assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [4, 5]}`, 5, 3).picked, [0, 1, 4], 'uzay yoksa sonuncunun yerine en yüksek puanlı uzay haberi')
-  assert.deepEqual(parseSelection(`{"picked": [1, 5], ${scores}, "space": [4, 5]}`, 5, 3).picked, [0, 4], 'zaten uzay varsa dokunulmaz')
-  assert.deepEqual(parseSelection(`{"picked": [1], ${scores}, "space": [4]}`, 5, 3).picked, [0, 3], 'yer varsa eklenir')
-  assert.deepEqual(parseSelection(`{"picked": [1, 2], ${scores}, "space": []}`, 5, 2).picked, [0, 1], 'uzay haberi yoksa değişmez')
-  assert.deepEqual(parseSelection(`{"picked": [1, 4, 2], ${scores}, "space": [3, 4, 5]}`, 5, 3, 2).picked, [0, 3, 2], 'en az 2: sondaki uzay olmayan, kalan en yüksek puanlı uzayla değişir')
-  assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [5]}`, 5, 3, 3).picked, [0, 1, 4], 'yeterli uzay haberi yoksa olanlarla yetinilir')
-  assert.deepEqual(parseSelection(`{"picked": [1, 2], ${scores}, "space": [4, 5]}`, 5, 2, 0).picked, [0, 1], '0 ise kural yok')
+test('ön puan yanıtı satır satır', () => {
+  const text = 'İşte puanlar:\n1 | 4 | 3 | 4 | 3 | uzay | -\n- 2 | 5 | 5 | 5 | 5 | diğer | Y\n3 | 2 | 2 | 3 | 2 | Diğer | 1\n3 | 1 | 1 | 1 | 1 | uzay | -\n9 | 3 | 3 | 3 | 3 | uzay | -\n4 | 6 | 3 | 3 | 3 | uzay | -\n**5** | 3 | 3 | 3 | 3 | Uzay | 5'
+  assert.deepEqual(parseScores(text, 5), [
+    { index: 0, criteria: { yenilik: 4, etki: 3, kanit: 4, anlam: 3 }, space: true, repeat: null },
+    { index: 1, criteria: { yenilik: 5, etki: 5, kanit: 5, anlam: 5 }, space: false, repeat: 'written' },
+    { index: 2, criteria: { yenilik: 2, etki: 2, kanit: 3, anlam: 2 }, space: false, repeat: 0 },
+    { index: 4, criteria: { yenilik: 3, etki: 3, kanit: 3, anlam: 3 }, space: true, repeat: null },
+  ], 'ikinci kez gelen numara, liste dışı numara ve 1-5 dışı puan düşer; kendine tekrar sayılmaz')
 })
 
-test('seçimde en fazla kaç uzay haberi', () => {
-  const scores = '"scores": {"1": 9, "2": 8, "3": 7, "4": 5, "5": 6, "6": 4}'
-  // 1, 2, 3 uzay; 4, 5, 6 diğer konular
-  assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [1, 2, 3]}`, 6, 3, 1, 2).picked, [0, 1, 4], 'en fazla 2: sondaki uzay, en yüksek puanlı diğer haberle (5) değişir')
-  assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [1, 2, 3]}`, 6, 3, 1, 1).picked, [0, 3, 4], 'en fazla 1: sondan başlayarak iki uzay değişir (en yüksek puanlı diğer haber en sona)')
-  assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [1, 2, 3, 4, 5, 6]}`, 6, 3, 1, 1).picked, [0, 1, 2], 'başka konu yoksa uzay haberleri kalır')
-  assert.deepEqual(parseSelection(`{"picked": [1, 2, 3], ${scores}, "space": [1, 2, 3]}`, 6, 3, 2, 1).picked, [0, 1, 4], 'en az, en fazladan büyükse en az geçerli')
-  assert.deepEqual(parseSelection(`{"picked": [1, 4, 2], ${scores}, "space": [1, 2, 3]}`, 6, 3, 1, 2).picked, [0, 3, 1], 'sınırın altındaysa dokunulmaz')
+test('seçime giden özetten kalıp sözler atılır', () => {
+  assert.equal(cleanSummary('Astronomers found X.  Image credit: NASA/JPL-Caltech. The post Big find appeared first on Universe Today.'), 'Astronomers found X.')
+  assert.equal(cleanSummary('Some text here. Read more »'), 'Some text here.')
+  assert.equal(cleanSummary('A photo of the plane. (Image credit: Satellite image ©2026 Vantor) A U.S. team saw it.'), 'A photo of the plane. A U.S. team saw it.')
+  assert.equal(cleanSummary('Salinity rose sharply. Read full article Comments'), 'Salinity rose sharply.')
+  assert.equal(cleanSummary('A result [&#8230;]'), 'A result')
+  assert.equal(cleanSummary('Credits to the team matter. Data show 3.5 K.'), 'Credits to the team matter. Data show 3.5 K.', 'iki noktasız "credits" dokunulmaz')
+})
+
+test('günlük seçim: eşik, en az/en fazla, istisna, uzay sınırları', () => {
+  const o = { min: 3, max: 5, threshold: 60, exceptional: 85, spaceMin: 1, spaceNormal: 2, spaceMax: 4, spaceImportant: 75 }
+  const items = (scores: number[], space = false) => scores.map((score) => ({ score, space }))
+  const scores = (picked: Array<{ score: number; space: boolean }>) => picked.map((p) => `${p.space ? 'U' : ''}${p.score}`).join(' ')
+  const pick = (list: Array<{ score: number; space: boolean }>, extra = {}) => scores(pickDaily(list, { ...o, spaceMin: 0, ...extra }))
+  assert.equal(pick(items([55, 90, 80, 70, 65, 40])), '90 80 70 65', 'eşiği geçenler')
+  assert.equal(pick(items([70, 50, 40, 35, 0])), '70 50 40', 'eşiği geçen azsa en iyilerle en aza')
+  assert.equal(pick(items([95, 90, 88, 86, 80, 78]), { max: 3 }), '95 90 88 86', 'istisna puanlı en fazla sınırını aşar')
+  assert.equal(pickDaily(items(Array(20).fill(90)), { ...o, exceptional: 85 }).length, DAILY_HARD_MAX)
+  assert.equal(pick([...items([80, 78, 70, 65], true), ...items([60])]), 'U80 U78 60', 'önemli uzay haberleri normal sınıra takılmaz, önemsizi takılır')
+  assert.equal(pick([...items([70, 68, 66], true), ...items([50])]), 'U70 U68 50', 'normalde en fazla 2 uzay')
+  assert.equal(pick(items([90, 88, 86, 84, 82], true)), 'U90 U88 U86 U84', 'önemlilerle de en fazla 4 uzay')
+  assert.equal(scores(pickDaily([...items([90, 80, 70]), ...items([40], true)], { ...o, max: 3 })), '90 80 U40', 'en az 1 uzay: sondaki diğer haberin yerine')
+  assert.equal(scores(pickDaily([...items([90, 88, 86]), ...items([40], true)], { ...o, max: 3, exceptional: 85 })), '90 88 86', 'istisna puanlının yerine uzay geçmez')
+  assert.equal(scores(pickDaily([...items([90, 80]), ...items([0], true)], o)), '90 80', 'puansız uzay haberi alınmaz')
+})
+
+test('arama: Türkçe katlama, kelime başı, başlık önde (FTS5)', async () => {
+  assert.equal(ftsQuery('Kara DEL'), '"kara"* "del"*')
+  assert.equal(ftsQuery('IRAF "ışık" OR -x*'), '"iraf"* "isik"* "or"* "x"*', 'tırnak ve işleçler sorguyu bozamaz')
+  assert.equal(ftsQuery('  ;; '), '')
+  const Database = (await import('better-sqlite3')).default
+  const db = new Database(':memory:')
+  db.exec("CREATE VIRTUAL TABLE SearchIndex USING fts5(kind UNINDEXED, ref UNINDEXED, title, body, tokenize='unicode61 remove_diacritics 2')")
+  const add = db.prepare('INSERT INTO SearchIndex VALUES (?, ?, ?, ?)')
+  add.run('post', 1, foldText('Modelleme'), foldText('Işık eğrisi ve Gökyüzü'))
+  add.run('post', 2, foldText('Işık Eğrisi Modelleme'), foldText('yıldız'))
+  add.run('post', 3, foldText('Koronagraf'), foldText('yok'))
+  const find = (q: string) => db.prepare('SELECT ref FROM SearchIndex WHERE SearchIndex MATCH ? ORDER BY bm25(SearchIndex, 0, 0, 10, 1)').all(ftsQuery(q)).map((r) => (r as { ref: number }).ref)
+  assert.deepEqual(find('ışık eğrisi'), [2, 1], 'başlıkta geçen önde')
+  assert.deepEqual(db.prepare('SELECT ref FROM SearchIndex WHERE SearchIndex MATCH ?').all(`title : (${ftsQuery('işık egri')})`).map((r) => (r as { ref: number }).ref), [2], 'yalnızca başlıkta arama (önce bunlar gösterilir)')
+  assert.deepEqual(find('gokyuzu'), [1], 'Türkçe harfsiz yazılan bulunur')
+  assert.deepEqual(find('egri'), [2, 1], 'kelime başı yeter')
+  assert.deepEqual(find('koronagraf spektrum'), [], 'her kelime geçmeli')
 })
 
 test('ders: kod bloğu ve formüller', () => {
@@ -277,11 +315,6 @@ test('gökyüzü takvimi ve arama', () => {
   assert.equal(mondayOf('2026-11-01'), '2026-10-26', 'pazar haftanın son günü')
   assert.equal(mondayOf('2026-10-26'), '2026-10-26')
   assert.equal(addDays('2026-12-30', 3), '2027-01-02')
-  assert.ok(searchScore('gokyuzu', 'Bu hafta Gökyüzünde', '') > 0, 'Türkçe harfsiz yazılan bulunur')
-  assert.ok(searchScore('IRAF', '', 'iraf ile fotometri') > 0, 'büyük I ile i aynı')
-  assert.ok(searchScore('ışık eğrisi', 'Işık Eğrisi Modelleme', '') > searchScore('ışık eğrisi', 'Modelleme', 'ışık eğrisi'), 'başlıkta geçen önde')
-  assert.equal(searchScore('koronagraf spektrum', 'Koronagraf', 'yok'), 0, 'her kelime geçmeli')
-  assert.equal(searchScore('   ', 'A', 'B'), 0)
 })
 
 test('ders çıktısı, linkler ve iç ağ adresleri', () => {

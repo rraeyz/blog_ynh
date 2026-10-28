@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { getSettings } from '@/lib/state'
 import { PROVIDERS } from '@/lib/ai'
-import { FEATURE_SUGGESTION, MIN_PRESCORE } from '@/lib/writer'
+import { MIN_PRESCORE } from '@/lib/writer'
+import { DAILY_HARD_MAX, formatScore } from '@/lib/text'
 import { changePasswordAction, saveSettingsAction } from '../../actions'
 import { Notice } from '../../Notice'
 import { ConfirmButton } from '../../ConfirmButton'
@@ -80,12 +81,29 @@ function Section({ section, s }: { section: string; s: Settings }) {
   if (section === 'haberler') return (
     <>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Field label="Günde kaç yazı" id="postsPerDay"><input id="postsPerDay" name="postsPerDay" type="number" min={0} max={20} defaultValue={s.postsPerDay} className="input" /></Field>
-        <Field label="En az kaçı astronomi/uzay" id="spacePerDay" hint="O gün yeterli uzay haberi yoksa diğer konulardan tamamlanır.">
-          <input id="spacePerDay" name="spacePerDay" type="number" min={0} max={20} defaultValue={s.spacePerDay} className="input" />
+        <Field label="Günde en az kaç yazı" id="postsMinPerDay" hint="Eşiği geçen az olsa da en iyileriyle tamamlanır.">
+          <input id="postsMinPerDay" name="postsMinPerDay" type="number" min={0} max={15} defaultValue={s.postsMinPerDay} className="input" />
         </Field>
-        <Field label="En fazla kaçı astronomi/uzay" id="spaceMaxPerDay" hint="Fazlası başka konuların en önemli haberleriyle değişir.">
-          <input id="spaceMaxPerDay" name="spaceMaxPerDay" type="number" min={0} max={20} defaultValue={s.spaceMaxPerDay} className="input" />
+        <Field label="Günde en fazla kaç yazı" id="postsPerDay" hint="0 = otomatik yazı yok.">
+          <input id="postsPerDay" name="postsPerDay" type="number" min={0} max={15} defaultValue={s.postsPerDay} className="input" />
+        </Field>
+        <Field label="Yazılma eşiği (ön puan)" id="scoreThreshold" hint="Bu ve üstü ön puanlı haberler yazılır (en fazla sınırına kadar).">
+          <input id="scoreThreshold" name="scoreThreshold" type="number" min={1} max={10} step={0.1} defaultValue={s.scoreThreshold / 10} className="input" />
+        </Field>
+        <Field label="İstisna eşiği" id="scoreExceptional" hint={`Bu ve üstü, en fazla sınırı dolsa da yazılır (günde en çok ${DAILY_HARD_MAX}).`}>
+          <input id="scoreExceptional" name="scoreExceptional" type="number" min={1} max={10} step={0.1} defaultValue={s.scoreExceptional / 10} className="input" />
+        </Field>
+        <Field label="En az kaçı astronomi/uzay" id="spacePerDay" hint="O gün yeterli uzay haberi yoksa diğer konulardan tamamlanır.">
+          <input id="spacePerDay" name="spacePerDay" type="number" min={0} max={15} defaultValue={s.spacePerDay} className="input" />
+        </Field>
+        <Field label="Normalde en fazla kaçı uzay" id="spaceNormalPerDay" hint="Diğer konular gölgede kalmasın.">
+          <input id="spaceNormalPerDay" name="spaceNormalPerDay" type="number" min={0} max={15} defaultValue={s.spaceNormalPerDay} className="input" />
+        </Field>
+        <Field label="Önemli uzay haberi eşiği" id="spaceImportantScore" hint="Bu ve üstü ön puanlı uzay haberi normal sınıra takılmaz.">
+          <input id="spaceImportantScore" name="spaceImportantScore" type="number" min={1} max={10} step={0.1} defaultValue={s.spaceImportantScore / 10} className="input" />
+        </Field>
+        <Field label="Önemlilerle en fazla kaçı uzay" id="spaceMaxPerDay" hint="Önemli uzay haberi çok olan günde bile.">
+          <input id="spaceMaxPerDay" name="spaceMaxPerDay" type="number" min={0} max={15} defaultValue={s.spaceMaxPerDay} className="input" />
         </Field>
         <Field label="Günlük iş saati" id="dailyHour" hint="Türkiye saati.">
           <select id="dailyHour" name="dailyHour" defaultValue={s.dailyHour} className="input">
@@ -93,11 +111,14 @@ function Section({ section, s }: { section: string; s: Settings }) {
           </select>
         </Field>
       </div>
-      <Field label="İlgi alanları" id="interests" hint={<>Model her gün bekleyen haberlerin başlık ve özetine bakıp en önemlilerini seçer ve hepsine ön puan verir. Burada yazdığın konular öncelik alır (baştaki en çok); sıradan bir haber yalnızca konusu uyuyor diye seçilmez. Ön puanı {MIN_PRESCORE} ve altı olanlar hemen atlanır.</>}>
+      <Field label="İlgi alanları" id="interests" hint={<>Model her yeni habere başlık, tarih ve özetinden bir kez ön puan verir: yenilik, etki, kanıt gücü ve okur için anlam (1-5); toplam ağırlıklı, 1,0-10,0. Haberler birbiriyle kıyaslanmaz. Burada yazdığın konular yalnızca &quot;okur için anlam&quot;ı biraz artırır. Ön puanı {formatScore(MIN_PRESCORE)} ve altı olanlar ile son 7 günde yazılanların tekrarı hemen atlanır.</>}>
         <textarea id="interests" name="interests" defaultValue={s.interests} rows={3} className="input" />
       </Field>
       <Check name="autoPublish" checked={s.autoPublish}>Yazıları onaysız yayımla (kapalıyken taslak olarak bekler)</Check>
-      <Check name="autoFeature" checked={s.autoFeature}>Önem puanı {FEATURE_SUGGESTION}/10 ve üstü olan yazıyı yayımlanınca kendiliğinden öne çıkar (öne çıkanlarda en fazla 10; en eskisi düşer)</Check>
+      <Field label="Öne çıkarma eşiği (önem puanı)" id="featureScore" hint="Yazarken tam metinden verilen önem puanı bu ve üstüyse panelde Öneri rozeti çıkar; aşağıdaki seçenek açıksa yayımlanınca kendiliğinden öne çıkar.">
+        <input id="featureScore" name="featureScore" type="number" min={1} max={10} step={0.1} defaultValue={s.featureScore / 10} className="input max-w-32" />
+      </Field>
+      <Check name="autoFeature" checked={s.autoFeature}>Önem puanı {formatScore(s.featureScore)}/10 ve üstü olan yazıyı yayımlanınca kendiliğinden öne çıkar (öne çıkanlarda en fazla 10; en eskisi düşer)</Check>
       <Check name="skyEnabled" checked={s.skyEnabled}>Gökyüzü takvimi: her hafta önümüzdeki 5 haftanın Türkiye&apos;den gözlenebilir gökyüzü olayları araştırılır (aylık takvim /gokyuzu, ana sayfa, bülten). Yardımcı modelle haftada birkaç sent.</Check>
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="Haberin ne kadarı okunsun?" id="readMode">

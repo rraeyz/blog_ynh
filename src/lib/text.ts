@@ -49,41 +49,86 @@ function escapeControlInStrings(json: string): string {
   return out
 }
 
-// Seçim yanıtı: {"picked": [3, 1], "scores": {"1": 6, "2": 3}, "space": [2]} (numaralar listedeki sıra, 1'den başlar).
-// Seçilen numaralar bozuksa en yüksek puanlılar alınır; puanlar 1-10'a sıkıştırılır.
-// Günde en az minSpace uzay yazısı: eksikse en yüksek puanlı uzay haberleri önce boş yerlere, sonra sondaki uzay olmayanların yerine girer
-export function parseSelection(text: string, count: number, n: number, minSpace = 1, maxSpace = n): { picked: number[]; scores: Map<number, number> } {
-  const data = extractJson(text) as { picked?: unknown; scores?: unknown; space?: unknown }
-  const scores = new Map<number, number>()
-  if (data && typeof data.scores === 'object' && !Array.isArray(data.scores)) {
-    for (const [key, value] of Object.entries(data.scores as Record<string, unknown>)) {
-      const index = Number(key) - 1
-      const score = Math.round(Number(value))
-      if (Number.isInteger(index) && index >= 0 && index < count && score > 0) scores.set(index, Math.min(10, score))
-    }
+// Puanlar onda bir tam sayı olarak saklanır (74 = 7,4/10): kolon tipi değişmez, kodda tek ondalık
+export const formatScore = (tenths: number) => (tenths / 10).toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+export type Criteria = { yenilik: number; etki: number; kanit: number; anlam: number }
+
+// Dört ölçüt (1-5) ağırlıklı ortalaması 1,0-10,0 aralığına: etki %35, kanıt gücü %25, yenilik %20, okur için anlam %20
+export function weightedScore(c: Criteria): number {
+  const average = 0.35 * c.etki + 0.25 * c.kanit + 0.2 * c.yenilik + 0.2 * c.anlam
+  return Math.round((1 + ((average - 1) * 9) / 4) * 10)
+}
+
+// Yazarın JSON'undaki {"yenilik": 4, ...}; bir ölçüt eksik ya da bozuksa 0 (puansız)
+export function criteriaScore(value: unknown): number {
+  const data = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
+  const c = { yenilik: Number(data.yenilik), etki: Number(data.etki), kanit: Number(data.kanit), anlam: Number(data.anlam) }
+  if (!Object.values(c).every((n) => n >= 1 && n <= 5)) return 0
+  return weightedScore({ yenilik: Math.round(c.yenilik), etki: Math.round(c.etki), kanit: Math.round(c.kanit), anlam: Math.round(c.anlam) })
+}
+
+// Ön puan yanıtı satır satır: "NUMARA | yenilik | etki | kanit | anlam | uzay/diğer | tekrar" (numaralar listedeki sıra, 1'den).
+// tekrar: "-", "Y" (son yazılanlardan biriyle aynı gelişme) ya da listede önce geçen haberin numarası. Bozuk satır yalnızca kendisi düşer
+export type ScoreLine = { index: number; criteria: Criteria; space: boolean; repeat: number | 'written' | null }
+export function parseScores(text: string, count: number): ScoreLine[] {
+  const seen = new Set<number>()
+  const lines: ScoreLine[] = []
+  for (const line of text.split('\n')) {
+    const parts = line.replace(/^[\s\-*•]+/, '').split('|').map((part) => part.trim().replace(/^\*+|\*+$/g, ''))
+    if (parts.length < 6) continue
+    const index = parseInt(parts[0], 10) - 1
+    const [yenilik, etki, kanit, anlam] = parts.slice(1, 5).map((part) => parseInt(part, 10))
+    if (!(index >= 0 && index < count) || seen.has(index) || ![yenilik, etki, kanit, anlam].every((n) => n >= 1 && n <= 5)) continue
+    seen.add(index)
+    const repeatOf = parseInt(parts[6] ?? '', 10) - 1
+    const repeat = /^y/i.test(parts[6] ?? '') ? 'written' : repeatOf >= 0 && repeatOf < count && repeatOf !== index ? repeatOf : null
+    lines.push({ index, criteria: { yenilik, etki, kanit, anlam }, space: /^uzay/i.test(parts[5]), repeat })
   }
-  const valid = (i: number) => Number.isInteger(i) && i >= 0 && i < count
-  let picked = Array.isArray(data?.picked) ? data.picked.map((i) => Number(i) - 1).filter(valid) : []
-  if (picked.length === 0) picked = Array.from(scores.entries()).sort((a, b) => b[1] - a[1]).map(([i]) => i)
-  picked = Array.from(new Set(picked)).slice(0, n)
-  const space = Array.isArray(data?.space) ? data.space.map((i) => Number(i) - 1).filter(valid) : []
-  const missing = Math.min(minSpace, n) - picked.filter((i) => space.includes(i)).length
-  const extra = space.filter((i) => !picked.includes(i)).sort((a, b) => (scores.get(b) ?? 0) - (scores.get(a) ?? 0)).slice(0, Math.max(0, missing))
-  for (const index of extra) {
-    if (picked.length < n) {
-      picked.push(index)
+  return lines
+}
+
+// Seçime giden özetin başı: beslemelerin kalıp sözleri ("The post … appeared first on …", görsel kredisi, "Read more") atılır
+export function cleanSummary(text: string): string {
+  return text
+    .replace(/The post .{0,300}? appeared first on [^.]*\.?/gi, ' ')
+    .replace(/\((?:image|photo|illustration|video|banner)?\s*credits?\s*:[^)]{0,200}\)/gi, ' ')
+    .replace(/\b(?:image|photo|illustration|video|banner)?\s*credits?\s*:\s*[^.\n]{0,120}?(?:\.(?=\s|$)|$)/gim, ' ')
+    .replace(/\b(?:read more|continue reading|read (?:the )?full (?:story|article))\b.{0,80}$/i, ' ')
+    .replace(/\[(?:…|\.\.\.|&#8230;)\]|&#\d+;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export const DAILY_HARD_MAX = 15 // istisnalarla bile günde en fazla
+
+export type PickOptions = { min: number; max: number; threshold: number; exceptional: number; spaceMin: number; spaceNormal: number; spaceMax: number; spaceImportant: number }
+
+// Günlük seçim, puanlar mutlak olduğu için kodda: eşiği geçenler en yüksekten, en fazla max (istisna puanlılar max'ı aşar,
+// en fazla DAILY_HARD_MAX); eşiği geçen azsa en iyilerle min'e tamamlanır. Uzay haberi normalde spaceNormal'a kadar,
+// spaceImportant ve üstü olanlar spaceMax'a kadar. Uzay haberi spaceMin'den azsa en iyi uzay haberleri eklenir ya da sondakinin yerine geçer
+export function pickDaily<T extends { score: number; space: boolean }>(items: T[], o: PickOptions): T[] {
+  const sorted = items.filter((item) => item.score > 0).sort((a, b) => b.score - a.score)
+  const picked: T[] = []
+  const spaces = () => picked.filter((p) => p.space).length
+  const fits = (item: T) => !item.space || spaces() < Math.max(o.spaceMin, item.score >= o.spaceImportant ? o.spaceMax : o.spaceNormal)
+  for (const item of sorted) {
+    if (picked.length >= DAILY_HARD_MAX || (item.score < o.threshold && picked.length >= o.min)) break
+    if (picked.length >= o.max && item.score < o.exceptional) break
+    if (fits(item)) picked.push(item)
+  }
+  for (const item of sorted.filter((i) => i.space && !picked.includes(i))) {
+    if (spaces() >= Math.min(o.spaceMin, o.max)) break
+    if (picked.length < o.max) {
+      picked.push(item)
       continue
     }
-    let last = picked.length - 1
-    while (last >= 0 && space.includes(picked[last])) last--
-    if (last >= 0) picked[last] = index
+    const last = picked.findLastIndex((p) => !p.space && p.score < o.exceptional)
+    if (last < 0) break
+    picked.splice(last, 1)
+    picked.push(item)
   }
-  // Üst sınır: fazla uzay haberi, sondakinden başlayarak en yüksek puanlı başka konudan haberle değişir (başka konu yoksa kalır)
-  const others = Array.from({ length: count }, (_, i) => i).filter((i) => !space.includes(i) && !picked.includes(i)).sort((a, b) => (scores.get(b) ?? 0) - (scores.get(a) ?? 0))
-  for (let i = picked.length - 1; i >= 0 && picked.filter((p) => space.includes(p)).length > Math.max(maxSpace, minSpace) && others.length; i--) {
-    if (space.includes(picked[i])) picked[i] = others.shift()!
-  }
-  return { picked, scores }
+  return picked.sort((a, b) => b.score - a.score)
 }
 
 export const monthKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
@@ -130,20 +175,13 @@ export function parseSkyEvents(text: string, from: string, to: string): SkyEvent
     .slice(0, 80)
 }
 
-// Arama için: küçük harf, Türkçe harfler ASCII karşılığına (okur "gokyuzu" da yazsa "Gökyüzü" bulunsun)
-const fold = (text: string) => text.toLocaleLowerCase('tr').replace(/[çğıöşü]/g, (c) => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' })[c] ?? c)
+// Arama için: küçük harf, Türkçe harfler ASCII karşılığına (okur "gokyuzu" da yazsa "Gökyüzü" bulunsun). Dizine giren metin de böyle
+export const foldText = (text: string) => text.toLocaleLowerCase('tr').replace(/[çğıöşüâîû]/g, (c) => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u', â: 'a', î: 'i', û: 'u' })[c] ?? c)
 
-// Her kelime başlıkta ya da metinde geçmeli; başlıkta geçen kelime daha değerli. Eşleşmezse 0
-export function searchScore(query: string, title: string, text: string): number {
-  const words = fold(query).split(/\s+/).filter(Boolean)
-  const [t, r] = [fold(title), fold(text)]
-  let score = 0
-  for (const word of words) {
-    if (t.includes(word)) score += 3
-    else if (r.includes(word)) score += 1
-    else return 0
-  }
-  return score
+// FTS5 sorgusu: her kelime geçmeli, kelime başı yeter ("kara del" → "kara delik"). Harf ve rakam dışı her şey atılır:
+// okurun yazdığı tırnak ya da işleç sorguyu bozamaz
+export function ftsQuery(query: string): string {
+  return (foldText(query).match(/[\p{L}\p{N}]+/gu) ?? []).slice(0, 8).map((word) => `"${word}"*`).join(' ')
 }
 
 // Takvim günleri ("2026-10-28"): saat dilimi kaymasın diye UTC öğlen üzerinden

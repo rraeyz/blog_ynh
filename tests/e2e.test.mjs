@@ -40,16 +40,15 @@ const fake = http.createServer((req, res) => {
       selectionCalls.push(body)
       const user = JSON.parse(body).messages[1].content
       const count = (user.match(/^\d+\. /gm) || []).length
-      const n = Number(user.match(/Seçilecek sayı: (\d+)/)[1])
-      const scores = Object.fromEntries(Array.from({ length: count }, (_, i) => [i + 1, 5]))
-      const content = JSON.stringify({ picked: Array.from({ length: Math.min(n, count) }, (_, i) => i + 1), scores, space: [] })
+      // İlk iki haber 7,8; kalanlar 5,5 (eşiğin altı). Son yazılanlardaki "Kediler"le aynı gelişme sayılan 3. haber tekrar
+      const content = Array.from({ length: count }, (_, i) => `${i + 1} | ${i < 2 ? '4 | 4 | 4 | 4' : '3 | 3 | 3 | 3'} | diğer | ${i === 2 && user.includes('Son yazılanlar') ? 'Y' : '-'}`).join('\n')
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 100, completion_tokens: 50 } }))
     }
     if (req.url === '/v1/chat/completions') {
       aiCalls++
       // Başlıktan sonra boş satır yok (Gemini böyle yazıyordu); vurgu ve "Kısaca" maddeleri
-      const content = JSON.stringify({ title: 'Kediler Neden Çok Uyur?', brief: 'Kediler günde 15 saat uyuyor.', highlights: ['Uyku enerji saklar', 'Avcılık için gerekli'], body: 'Giriş.\n## Ne yaptılar?\n<script>alert(1)</script> **önemli**\n> Büyük bulgu', category: 'uzay', importance: 9 })
+      const content = JSON.stringify({ title: 'Kediler Neden Çok Uyur?', brief: 'Kediler günde 15 saat uyuyor.', highlights: ['Uyku enerji saklar', 'Avcılık için gerekli'], body: 'Giriş.\n## Ne yaptılar?\n<script>alert(1)</script> **önemli**\n> Büyük bulgu', category: 'uzay', scores: { yenilik: 5, etki: 5, kanit: 4, anlam: 5 } })
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content: `İşte yazı:\n${content}` } }], usage: { prompt_tokens: 100, completion_tokens: 50 } }))
     }
@@ -214,7 +213,7 @@ test('kurulum ve giriş', async () => {
 const SETTINGS = {
   site: { siteTitle: 'Test Blog', siteDescription: '', siteUrl: 'https://blog.example.com' },
   'yapay-zeka': { aiProvider: 'custom', aiModel: 'test-model', aiBaseUrl: `${FAKE}/v1`, aiApiKey: 'ai-anahtari', imageApiKey: 'or-anahtari', monthlyTokenLimit: '0' },
-  haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', spacePerDay: '1', spaceMaxPerDay: '4', dailyHour: '9', autoFeature: 'on', skyEnabled: 'on', imageModel: 'test/gorsel' },
+  haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', postsMinPerDay: '1', scoreThreshold: '6', scoreExceptional: '9,5', spacePerDay: '1', spaceNormalPerDay: '2', spaceImportantScore: '7.5', spaceMaxPerDay: '4', dailyHour: '9', autoFeature: 'on', featureScore: '7,5', skyEnabled: 'on', imageModel: 'test/gorsel' },
   egitim: { lessonModel: 'test/ders-modeli', lessonHelperModel: 'test/yardimci', lessonDay: '1', lessonAutoPublish: 'on' },
   bulten: { kunyeUrl: FAKE, kunyeToken: 'kunye-anahtari', newsletterTag: '', digestWeekday: '1', astroDigestWeekday: '0' },
 }
@@ -226,7 +225,11 @@ test('ayarlar', async () => {
     const page = (await get(`/admin/ayarlar?bolum=${section}`)).html
     assert.ok(!/ai-anahtari|kunye-anahtari|or-anahtari/.test(page), 'gizli anahtarlar sayfada görünmemeli')
   }
-  assert.match((await get('/admin/ayarlar?bolum=haberler')).html, /name="autoFeature"[^>]*checked/)
+  const news = (await get('/admin/ayarlar?bolum=haberler')).html
+  assert.match(news, /name="autoFeature"[^>]*checked/)
+  assert.match(news, /name="scoreExceptional"[^>]*value="9.5"/, 'virgüllü puan onda bir saklanır, geri gösterilir')
+  assert.match(news, /name="spaceImportantScore"[^>]*value="7.5"/)
+  assert.match(news, /name="featureScore"[^>]*value="7.5"/, 'öne çıkarma eşiği ayardan')
   assert.match(await saveSettings('bulten', { kunyeUrl: 'ftp://x' }), /http/)
   // Bir sekmeyi kaydetmek ötekileri değiştirmez
   assert.match((await get('/admin/ayarlar?bolum=site')).html, /value="Test Blog"/)
@@ -319,7 +322,11 @@ test('makale → taslak yazı → yayın', async () => {
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkanlardan kaldır'), /kaldırıldı/)
   assert.match((await get('/')).html, /Okuma köşesi/)
   // Kaldırılınca öneri rozeti görünür, elle yeniden öne çıkarılabilir
-  assert.match((await get('/admin/yazilar')).html, /önem 9\/10[\s\S]*Öneri/)
+  assert.match((await get('/admin/yazilar')).html, /önem 9,4\/10[\s\S]*Öneri/)
+  // Süzgeçler: konu, en az önem, durum, sıralama
+  assert.match((await get('/admin/yazilar?durum=yayinda&konu=uzay&onem=9&sira=onem')).html, /1 yazı[\s\S]*Kediler Neden Çok Uyur/)
+  assert.match((await get('/admin/yazilar?konu=saglik')).html, /Bu süzgece uyan yazı yok/)
+  assert.match((await get('/admin/yazilar?durum=taslak')).html, /Bu süzgece uyan yazı yok/)
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkar'), /Öne çıkarıldı/)
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkanlardan kaldır'), /kaldırıldı/)
 })
@@ -574,6 +581,11 @@ test('site içi arama', async () => {
   try {
     assert.match((await get('/ara?q=KEDİLER')).html, /Yazılar[\s\S]*href="\/yazi\/kediler-neden-cok-uyur"/)
     assert.match((await get('/ara?q=airy%20kirinim')).html, /Dersler[\s\S]*Kırınım ve Airy diski/, 'Türkçe harfsiz de bulur')
+    // Üstteki kutunun anlık önerileri
+    const live = JSON.parse((await get('/api/ara?q=kedi')).html).results
+    assert.ok(live.some((r) => r.kind === 'Yazı' && r.href === '/yazi/kediler-neden-cok-uyur'), 'yazdıkça eşleşen yazı')
+    assert.deepEqual(JSON.parse((await get('/api/ara?q=k')).html).results, [], 'tek harfte aranmaz')
+    assert.match((await get('/')).html, /href="\/ara"[^>]*aria-label="Ara"|aria-label="Ara"[^>]*href="\/ara"/, 'JavaScript yoksa simge arama sayfasını açar')
     const none = (await get('/ara?q=%3Cscript%3Ezzz')).html
     assert.match(none, /&lt;script&gt;zzz(&quot;|")? için sonuç yok/)
   } finally {
@@ -581,14 +593,17 @@ test('site içi arama', async () => {
   }
 })
 
-test('günlük iş: büyük yığılmada bütün haberler parça parça değerlendirilir', async () => {
+test('günlük iş: büyük yığılmada bütün haberler parça parça puanlanır, eşiği geçenler yazılır', async () => {
+  selectionCalls.length = 0
   assert.match(await submit('/admin/kaynaklar', 'Kaynak ekle', { url: `${FAKE}/feed-cok.xml` }), /Eklendi/)
   assert.match(await submit('/admin', 'Şimdi tara ve yazı üret'), /arka planda/)
   await waitFor(async () => /Günlük iş \(elle\):/.test((await get('/admin')).html), 'günlük iş')
   const log = (await get('/admin')).html
-  // 700 haber: 3 parça (300+300+100) ön eleme, sonra adaylar arasından son seçim (günde 2 yazı)
-  assert.match(log, /Günlük iş: 70\d makaleden \(ön elemeyle \d+ aday\) 2 tanesi seçildi/)
-  assert.equal(selectionCalls.length, 4, '3 ön eleme + 1 son seçim')
-  const shown = selectionCalls.slice(0, 3).map((b) => (JSON.parse(b).messages[1].content.match(/^\d+\. /gm) || []).length)
-  assert.ok(shown.every((n) => n <= 300) && shown.reduce((a, b) => a + b, 0) >= 700, `her haber bir kez gösterildi: ${shown}`)
+  // 700 haber 100'lük parçalarla bir kez puanlanır; eşiği (6,0) geçen 7,8'liklerden günde en fazla 2 yazı
+  assert.match(log, /Günlük iş: 70\d yeni makale puanlandı \(tekrar olan \d+ tanesi atlandı\); \d+ adayın \d+ tanesi eşiği geçti, 2 tanesi seçildi/)
+  const shown = selectionCalls.map((b) => (JSON.parse(b).messages[1].content.match(/^\d+\. /gm) || []).length)
+  assert.ok(shown.every((n) => n <= 100) && shown.reduce((a, b) => a + b, 0) >= 700, `her haber bir kez gösterildi: ${shown}`)
+  assert.match(selectionCalls[0], /Son yazılanlar:\\n- Örnek Makale/, 'son 7 günde yazılanlar tekrar denetimi için gider')
+  assert.match((await get('/admin/makaleler?durum=skipped')).html, /Son 7 günde yazılan bir haberin tekrarı/)
+  assert.match((await get('/admin/makaleler?durum=new')).html, /ön puan (<!-- -->)?7,8(<!-- -->)?\/10/)
 })
