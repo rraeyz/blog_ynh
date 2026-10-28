@@ -18,6 +18,7 @@ const kunyeRequests = []
 const subscribeRequests = []
 const openRouterRequests = []
 let aiCalls = 0
+const selectionCalls = []
 const fake = http.createServer((req, res) => {
   let body = ''
   req.on('data', (chunk) => { body += chunk })
@@ -29,6 +30,21 @@ const fake = http.createServer((req, res) => {
     if (req.url === '/makale') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       return res.end('<html><head><title>Örnek Makale</title></head><body><p>Bu makale kedilerin uykusunu inceliyor.</p></body></html>')
+    }
+    // Sıfırlamadan sonraki gibi büyük yığılma: 700 haber
+    if (req.url === '/feed-cok.xml') {
+      res.writeHead(200, { 'Content-Type': 'application/rss+xml' })
+      return res.end(`<rss><channel>${Array.from({ length: 700 }, (_, i) => `<item><title>Yığın haberi ${i + 1}</title><link>${FAKE}/yigin/${i + 1}</link><description>Kısa ${i + 1}</description></item>`).join('')}</channel></rss>`)
+    }
+    if (req.url === '/v1/chat/completions' && body.includes('Bir bilim editörüsün')) {
+      selectionCalls.push(body)
+      const user = JSON.parse(body).messages[1].content
+      const count = (user.match(/^\d+\. /gm) || []).length
+      const n = Number(user.match(/Seçilecek sayı: (\d+)/)[1])
+      const scores = Object.fromEntries(Array.from({ length: count }, (_, i) => [i + 1, 5]))
+      const content = JSON.stringify({ picked: Array.from({ length: Math.min(n, count) }, (_, i) => i + 1), scores, space: [] })
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      return res.end(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 100, completion_tokens: 50 } }))
     }
     if (req.url === '/v1/chat/completions') {
       aiCalls++
@@ -563,4 +579,16 @@ test('site içi arama', async () => {
   } finally {
     cookie = saved
   }
+})
+
+test('günlük iş: büyük yığılmada bütün haberler parça parça değerlendirilir', async () => {
+  assert.match(await submit('/admin/kaynaklar', 'Kaynak ekle', { url: `${FAKE}/feed-cok.xml` }), /Eklendi/)
+  assert.match(await submit('/admin', 'Şimdi tara ve yazı üret'), /arka planda/)
+  await waitFor(async () => /Günlük iş \(elle\):/.test((await get('/admin')).html), 'günlük iş')
+  const log = (await get('/admin')).html
+  // 700 haber: 3 parça (300+300+100) ön eleme, sonra adaylar arasından son seçim (günde 2 yazı)
+  assert.match(log, /Günlük iş: 70\d makaleden \(ön elemeyle \d+ aday\) 2 tanesi seçildi/)
+  assert.equal(selectionCalls.length, 4, '3 ön eleme + 1 son seçim')
+  const shown = selectionCalls.slice(0, 3).map((b) => (JSON.parse(b).messages[1].content.match(/^\d+\. /gm) || []).length)
+  assert.ok(shown.every((n) => n <= 300) && shown.reduce((a, b) => a + b, 0) >= 700, `her haber bir kez gösterildi: ${shown}`)
 })
