@@ -153,3 +153,30 @@ export function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 export const mondayOf = (date: string) => addDays(date, -((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7))
+
+// Ders aşamalarının yanıtları da satır satır: JSON'daki tek bir kaçışsız tırnak bütün planı bozuyordu.
+// "|" ile ayrılmış satırlar; liste işaretleri ve ** atılır, biçime uymayan satır yalnızca kendisi düşer
+const fields = (text: string) => text.split('\n').map((line) => line.replace(/^[\s\-*•\d.)]+(?=\S)/, '').split('|').map((part) => part.trim().replace(/^\*+|\*+$/g, '')))
+
+// Ders planı: "SEVİYE | Başlık | Kapsam"
+export function parsePlan(text: string): Array<{ level: string; title: string; scope: string }> {
+  return fields(text)
+    .filter((parts) => parts.length >= 2 && /^(temel|orta|ileri)$/i.test(parts[0]) && parts[1])
+    .map(([level, title, ...scope]) => ({ level: level.toLowerCase(), title: title.slice(0, 200), scope: scope.join(' | ').slice(0, 1000) }))
+    .slice(0, 15)
+}
+
+// Denetim: "ciddi | nerede | sorun | doğrusu" satırları ya da "SORUN YOK". İkisi de yoksa okunamadı sayılır (ders yayımlanmaz)
+export function parseIssues(text: string): { issues: Array<{ major: boolean; where: string; problem: string; fix: string }>; readable: boolean } {
+  const issues = fields(text)
+    .filter((parts) => parts.length >= 3 && /^(ciddi|küçük|kucuk)$/i.test(parts[0]) && parts[2])
+    .map(([severity, where, problem, ...fix]) => ({ major: /^ciddi$/i.test(severity), where, problem, fix: fix.join(' | ') }))
+  return { issues, readable: issues.length > 0 || /SORUN YOK/i.test(text) }
+}
+
+// Yeni seri önerisi: "Başlık: …", "Kapsam: …", "Alan: …", "Seviye: …" satırları
+export function parseProposal(text: string): { title: string; summary: string; track: string; level: string } | null {
+  const field = (name: string) => text.match(new RegExp(`^[\\s*-]*\\**${name}\\**\\s*:\\**\\s*(.+)$`, 'im'))?.[1].trim().replace(/\*+$/, '') ?? ''
+  const title = field('Başlık')
+  return title ? { title: title.slice(0, 200), summary: field('Kapsam').slice(0, 1000), track: field('Alan').slice(0, 100), level: field('Seviye').toLowerCase().slice(0, 20) } : null
+}

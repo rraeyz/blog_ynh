@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { addDays, mondayOf, extractJson, markdownLinks, parseLesson, parseSelection, parseSkyEvents, searchScore, slugify, unlink } from '../src/lib/text.ts'
+import { addDays, mondayOf, extractJson, markdownLinks, parseIssues, parseLesson, parsePlan, parseProposal, parseSelection, parseSkyEvents, searchScore, slugify, unlink } from '../src/lib/text.ts'
 import { isPrivateIp, safeFetch } from '../src/lib/net.ts'
 import { levelRange, planLevels } from '../src/lib/levels.ts'
 import { compressImage } from '../src/lib/compress.ts'
@@ -231,6 +231,21 @@ test('ders: numaralı liste, tablo, açılır çözüm', () => {
   assert.match(html, /<details class="solution"><summary>Çözümü göster<\/summary>\s*<p>Cevap <span class="katex">[\s\S]*<\/p>\s*<\/details>\s*<p>Sonra/)
   assert.doesNotMatch(renderMarkdown(':::cozum\nA\n:::'), /<details/, 'haberlerde çözüm bloğu yok')
   assert.doesNotMatch(renderMarkdown('| <b>x</b> |\n|---|\n| y |'), /<b>/, 'tablo hücresi kaçışlanır')
+})
+
+test('ders aşamalarının satır yanıtları', () => {
+  assert.deepEqual(parsePlan('Araştırdım:\n1. temel | Işık "dalga"dır | Faz, girişim | yarık\n- **orta** | Seeing |\nbozuk satır\nuzman | Yanlış seviye | x'), [
+    { level: 'temel', title: 'Işık "dalga"dır', scope: 'Faz, girişim | yarık' },
+    { level: 'orta', title: 'Seeing', scope: '' },
+  ])
+  assert.deepEqual(parseIssues('ciddi | Nedir? | "1.22" yerine 1.12 | 1.22\n- Küçük | Özet | eksik\nnot: başka'), {
+    issues: [{ major: true, where: 'Nedir?', problem: '"1.22" yerine 1.12', fix: '1.22' }, { major: false, where: 'Özet', problem: 'eksik', fix: '' }],
+    readable: true,
+  })
+  assert.deepEqual(parseIssues('SORUN YOK'), { issues: [], readable: true })
+  assert.deepEqual(parseIssues('Her şey güzel görünüyor.'), { issues: [], readable: false }, 'biçimsiz yanıt temiz sayılmaz')
+  assert.deepEqual(parseProposal('**Başlık:** Kütleçekim "dalgaları"\nKapsam: LIGO, girişimölçer\nAlan: Yüksek enerji\nSeviye: Orta'), { title: 'Kütleçekim "dalgaları"', summary: 'LIGO, girişimölçer', track: 'Yüksek enerji', level: 'orta' })
+  assert.equal(parseProposal('Öneri yok'), null)
 })
 
 test('ders seviyeleri: plan ve aralık', () => {
