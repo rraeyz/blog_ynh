@@ -224,7 +224,12 @@ export async function writeDaily(settings: Settings): Promise<{ written: number;
   // Ön puanı çok düşük olanlar beklemeden atlanır (Bekliyor listesi dolmasın)
   const low = await prisma.paper.updateMany({ where: { status: 'new', score: { gte: 1, lte: MIN_PRESCORE } }, data: { status: 'skipped' } })
   summary.skipped += low.count + repeats
-  const pool = await prisma.paper.findMany({ where: { status: 'new', createdAt: { gte: cutoff }, score: { gt: MIN_PRESCORE } }, select: { id: true, score: true, space: true } })
+  // En yeni önce: puanlar birkaç değerde yığılır (ör. çok sayıda 7,0), eşit puanda yeni haber önce yazılır (pickDaily sırayı korur)
+  const pool = await prisma.paper.findMany({
+    where: { status: 'new', createdAt: { gte: cutoff }, score: { gt: MIN_PRESCORE } },
+    orderBy: { publishedAt: 'desc' },
+    select: { id: true, score: true, space: true },
+  })
   const options = {
     min: settings.postsMinPerDay,
     max: settings.postsPerDay,
