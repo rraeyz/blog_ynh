@@ -13,12 +13,19 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
   const status = { taslak: { status: 'draft' }, yayinda: { status: 'published' }, one: { featuredAt: { not: null } } }[searchParams.durum ?? ''] ?? {}
   const category = searchParams.konu === 'yok' ? '' : CATEGORIES[searchParams.konu ?? ''] ? searchParams.konu : undefined
   const minImportance = Math.min(10, Math.max(0, Number(searchParams.onem) || 0))
-  const byImportance = searchParams.sira === 'onem'
+  const SORTS = {
+    yeni: [{ createdAt: 'desc' }],
+    eski: [{ createdAt: 'asc' }],
+    onem: [{ importance: 'desc' }, { createdAt: 'desc' }],
+    'onem-az': [{ importance: 'asc' }, { createdAt: 'desc' }],
+  } as const
+  const sort = searchParams.sira && Object.hasOwn(SORTS, searchParams.sira) ? (searchParams.sira as keyof typeof SORTS) : null
   const paper = { select: { title: true, url: true, imageUrl: true } }
   const [posts, published] = await Promise.all([
     prisma.post.findMany({
       where: { ...status, ...(category !== undefined ? { category } : {}), ...(minImportance ? { importance: { gte: minImportance } } : {}) },
-      orderBy: byImportance ? [{ importance: 'desc' }, { createdAt: 'desc' }] : [{ status: 'asc' }, { createdAt: 'desc' }],
+      // Varsayılan: taslaklar üstte (onay bekleyenler), sonra en yeni
+      orderBy: sort ? [...SORTS[sort]] : [{ status: 'asc' }, { createdAt: 'desc' }],
       take: 200,
       include: { paper },
     }),
@@ -58,12 +65,16 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
           </select>
         </label>
         <label className="flex flex-col gap-1">Sıralama
-          <select name="sira" defaultValue={byImportance ? 'onem' : ''} className="input">
-            <option value="">En yeni önce</option><option value="onem">En önemli önce</option>
+          <select name="sira" defaultValue={sort ?? ''} className="input">
+            <option value="">Taslaklar üstte, sonra en yeni</option>
+            <option value="yeni">En yeni önce</option>
+            <option value="eski">En eski önce</option>
+            <option value="onem">Önem puanı: yüksekten düşüğe</option>
+            <option value="onem-az">Önem puanı: düşükten yükseğe</option>
           </select>
         </label>
         <button className="btn-primary">Uygula</button>
-        {(filtered || byImportance) && <Link href="/admin/yazilar" className="btn">Temizle</Link>}
+        {(filtered || sort) && <Link href="/admin/yazilar" className="btn">Temizle</Link>}
         <span className="ml-auto self-center text-stone-500">{`${posts.length} yazı`}</span>
       </form>
       <p className="text-sm text-stone-500 mb-4">☆ ile yayındaki yazıyı ana sayfadaki Öne çıkanlara al (en fazla 10; yenisi eklenince en eskisi düşer). <span className="text-violet-700 dark:text-violet-300">Öneri</span> rozeti, yapay zekânın önem puanı {FEATURE_SUGGESTION}/10 ve üstü olanlarda görünür.</p>
