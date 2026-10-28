@@ -22,6 +22,7 @@ model Settings {
   maxInputChars     Int      @default(8000) // makale başına modele gönderilecek en fazla karakter
   postsPerDay       Int      @default(3)
   spacePerDay       Int      @default(1) // Bunlardan en az kaçı astronomi/uzay (o gün o kadar uzay haberi varsa)
+  spaceMaxPerDay    Int      @default(4) // En fazla kaçı: kaynakların çoğu astronomi, diğer konular gölgede kalmasın
   dailyHour         Int      @default(9) // günlük işin çalışacağı saat (sunucu saati)
   interests         String   @default("") // doluysa makaleler bu ilgi alanlarına göre seçilir
   monthlyTokenLimit Int      @default(0) // 0 = sınırsız; aşılınca otomatik üretim durur

@@ -52,7 +52,7 @@ function escapeControlInStrings(json: string): string {
 // Seçim yanıtı: {"picked": [3, 1], "scores": {"1": 6, "2": 3}, "space": [2]} (numaralar listedeki sıra, 1'den başlar).
 // Seçilen numaralar bozuksa en yüksek puanlılar alınır; puanlar 1-10'a sıkıştırılır.
 // Günde en az minSpace uzay yazısı: eksikse en yüksek puanlı uzay haberleri önce boş yerlere, sonra sondaki uzay olmayanların yerine girer
-export function parseSelection(text: string, count: number, n: number, minSpace = 1): { picked: number[]; scores: Map<number, number> } {
+export function parseSelection(text: string, count: number, n: number, minSpace = 1, maxSpace = n): { picked: number[]; scores: Map<number, number> } {
   const data = extractJson(text) as { picked?: unknown; scores?: unknown; space?: unknown }
   const scores = new Map<number, number>()
   if (data && typeof data.scores === 'object' && !Array.isArray(data.scores)) {
@@ -77,6 +77,11 @@ export function parseSelection(text: string, count: number, n: number, minSpace 
     let last = picked.length - 1
     while (last >= 0 && space.includes(picked[last])) last--
     if (last >= 0) picked[last] = index
+  }
+  // Üst sınır: fazla uzay haberi, sondakinden başlayarak en yüksek puanlı başka konudan haberle değişir (başka konu yoksa kalır)
+  const others = Array.from({ length: count }, (_, i) => i).filter((i) => !space.includes(i) && !picked.includes(i)).sort((a, b) => (scores.get(b) ?? 0) - (scores.get(a) ?? 0))
+  for (let i = picked.length - 1; i >= 0 && picked.filter((p) => space.includes(p)).length > Math.max(maxSpace, minSpace) && others.length; i--) {
+    if (space.includes(picked[i])) picked[i] = others.shift()!
   }
   return { picked, scores }
 }

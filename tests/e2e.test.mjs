@@ -198,7 +198,7 @@ test('kurulum ve giriş', async () => {
 const SETTINGS = {
   site: { siteTitle: 'Test Blog', siteDescription: '', siteUrl: 'https://blog.example.com' },
   'yapay-zeka': { aiProvider: 'custom', aiModel: 'test-model', aiBaseUrl: `${FAKE}/v1`, aiApiKey: 'ai-anahtari', imageApiKey: 'or-anahtari', monthlyTokenLimit: '0' },
-  haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', spacePerDay: '1', dailyHour: '9', autoFeature: 'on', skyEnabled: 'on', imageModel: 'test/gorsel' },
+  haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', spacePerDay: '1', spaceMaxPerDay: '4', dailyHour: '9', autoFeature: 'on', skyEnabled: 'on', imageModel: 'test/gorsel' },
   egitim: { lessonModel: 'test/ders-modeli', lessonHelperModel: 'test/yardimci', lessonDay: '1', lessonAutoPublish: 'on' },
   bulten: { kunyeUrl: FAKE, kunyeToken: 'kunye-anahtari', newsletterTag: '', digestWeekday: '1', astroDigestWeekday: '0' },
 }
