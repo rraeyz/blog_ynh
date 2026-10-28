@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { addDays, mondayOf, extractJson, markdownLinks, parseIssues, parseLesson, parsePlan, parseProposal, parseScores, parseSkyEvents, pickDaily, weightedScore, criteriaScore, cleanSummary, formatScore, DAILY_HARD_MAX, searchScore, slugify, unlink } from '../src/lib/text.ts'
+import { addDays, mondayOf, extractJson, markdownLinks, parseIssues, parseLesson, parsePlan, parseProposal, parseScores, parseSkyEvents, pickDaily, weightedScore, criteriaScore, cleanSummary, formatScore, DAILY_HARD_MAX, foldText, ftsQuery, slugify, unlink } from '../src/lib/text.ts'
 import { isPrivateIp, safeFetch } from '../src/lib/net.ts'
 import { levelRange, planLevels } from '../src/lib/levels.ts'
 import { compressImage } from '../src/lib/compress.ts'
@@ -230,6 +230,25 @@ test('günlük seçim: eşik, en az/en fazla, istisna, uzay sınırları', () =>
   assert.equal(scores(pickDaily([...items([90, 80]), ...items([0], true)], o)), '90 80', 'puansız uzay haberi alınmaz')
 })
 
+test('arama: Türkçe katlama, kelime başı, başlık önde (FTS5)', async () => {
+  assert.equal(ftsQuery('Kara DEL'), '"kara"* "del"*')
+  assert.equal(ftsQuery('IRAF "ışık" OR -x*'), '"iraf"* "isik"* "or"* "x"*', 'tırnak ve işleçler sorguyu bozamaz')
+  assert.equal(ftsQuery('  ;; '), '')
+  const Database = (await import('better-sqlite3')).default
+  const db = new Database(':memory:')
+  db.exec("CREATE VIRTUAL TABLE SearchIndex USING fts5(kind UNINDEXED, ref UNINDEXED, title, body, tokenize='unicode61 remove_diacritics 2')")
+  const add = db.prepare('INSERT INTO SearchIndex VALUES (?, ?, ?, ?)')
+  add.run('post', 1, foldText('Modelleme'), foldText('Işık eğrisi ve Gökyüzü'))
+  add.run('post', 2, foldText('Işık Eğrisi Modelleme'), foldText('yıldız'))
+  add.run('post', 3, foldText('Koronagraf'), foldText('yok'))
+  const find = (q: string) => db.prepare('SELECT ref FROM SearchIndex WHERE SearchIndex MATCH ? ORDER BY bm25(SearchIndex, 0, 0, 10, 1)').all(ftsQuery(q)).map((r) => (r as { ref: number }).ref)
+  assert.deepEqual(find('ışık eğrisi'), [2, 1], 'başlıkta geçen önde')
+  assert.deepEqual(db.prepare('SELECT ref FROM SearchIndex WHERE SearchIndex MATCH ?').all(`title : (${ftsQuery('işık egri')})`).map((r) => (r as { ref: number }).ref), [2], 'yalnızca başlıkta arama (önce bunlar gösterilir)')
+  assert.deepEqual(find('gokyuzu'), [1], 'Türkçe harfsiz yazılan bulunur')
+  assert.deepEqual(find('egri'), [2, 1], 'kelime başı yeter')
+  assert.deepEqual(find('koronagraf spektrum'), [], 'her kelime geçmeli')
+})
+
 test('ders: kod bloğu ve formüller', () => {
   const html = renderMarkdown('## Matematiği\nAiry diski: $\\theta = 1.22 \\lambda / D$ ve **kalın**.\n$$\nF = \\frac{a}{b}\n$$\n```python\nimport numpy as np\nx = 1 < 2\n```\n```iraf\nimexam <b>\n```', { math: true })
   assert.match(html, /class="katex"/, 'satır içi formül KaTeX ile')
@@ -296,11 +315,6 @@ test('gökyüzü takvimi ve arama', () => {
   assert.equal(mondayOf('2026-11-01'), '2026-10-26', 'pazar haftanın son günü')
   assert.equal(mondayOf('2026-10-26'), '2026-10-26')
   assert.equal(addDays('2026-12-30', 3), '2027-01-02')
-  assert.ok(searchScore('gokyuzu', 'Bu hafta Gökyüzünde', '') > 0, 'Türkçe harfsiz yazılan bulunur')
-  assert.ok(searchScore('IRAF', '', 'iraf ile fotometri') > 0, 'büyük I ile i aynı')
-  assert.ok(searchScore('ışık eğrisi', 'Işık Eğrisi Modelleme', '') > searchScore('ışık eğrisi', 'Modelleme', 'ışık eğrisi'), 'başlıkta geçen önde')
-  assert.equal(searchScore('koronagraf spektrum', 'Koronagraf', 'yok'), 0, 'her kelime geçmeli')
-  assert.equal(searchScore('   ', 'A', 'B'), 0)
 })
 
 test('ders çıktısı, linkler ve iç ağ adresleri', () => {

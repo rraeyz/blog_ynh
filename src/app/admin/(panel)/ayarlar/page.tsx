@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { getSettings } from '@/lib/state'
 import { PROVIDERS } from '@/lib/ai'
-import { FEATURE_SUGGESTION, MIN_PRESCORE } from '@/lib/writer'
+import { MIN_PRESCORE } from '@/lib/writer'
 import { DAILY_HARD_MAX, formatScore } from '@/lib/text'
 import { changePasswordAction, saveSettingsAction } from '../../actions'
 import { Notice } from '../../Notice'
@@ -115,7 +115,10 @@ function Section({ section, s }: { section: string; s: Settings }) {
         <textarea id="interests" name="interests" defaultValue={s.interests} rows={3} className="input" />
       </Field>
       <Check name="autoPublish" checked={s.autoPublish}>Yazıları onaysız yayımla (kapalıyken taslak olarak bekler)</Check>
-      <Check name="autoFeature" checked={s.autoFeature}>Önem puanı (yazarken tam metinden) {formatScore(FEATURE_SUGGESTION)}/10 ve üstü olan yazıyı yayımlanınca kendiliğinden öne çıkar (öne çıkanlarda en fazla 10; en eskisi düşer)</Check>
+      <Field label="Öne çıkarma eşiği (önem puanı)" id="featureScore" hint="Yazarken tam metinden verilen önem puanı bu ve üstüyse panelde Öneri rozeti çıkar; aşağıdaki seçenek açıksa yayımlanınca kendiliğinden öne çıkar.">
+        <input id="featureScore" name="featureScore" type="number" min={1} max={10} step={0.1} defaultValue={s.featureScore / 10} className="input max-w-32" />
+      </Field>
+      <Check name="autoFeature" checked={s.autoFeature}>Önem puanı {formatScore(s.featureScore)}/10 ve üstü olan yazıyı yayımlanınca kendiliğinden öne çıkar (öne çıkanlarda en fazla 10; en eskisi düşer)</Check>
       <Check name="skyEnabled" checked={s.skyEnabled}>Gökyüzü takvimi: her hafta önümüzdeki 5 haftanın Türkiye&apos;den gözlenebilir gökyüzü olayları araştırılır (aylık takvim /gokyuzu, ana sayfa, bülten). Yardımcı modelle haftada birkaç sent.</Check>
       <div className="grid sm:grid-cols-2 gap-4">
         <Field label="Haberin ne kadarı okunsun?" id="readMode">

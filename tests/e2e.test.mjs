@@ -213,7 +213,7 @@ test('kurulum ve giriş', async () => {
 const SETTINGS = {
   site: { siteTitle: 'Test Blog', siteDescription: '', siteUrl: 'https://blog.example.com' },
   'yapay-zeka': { aiProvider: 'custom', aiModel: 'test-model', aiBaseUrl: `${FAKE}/v1`, aiApiKey: 'ai-anahtari', imageApiKey: 'or-anahtari', monthlyTokenLimit: '0' },
-  haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', postsMinPerDay: '1', scoreThreshold: '6', scoreExceptional: '9,5', spacePerDay: '1', spaceNormalPerDay: '2', spaceImportantScore: '7.5', spaceMaxPerDay: '4', dailyHour: '9', autoFeature: 'on', skyEnabled: 'on', imageModel: 'test/gorsel' },
+  haberler: { readMode: 'abstract', maxInputChars: '8000', interests: '', postsPerDay: '2', postsMinPerDay: '1', scoreThreshold: '6', scoreExceptional: '9,5', spacePerDay: '1', spaceNormalPerDay: '2', spaceImportantScore: '7.5', spaceMaxPerDay: '4', dailyHour: '9', autoFeature: 'on', featureScore: '7,5', skyEnabled: 'on', imageModel: 'test/gorsel' },
   egitim: { lessonModel: 'test/ders-modeli', lessonHelperModel: 'test/yardimci', lessonDay: '1', lessonAutoPublish: 'on' },
   bulten: { kunyeUrl: FAKE, kunyeToken: 'kunye-anahtari', newsletterTag: '', digestWeekday: '1', astroDigestWeekday: '0' },
 }
@@ -229,6 +229,7 @@ test('ayarlar', async () => {
   assert.match(news, /name="autoFeature"[^>]*checked/)
   assert.match(news, /name="scoreExceptional"[^>]*value="9.5"/, 'virgüllü puan onda bir saklanır, geri gösterilir')
   assert.match(news, /name="spaceImportantScore"[^>]*value="7.5"/)
+  assert.match(news, /name="featureScore"[^>]*value="7.5"/, 'öne çıkarma eşiği ayardan')
   assert.match(await saveSettings('bulten', { kunyeUrl: 'ftp://x' }), /http/)
   // Bir sekmeyi kaydetmek ötekileri değiştirmez
   assert.match((await get('/admin/ayarlar?bolum=site')).html, /value="Test Blog"/)

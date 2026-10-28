@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { formatScore } from '@/lib/text'
-import { FEATURE_SUGGESTION } from '@/lib/writer'
 import { getSettings, getState, getUsage } from '@/lib/state'
 import { isJobRunning } from '@/lib/jobs'
 import { aiConfig, PROVIDERS } from '@/lib/ai'
@@ -51,7 +50,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
           <b>Bu ay kullanılan token:</b> {total.toLocaleString('tr-TR')} (giriş {usage.input.toLocaleString('tr-TR')}, çıkış {usage.output.toLocaleString('tr-TR')})
           {settings.monthlyTokenLimit > 0 && ` / sınır ${settings.monthlyTokenLimit.toLocaleString('tr-TR')}`}
         </p>
-        <p><b>Otomatik:</b> her gün {settings.dailyHour}:00&apos;da tarama ve ön puanı {formatScore(settings.scoreThreshold)}+ olan {settings.postsMinPerDay}-{settings.postsPerDay} yazı ({settings.autoPublish ? 'doğrudan yayımlanır' : 'taslak olarak bekler'}{settings.autoFeature && `, önem puanı ${formatScore(FEATURE_SUGGESTION)}+ olanlar öne çıkar`}); her {DAYS[settings.digestWeekday]} haftalık bülten
+        <p><b>Otomatik:</b> her gün {settings.dailyHour}:00&apos;da tarama ve ön puanı {formatScore(settings.scoreThreshold)}+ olan {settings.postsMinPerDay}-{settings.postsPerDay} yazı ({settings.autoPublish ? 'doğrudan yayımlanır' : 'taslak olarak bekler'}{settings.autoFeature && `, önem puanı ${formatScore(settings.featureScore)}+ olanlar öne çıkar`}); her {DAYS[settings.digestWeekday]} haftalık bülten
           {settings.astroDigest && `, her ${DAYS[settings.astroDigestWeekday]} astronomi özeti`} ({settings.autoNewsletter ? 'otomatik gönderilir' : 'taslak olarak bekler'}){settings.skyEnabled && '; haftada bir gökyüzü takvimi'}.</p>
       </section>
 

@@ -6,9 +6,7 @@ import { addUsage, getState, logJob, overBudget, type Settings } from '@/lib/sta
 import { CATEGORIES } from '@/lib/topics'
 import { coverIfNeeded } from '@/lib/images'
 
-// Puanlar onda bir (80 = 8,0/10). Öne çıkanlara alınması önerilen en düşük önem puanı (panelde rozet; ayar açıksa kendiliğinden öne çıkar)
-export const FEATURE_SUGGESTION = 80
-// Ön puanı bu ve altı olan haberler puanlanınca hemen atlanır, en az sayıyı tamamlamaya da girmez
+// Puanlar onda bir (30 = 3,0/10). Ön puanı bu ve altı olan haberler puanlanınca hemen atlanır, en az sayıyı tamamlamaya da girmez
 export const MIN_PRESCORE = 30
 const MAX_FEATURED = 10
 const CHUNK = 100 // puanlamada modele bir seferde gösterilen en fazla haber (~16 bin token)
@@ -19,7 +17,7 @@ const CRITERIA = `Dört ölçüt, her biri 1-5 arası tam sayı:
 - yenilik: 5 alanında bir ilk ya da çığır açan bulgu; 4 yeni ve somut bir sonuç (keşif, icat, ölçüm, yöntem); 3 bilinen bir konuda yeni veri; 2 önceki bir sonuca küçük bir ek ya da eski bir haber; 1 yeni bir sonuç yok (duyuru, tanıtım, röportaj, yorum, etkinlik).
 - etki: 5 alanını ya da çok sayıda insanı doğrudan değiştirecek; 4 alanında önemli bir ilerleme; 3 kendi alt alanında kayda değer; 2 dar bir uzmanlık için; 1 neredeyse yok.
 - kanit (kanıt gücü): 5 hakemli yayın ve güçlü veri (büyük örnek, doğrudan ölçüm, bağımsız doğrulama); 4 hakemli yayın; 3 ön baskı ya da ilk sonuç; 2 tek gözlem, küçük çalışma ya da yalnızca model; 1 kanıtsız iddia ya da yalnızca basın açıklaması.
-- anlam (okur için anlam; meraklı ama uzman olmayan okur): 5 herkesin konuşacağı; 4 kolayca ilgi çeker; 3 iyi anlatılırsa ilgi çeker; 2 ancak çok meraklısı okur; 1 okuru ilgilendirmez.
+- anlam (okur için anlam; okurlar astronomi öğrencileri ve bilime meraklı okurlar): okurun bu haberden ne kazandığı. 5 herkesin konuşacağı ya da dünyaya bakışı değiştiren; 4 önemli bir kavramı, yöntemi ya da bilimin nasıl işlediğini öğreten; 3 alanını izleyen için ilginç, iyi anlatılırsa herkes için; 2 yalnızca o dar alt alanın uzmanına bir şey söyleyen; 1 okura bir şey katmayan (tanıtım, magazin, eğlence).
 Temel bilimde gerçek bir ilk (yeni bir ötegezegen ya da süpernova, yeni bir parçacık ya da kuantum olgusu, ilk kez yapılan bir ölçüm, yeni bir gözlem tekniği) teknik görünse bile yeni ve etkilidir: okura anlatılabilir.
 Haberi kendi başına, bu sabit ölçeğe göre puanla; başka haberlerle kıyaslama.`
 
@@ -46,7 +44,7 @@ export async function featurePost(postId: number): Promise<string | null> {
 
 // Ayar açıksa yayımlanan yüksek puanlı yazı kendiliğinden öne çıkar
 export async function autoFeature(post: { id: number; importance: number }, settings: Settings) {
-  if (settings.autoFeature && post.importance >= FEATURE_SUGGESTION) await featurePost(post.id)
+  if (settings.autoFeature && post.importance >= settings.featureScore) await featurePost(post.id)
 }
 
 const SYSTEM = `Sen Türkçe yazan bir bilim iletişimcisisin. Sana bir makalenin bilgileri ve metni verilecek.

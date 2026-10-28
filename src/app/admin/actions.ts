@@ -99,7 +99,7 @@ const intIn = (value: string, min: number, max: number, fallback: number) => {
 const SETTINGS_SECTIONS: Record<string, string[]> = {
   site: ['siteTitle', 'siteDescription', 'siteUrl'],
   'yapay-zeka': ['aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'imageApiKey', 'monthlyTokenLimit'],
-  haberler: ['readMode', 'maxInputChars', 'interests', 'postsPerDay', 'postsMinPerDay', 'scoreThreshold', 'scoreExceptional', 'spacePerDay', 'spaceNormalPerDay', 'spaceImportantScore', 'spaceMaxPerDay', 'dailyHour', 'autoPublish', 'autoFeature', 'imageModel', 'skyEnabled'],
+  haberler: ['readMode', 'maxInputChars', 'interests', 'postsPerDay', 'postsMinPerDay', 'scoreThreshold', 'scoreExceptional', 'spacePerDay', 'spaceNormalPerDay', 'spaceImportantScore', 'spaceMaxPerDay', 'dailyHour', 'autoPublish', 'autoFeature', 'featureScore', 'imageModel', 'skyEnabled'],
   egitim: ['lessonModel', 'lessonHelperModel', 'lessonWeekdays', 'lessonAutoPublish'],
   bulten: ['kunyeUrl', 'kunyeToken', 'newsletterTag', 'digestWeekday', 'autoNewsletter', 'astroDigest', 'astroDigestWeekday'],
 }
@@ -120,7 +120,7 @@ export async function saveSettingsAction(form: FormData) {
   const secret = (name: 'aiApiKey' | 'kunyeToken' | 'imageApiKey') => text(form, name) || (form.get(`${name}Clear`) ? '' : current[name])
   const checked = (name: string) => form.get(name) === 'on'
   // Puan alanı "6,5" ya da "6.5" → onda bir tam sayı (65)
-  const score = (name: 'scoreThreshold' | 'scoreExceptional' | 'spaceImportantScore') => intIn(String(Math.round(Number(text(form, name).replace(',', '.')) * 10)), 10, 100, current[name])
+  const score = (name: 'scoreThreshold' | 'scoreExceptional' | 'spaceImportantScore' | 'featureScore') => intIn(String(Math.round(Number(text(form, name).replace(',', '.')) * 10)), 10, 100, current[name])
   const parse: Record<string, () => unknown> = {
     siteTitle: () => text(form, 'siteTitle').slice(0, 100) || current.siteTitle,
     siteDescription: () => text(form, 'siteDescription').slice(0, 300),
@@ -145,6 +145,7 @@ export async function saveSettingsAction(form: FormData) {
     dailyHour: () => intIn(text(form, 'dailyHour'), 0, 23, current.dailyHour),
     autoPublish: () => checked('autoPublish'),
     autoFeature: () => checked('autoFeature'),
+    featureScore: () => score('featureScore'),
     imageModel: () => text(form, 'imageModel').slice(0, 200) || current.imageModel,
     skyEnabled: () => checked('skyEnabled'),
     lessonModel: () => text(form, 'lessonModel').slice(0, 200) || current.lessonModel,

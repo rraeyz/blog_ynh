@@ -4,7 +4,6 @@ import { coverPostAction, deletePostAction, featurePostAction, postToDigestActio
 import { Notice } from '../../../Notice'
 import { ConfirmButton } from '../../../ConfirmButton'
 import { CATEGORIES, coverOf } from '@/lib/topics'
-import { FEATURE_SUGGESTION } from '@/lib/writer'
 import { formatScore } from '@/lib/text'
 import { getSettings } from '@/lib/state'
 
@@ -14,7 +13,8 @@ export default async function EditPostPage({ params, searchParams }: { params: {
   if (!post) notFound()
   const cover = coverOf(post)
   // Kaynağın serbest görseli varsa çizmeye gerek yok
-  const canDraw = !!(await getSettings()).imageApiKey.trim() && (!cover || cover.ai)
+  const settings = await getSettings()
+  const canDraw = !!settings.imageApiKey.trim() && (!cover || cover.ai)
   const published = post.status === 'published'
   return (
     <>
@@ -32,7 +32,7 @@ export default async function EditPostPage({ params, searchParams }: { params: {
       {post.importance > 0 && (
         <p className="text-sm mb-4">
           Yapay zekânın önem puanı: <strong>{formatScore(post.importance)}/10</strong>
-          {post.importance >= FEATURE_SUGGESTION && !post.featuredAt && <span className="ml-2 rounded bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 px-2 py-0.5 text-xs">Öne çıkarılması öneriliyor</span>}
+          {post.importance >= settings.featureScore && !post.featuredAt && <span className="ml-2 rounded bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 px-2 py-0.5 text-xs">Öne çıkarılması öneriliyor</span>}
         </p>
       )}
       <div className="card mb-4 flex flex-wrap items-center gap-4">

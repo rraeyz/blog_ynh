@@ -175,25 +175,14 @@ export function parseSkyEvents(text: string, from: string, to: string): SkyEvent
     .slice(0, 80)
 }
 
-// Arama için: küçük harf, Türkçe harfler ASCII karşılığına (okur "gokyuzu" da yazsa "Gökyüzü" bulunsun)
-const fold = (text: string) => text.toLocaleLowerCase('tr').replace(/[çğıöşü]/g, (c) => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' })[c] ?? c)
+// Arama için: küçük harf, Türkçe harfler ASCII karşılığına (okur "gokyuzu" da yazsa "Gökyüzü" bulunsun). Dizine giren metin de böyle
+export const foldText = (text: string) => text.toLocaleLowerCase('tr').replace(/[çğıöşüâîû]/g, (c) => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u', â: 'a', î: 'i', û: 'u' })[c] ?? c)
 
-// Her kelime başlıkta ya da metinde geçmeli; başlıkta geçen kelime daha değerli. Eşleşmezse 0
-export function searchScore(query: string, title: string, text: string): number {
-  const words = fold(query).split(/\s+/).filter(Boolean)
-  const [t, r] = [fold(title), fold(text)]
-  let score = 0
-  for (const word of words) {
-    if (t.includes(word)) score += 3
-    else if (r.includes(word)) score += 1
-    else return 0
-  }
-  return score
+// FTS5 sorgusu: her kelime geçmeli, kelime başı yeter ("kara del" → "kara delik"). Harf ve rakam dışı her şey atılır:
+// okurun yazdığı tırnak ya da işleç sorguyu bozamaz
+export function ftsQuery(query: string): string {
+  return (foldText(query).match(/[\p{L}\p{N}]+/gu) ?? []).slice(0, 8).map((word) => `"${word}"*`).join(' ')
 }
-
-// Eşleşenler, en iyi eşleşen önce
-export const topMatches = <T,>(items: T[], score: (item: T) => number, take: number) =>
-  items.map((item) => ({ item, score: score(item) })).filter((r) => r.score > 0).sort((a, b) => b.score - a.score).slice(0, take).map((r) => r.item)
 
 // Takvim günleri ("2026-10-28"): saat dilimi kaymasın diye UTC öğlen üzerinden
 export function addDays(date: string, days: number): string {

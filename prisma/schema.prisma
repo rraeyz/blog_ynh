@@ -33,7 +33,8 @@ model Settings {
   interests         String   @default("") // doluysa makaleler bu ilgi alanlarına göre seçilir
   monthlyTokenLimit Int      @default(0) // 0 = sınırsız; aşılınca otomatik üretim durur
   autoPublish       Boolean  @default(false) // kapalıyken yazılar taslak olarak bekler
-  autoFeature       Boolean  @default(true) // yayımlanan yazının önem puanı 8,0+ ise kendiliğinden öne çıkar
+  autoFeature       Boolean  @default(true) // yayımlanan yazının önem puanı featureScore ve üstüyse kendiliğinden öne çıkar
+  featureScore      Int      @default(75) // Öne çıkarma eşiği (önem puanı, onda bir; panelde "Öneri" rozeti)
   skyEnabled        Boolean  @default(true) // haftalık gökyüzü takvimi (ana sayfa, /gokyuzu, bülten)
   astroDigest       Boolean  @default(false) // haftanın astronomi özeti bülteni (abonelere e-posta gider)
   astroDigestWeekday Int     @default(0) // 0 = pazar: pazartesi dersinden önce

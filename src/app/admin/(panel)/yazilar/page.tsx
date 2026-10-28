@@ -4,7 +4,7 @@ import { Notice } from '../../Notice'
 import { coverMissingAction, deleteDraftsAction, deletePostAction, featurePostAction } from '../../actions'
 import { ConfirmButton } from '../../ConfirmButton'
 import { CATEGORIES, freeImage, topicLabel } from '@/lib/topics'
-import { FEATURE_SUGGESTION } from '@/lib/writer'
+import { getSettings } from '@/lib/state'
 import { formatScore } from '@/lib/text'
 
 type Filters = { mesaj?: string; durum?: string; konu?: string; onem?: string; sira?: string }
@@ -22,7 +22,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
   } as const
   const sort = searchParams.sira && Object.hasOwn(SORTS, searchParams.sira) ? (searchParams.sira as keyof typeof SORTS) : null
   const paper = { select: { title: true, url: true, imageUrl: true } }
-  const [posts, published] = await Promise.all([
+  const [posts, published, { featureScore }] = await Promise.all([
     prisma.post.findMany({
       where: { ...status, ...(category !== undefined ? { category } : {}), ...(minImportance ? { importance: { gte: minImportance * 10 } } : {}) },
       // Varsayılan: taslaklar üstte (onay bekleyenler), sonra en yeni
@@ -31,6 +31,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
       include: { paper },
     }),
     prisma.post.findMany({ where: { status: 'published', image: '' }, select: { paper } }),
+    getSettings(),
   ])
   const coverless = published.filter((post) => !freeImage(post.paper)).length
   const filtered = !!(searchParams.durum || category !== undefined || minImportance)
@@ -78,7 +79,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
         {(filtered || sort) && <Link href="/admin/yazilar" className="btn">Temizle</Link>}
         <span className="ml-auto self-center text-stone-500">{`${posts.length} yazı`}</span>
       </form>
-      <p className="text-sm text-stone-500 mb-4">☆ ile yayındaki yazıyı ana sayfadaki Öne çıkanlara al (en fazla 10; yenisi eklenince en eskisi düşer). <span className="text-violet-700 dark:text-violet-300">Öneri</span> rozeti, yapay zekânın önem puanı {formatScore(FEATURE_SUGGESTION)}/10 ve üstü olanlarda görünür.</p>
+      <p className="text-sm text-stone-500 mb-4">☆ ile yayındaki yazıyı ana sayfadaki Öne çıkanlara al (en fazla 10; yenisi eklenince en eskisi düşer). <span className="text-violet-700 dark:text-violet-300">Öneri</span> rozeti, yapay zekânın önem puanı {formatScore(featureScore)}/10 ve üstü olanlarda görünür (Ayarlar → Haberler).</p>
       {posts.length === 0 ? (
         <p className="text-sm text-stone-500">{filtered ? 'Bu süzgece uyan yazı yok.' : <>Henüz yazı yok. Makaleler sayfasından bir makaleyi yazıya dönüştür ya da Genel&apos;den günlük işi çalıştır.</>}</p>
       ) : (
@@ -96,7 +97,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
                   {post.paper && ` · Kaynak: ${post.paper.title}`}
                 </span>
               </Link>
-              {post.importance >= FEATURE_SUGGESTION && !post.featuredAt && <span className="text-xs rounded px-2 py-0.5 bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">Öneri</span>}
+              {post.importance >= featureScore && !post.featuredAt && <span className="text-xs rounded px-2 py-0.5 bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">Öneri</span>}
               {post.status === 'published' && (
                 <form action={featurePostAction}>
                   <input type="hidden" name="id" value={post.id} />
