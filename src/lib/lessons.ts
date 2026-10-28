@@ -90,6 +90,7 @@ const PLAN = `Bir astronomi ve astrofizik eğitimcisisin; lisans ve yüksek lisa
 Önce web'de araştır (ders kitapları, üniversite ders notları, gözlemevi ve yazılım belgeleri): konu bugün nasıl öğretiliyor, hangi alt başlıklar şart, hangi sırayla.
 Seriyi, konunun gerektirdiği sayıda derse böl (en az 4, en fazla 15). Her ders tek bir kavramı ya da yöntemi uzman seviyesine kadar götürecek
 büyüklükte olsun; sıra, önceki dersin bilgisini kullanan mantıklı bir ilerleme izlesin. Popüler bilim değil, yöntem ve mantık öğreten dersler olsun.
+Seri seviyesindeki okurun bilmediği bir matematik aracı (ör. Fourier dönüşümü, karmaşık sayılar, olasılık dağılımları) gerekiyorsa, onu kullanan dersten önce öğreten bir ders koy.
 Yanıtı yalnızca şu JSON biçiminde ver: {"lessons": [{"title": "Kısa ders başlığı", "scope": "Bu derste neler anlatılacak, 1-3 cümle"}]}`
 
 // Serinin ders listesini çıkarır (ders sayısına model, kapsama göre karar verir)
@@ -179,13 +180,23 @@ Notlarda bulunsun:
 Her bilginin sonunda hangi kaynaktan geldiğini [1], [2] diye belirt ve en sonda "Kaynaklar" başlığı altında numaralı listede [n] Başlık — URL yaz.
 Doğrulayamadığın hiçbir şeyi not etme.`
 
-const WRITE = `Sen astronomi ve astrofizik öğreten deneyimli bir öğretim üyesisin. Lisans ve yüksek lisans öğrencileri için Türkçe, uzman seviyesinde,
-eksiksiz bir ders yazıyorsun. Amaç: dersi baştan sona okuyan, örnekleri deneyen ve alıştırmaları çözen kişi konuyu tamamen öğrensin; yöntemi
-kendisi uygulayabilsin, neden ve ne zaman kullanıldığını bilsin. Uzunluk sınırı yok: konu ne kadar gerektiriyorsa o kadar yaz, hiçbir adımı atlama.
-Yalnızca verilen araştırma notlarındaki bilgileri kullan; notlarda olmayan sayı, tarih, isim, formül ya da fonksiyon adı ekleme.
+const WRITE = `Sen astronomi ve astrofizik öğreten deneyimli bir öğretim üyesisin. Türkçe, uzman seviyesine kadar götüren, eksiksiz bir ders yazıyorsun.
+Amaç: dersi baştan sona okuyan, örnekleri deneyen ve alıştırmaları çözen kişi konuyu tamamen öğrensin; yöntemi kendisi uygulayabilsin, neden ve
+ne zaman kullanıldığını bilsin. Uzunluk sınırı yok: konu ne kadar gerektiriyorsa o kadar yaz, hiçbir adımı atlama.
+
+OKUR: verilen "Okur" satırındaki kişi. Onun bilmediği hiçbir kavramı, sembolü ya da matematik aracını açıklamadan kullanma. Her formülü önce
+sözle ve sezgiyle anlat, sonra yaz; türetmede adım atlama ve her adımda ne yaptığını söyle. Okur uzmanlığa bu dersin sonunda ulaşmalı, başında değil.
+
+Bilgiler yalnızca verilen araştırma notlarından gelir; notlarda olmayan sayı, tarih, isim, deney sonucu ya da fonksiyon adı ekleme. Temel
+matematik ve fizik araçlarının ders kitabı tanımları ve kendi yaptığın cebir bu sınırın dışındadır. Metinde araştırma sürecinden, notlardan,
+kaynakların neyi doğrulayıp doğrulamadığından ya da aralarındaki çelişkilerden söz etme: okur yalnızca dersi görür. Doğrulanmamış bilgiyi hiç yazma.
 
 BİÇİM: İlk satır "Özet: " ile başlayan tek cümle. İkinci satır "Önkoşul: " ve verilen ders listesinden önce okunması gereken derslerin
 numaraları (yoksa "Önkoşul: yok"). Sonra şu bölümler, bu başlıklarla ve bu sırayla:
+## Ön bilgiler
+(dersin kullandığı ve okurun bilmediği her kavram ve matematik aracı için kısa ama kendi başına yeten bir açıklama: sade bir tanım, neden
+gerektiği, küçük bir sayısal örnek. Örnek: karmaşık sayılar ve $e^{i\\phi}$, Fourier dönüşümü, Taylor açılımı, integralin anlamı, dalga ve faz.
+Sonunda dersteki sembollerin tablosu: | Sembol | Anlamı | Birimi |)
 ## Nedir?
 ## Neden ortaya çıktı?
 ## Mantığı
@@ -208,11 +219,20 @@ KURALLAR: Formüller LaTeX: satır içi $...$, ayrı satırda $$...$$. Kod dil a
 [metin](https://...) biçiminde ve yalnızca notların kaynaklarından. Numaralı adımlar için "1. " listesi, karşılaştırma için "| a | b |" tablosu kullanabilirsin.
 Terimleri ilk geçtiklerinde açıkla, İngilizce karşılığını parantezde ver. Eskimiş bir yöntemi tek doğru yol gibi anlatma.`
 
-const CHECK = `Bir astronomi dersinin bilimsel editörüsün. Sana dersin araştırma notları (kaynaklı) ve yazılmış ders verilecek.
+const CHECK = `Bir astronomi dersinin bilimsel editörüsün. Sana dersin okuru, araştırma notları (kaynaklı) ve yazılmış ders verilecek.
 Dersi notlarla karşılaştır ve yalnızca gerçek sorunları bul: yanlış ya da notlarla çelişen formül, katsayı, birim, sayı, isim ya da tarih;
 notlarda dayanağı olmayan önemli iddialar; çalışmayacak ya da yanlış API kullanan kod; çözümü hatalı alıştırmalar; eskimiş yöntemin tek doğru gibi sunulması.
-Üslup ve yazım tercihlerini sorun sayma. "major": okuru yanlış öğrenmeye götürür; "minor": küçük eksik ya da belirsizlik.
+Sonra dersi o okurun gözüyle oku: açıklanmadan kullanılan kavram, sembol ya da matematik aracı; okurun izleyemeyeceği atlanmış türetme adımı;
+araştırma sürecine dair metin ("notlarda", "kaynaklar doğrulamadı" gibi).
+Üslup ve yazım tercihlerini sorun sayma. "major": okuru yanlış öğrenmeye götürür ya da okur bir bölümü hiç izleyemez; "minor": küçük eksik ya da belirsizlik.
 Yanıtı yalnızca şu JSON biçiminde ver: {"issues": [{"severity": "major", "where": "bölüm ya da alıntı", "problem": "...", "fix": "doğrusu"}]} (sorun yoksa boş dizi).`
+
+// Seri seviyesine göre okurun bildiği varsayılanlar; seviyesi olmayan seri (ör. istekler) en baştan anlatılır
+const READERS: Record<string, string> = {
+  temel: 'lise matematiği (cebir, trigonometri, türevin anlamı) ve giriş fiziği bilen birinci sınıf öğrencisi; karmaşık sayıları, integral hesabını, Fourier dönüşümünü, olasılık dağılımlarını ve programlamayı bilmediğini varsay',
+  orta: 'kalkülüs, temel olasılık ve biraz Python bilen lisans ikinci-üçüncü sınıf öğrencisi; karmaşık üstel, Fourier dönüşümü ve istatistik araçlarını kısa bir hatırlatmayla kullan',
+  ileri: 'lisansı bitirmiş, matematik araçlarını bilen yüksek lisans öğrencisi; alana özgü kavramları yine tanımla',
+}
 
 const SOURCE_CHARS = 12_000
 
@@ -246,6 +266,7 @@ export async function writeLesson(lessonId: number, settings: Settings) {
     const index = lesson.series.lessons.findIndex((l) => l.id === lesson.id)
     const context = [
       `Seri: ${lesson.series.title} — ${lesson.series.summary}`,
+      `Okur: ${READERS[lesson.series.level] ?? READERS.temel}`,
       `Ders: ${lesson.title}`,
       `Bu derste anlatılacaklar: ${lesson.scope || '-'}`,
       `Serinin önceki dersleri (okur bunları biliyor): ${lesson.series.lessons.slice(0, index).map((l) => l.title).join('; ') || '-'}`,
@@ -279,7 +300,7 @@ export async function writeLesson(lessonId: number, settings: Settings) {
 
     // 3. Denetim: notlarla karşılaştırma; ciddi sorun varsa ders yayımlanmaz
     await logJob(`Eğitim: "${lesson.title}" 3/3 denetleniyor…`)
-    const check = await ask(settings, CHECK, `ARAŞTIRMA NOTLARI:\n${research.text}\n\nDERS:\n${body}`, { max_tokens: 6000 }, LONG)
+    const check = await ask(settings, CHECK, `OKUR: ${READERS[lesson.series.level] ?? READERS.temel}\n\nARAŞTIRMA NOTLARI:\n${research.text}\n\nDERS:\n${body}`, { max_tokens: 6000 }, LONG)
     const issues = ((extractJson(check.text) as { issues?: Issue[] }).issues ?? []).filter((i) => typeof i?.problem === 'string')
     const major = issues.filter((i) => i.severity === 'major').length
     const review = issues.map((i) => `- **${i.severity === 'major' ? 'Ciddi' : 'Küçük'}** · ${String(i.where ?? '')}: ${String(i.problem)}${i.fix ? ` → ${String(i.fix)}` : ''}`).join('\n')
