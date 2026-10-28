@@ -198,6 +198,7 @@ test('ön puan yanıtı satır satır', () => {
     { index: 2, criteria: { yenilik: 2, etki: 2, kanit: 3, anlam: 2 }, space: false, repeat: 0 },
     { index: 4, criteria: { yenilik: 3, etki: 3, kanit: 3, anlam: 3 }, space: true, repeat: null },
   ], 'ikinci kez gelen numara, liste dışı numara ve 1-5 dışı puan düşer; kendine tekrar sayılmaz')
+  assert.deepEqual(parseScores('| 1 | 4 | 3 | 4 | 3 | uzay | - |', 1), [{ index: 0, criteria: { yenilik: 4, etki: 3, kanit: 4, anlam: 3 }, space: true, repeat: null }], 'tablo biçimindeki satır')
 })
 
 test('seçime giden özetten kalıp sözler atılır', () => {
@@ -287,6 +288,7 @@ test('ders aşamalarının satır yanıtları', () => {
     { level: 'temel', title: 'Işık "dalga"dır', scope: 'Faz, girişim | yarık' },
     { level: 'orta', title: 'Seeing', scope: '' },
   ])
+  assert.deepEqual(parsePlan('| temel | Seeing | atmosfer |'), [{ level: 'temel', title: 'Seeing', scope: 'atmosfer' }], 'tablo biçimindeki satır')
   assert.deepEqual(parseIssues('ciddi | Nedir? | "1.22" yerine 1.12 | 1.22\n- Küçük | Özet | eksik\nnot: başka'), {
     issues: [{ major: true, where: 'Nedir?', problem: '"1.22" yerine 1.12', fix: '1.22' }, { major: false, where: 'Özet', problem: 'eksik', fix: '' }],
     readable: true,
@@ -322,6 +324,7 @@ test('gökyüzü takvimi ve arama', () => {
     { date: '2026-10-28', time: '', kind: 'diger', rank: 2, title: 'Orionid', detail: '' },
     { date: '2026-10-30', time: '21:00', kind: 'yakinlasma', rank: 1, title: 'Ay ve Satürn', detail: 'Güneydoğu; "parlak" | dürbün' },
   ])
+  assert.equal(parseSkyEvents('| 2026-10-28 | - | meteor | önemli | Orionid | |', '2026-10-27', '2026-11-02')[0]?.title, 'Orionid', 'tablo biçimindeki satır')
   assert.equal(mondayOf('2026-10-28'), '2026-10-26', 'çarşambanın pazartesisi')
   assert.equal(mondayOf('2026-11-01'), '2026-10-26', 'pazar haftanın son günü')
   assert.equal(mondayOf('2026-10-26'), '2026-10-26')
