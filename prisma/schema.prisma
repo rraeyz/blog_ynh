@@ -23,7 +23,7 @@ model Settings {
   // Günlük seçim (lib/text.ts pickDaily). Puanlar onda bir: 60 = 6,0/10
   postsPerDay       Int      @default(10) // Günde en fazla kaç yazı (istisna puanlılar aşabilir)
   postsMinPerDay    Int      @default(3) // Eşiği geçen azsa en iyilerle bu sayıya tamamlanır
-  scoreThreshold    Int      @default(60) // Ön puanı bu ve üstü olanlar yazılır
+  scoreThreshold    Int      @default(65) // Ön puanı bu ve üstü olanlar yazılır
   scoreExceptional  Int      @default(85) // Bu ve üstü en fazla sınırını aşar (en çok 15)
   spacePerDay       Int      @default(1) // Bunlardan en az kaçı astronomi/uzay (o gün o kadar uzay haberi varsa)
   spaceNormalPerDay Int      @default(2) // Önemli değilse en fazla kaçı uzay: kaynakların çoğu astronomi, diğer konular gölgede kalmasın

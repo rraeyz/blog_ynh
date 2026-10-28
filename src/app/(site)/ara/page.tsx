@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
-import { searchScore } from '@/lib/text'
+import { searchScore, topMatches } from '@/lib/text'
 import { LevelBadge, PAPER_FIELDS, RowPost } from '../parts'
 
 export const metadata: Metadata = { title: 'Ara', robots: { index: false } }
@@ -15,10 +15,8 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
         prisma.lesson.findMany({ where: { status: 'published' }, include: { series: { select: { slug: true, title: true } } } }),
       ])
     : [[], []]
-  const rank = <T,>(items: T[], score: (item: T) => number, take: number) =>
-    items.map((item) => ({ item, score: score(item) })).filter((r) => r.score > 0).sort((a, b) => b.score - a.score).slice(0, take).map((r) => r.item)
-  const foundPosts = rank(posts, (p) => searchScore(q, p.title, `${p.excerpt}\n${p.body}`), 40)
-  const foundLessons = rank(lessons, (l) => searchScore(q, l.title, `${l.excerpt}\n${l.series.title}\n${l.body}`), 20)
+  const foundPosts = topMatches(posts, (p) => searchScore(q, p.title, `${p.excerpt}\n${p.body}`), 40)
+  const foundLessons = topMatches(lessons, (l) => searchScore(q, l.title, `${l.excerpt}\n${l.series.title}\n${l.body}`), 20)
   return (
     <div className="mx-auto max-w-3xl px-4">
       <form action="/ara" className="py-10 flex gap-2" role="search">

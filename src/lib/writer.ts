@@ -142,7 +142,8 @@ export async function scorePapers(candidates: Candidate[], settings: Settings, r
   // İlgi alanları yalnızca "okur için anlam"a dokunur: konusu uyan sıradan bir haber önemli bir haberin önüne geçmesin
   const interests = settings.interests.trim() ? `Okurun ilgi alanları: ${settings.interests}\nBu alanlardaki haberlerde "anlam" bir puan yüksek olabilir; diğer ölçütler değişmez.\n` : ''
   const recent = recentTitles.length ? `Son yazılanlar:\n${recentTitles.map((title) => `- ${title}`).join('\n')}\n\n` : ''
-  const result = await complete(settings, SCORE_PROMPT, `${interests}Bugün: ${today.toISOString().slice(0, 10)}\n\n${recent}Haberler:\n${list}`)
+  // temperature 0: aynı haber iki kez puanlanınca fark yarıya iner (gerçek Haiku denemesinde 0,52 → 0,33)
+  const result = await complete(settings, SCORE_PROMPT, `${interests}Bugün: ${today.toISOString().slice(0, 10)}\n\n${recent}Haberler:\n${list}`, { temperature: 0 })
   await addUsage(result.inputTokens, result.outputTokens)
   const lines = parseScores(result.text, candidates.length)
   if (lines.length === 0) throw new Error('Puan yanıtında geçerli satır yok')
@@ -200,7 +201,7 @@ export async function writeDaily(settings: Settings): Promise<{ written: number;
     spaceImportant: settings.spaceImportantScore,
   }).map((paper) => paper.id)
   const notes = [low.count && `ön puanı ${MIN_PRESCORE / 10} ve altı olan ${low.count}`, repeats && `tekrar olan ${repeats}`].filter(Boolean)
-  await logJob(`Günlük iş: ${unscored.length} yeni makale puanlandı${notes.length ? ` (${notes.join(', ')} tanesi atlandı)` : ''}; ${pool.length} adaydan ${picked.length} tanesi seçildi, yazılıyor…`)
+  await logJob(`Günlük iş: ${unscored.length} yeni makale puanlandı${notes.length ? ` (${notes.join(', ')} tanesi atlandı)` : ''}; ${pool.length} adayın ${pool.filter((p) => p.score >= settings.scoreThreshold).length} tanesi eşiği geçti, ${picked.length} tanesi seçildi, yazılıyor…`)
   for (let index = 0; index < picked.length; index++) {
     const id = picked[index]
     if (await overBudget(settings)) {

@@ -580,6 +580,11 @@ test('site içi arama', async () => {
   try {
     assert.match((await get('/ara?q=KEDİLER')).html, /Yazılar[\s\S]*href="\/yazi\/kediler-neden-cok-uyur"/)
     assert.match((await get('/ara?q=airy%20kirinim')).html, /Dersler[\s\S]*Kırınım ve Airy diski/, 'Türkçe harfsiz de bulur')
+    // Üstteki kutunun anlık önerileri
+    const live = JSON.parse((await get('/api/ara?q=kedi')).html).results
+    assert.ok(live.some((r) => r.kind === 'Yazı' && r.href === '/yazi/kediler-neden-cok-uyur'), 'yazdıkça eşleşen yazı')
+    assert.deepEqual(JSON.parse((await get('/api/ara?q=k')).html).results, [], 'tek harfte aranmaz')
+    assert.match((await get('/')).html, /href="\/ara"[^>]*aria-label="Ara"|aria-label="Ara"[^>]*href="\/ara"/, 'JavaScript yoksa simge arama sayfasını açar')
     const none = (await get('/ara?q=%3Cscript%3Ezzz')).html
     assert.match(none, /&lt;script&gt;zzz(&quot;|")? için sonuç yok/)
   } finally {
@@ -594,7 +599,7 @@ test('günlük iş: büyük yığılmada bütün haberler parça parça puanlan�
   await waitFor(async () => /Günlük iş \(elle\):/.test((await get('/admin')).html), 'günlük iş')
   const log = (await get('/admin')).html
   // 700 haber 100'lük parçalarla bir kez puanlanır; eşiği (6,0) geçen 7,8'liklerden günde en fazla 2 yazı
-  assert.match(log, /Günlük iş: 70\d yeni makale puanlandı \(tekrar olan \d+ tanesi atlandı\); \d+ adaydan 2 tanesi seçildi/)
+  assert.match(log, /Günlük iş: 70\d yeni makale puanlandı \(tekrar olan \d+ tanesi atlandı\); \d+ adayın \d+ tanesi eşiği geçti, 2 tanesi seçildi/)
   const shown = selectionCalls.map((b) => (JSON.parse(b).messages[1].content.match(/^\d+\. /gm) || []).length)
   assert.ok(shown.every((n) => n <= 100) && shown.reduce((a, b) => a + b, 0) >= 700, `her haber bir kez gösterildi: ${shown}`)
   assert.match(selectionCalls[0], /Son yazılanlar:\\n- Örnek Makale/, 'son 7 günde yazılanlar tekrar denetimi için gider')

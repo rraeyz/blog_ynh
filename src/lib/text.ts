@@ -191,6 +191,10 @@ export function searchScore(query: string, title: string, text: string): number 
   return score
 }
 
+// Eşleşenler, en iyi eşleşen önce
+export const topMatches = <T,>(items: T[], score: (item: T) => number, take: number) =>
+  items.map((item) => ({ item, score: score(item) })).filter((r) => r.score > 0).sort((a, b) => b.score - a.score).slice(0, take).map((r) => r.item)
+
 // Takvim günleri ("2026-10-28"): saat dilimi kaymasın diye UTC öğlen üzerinden
 export function addDays(date: string, days: number): string {
   const d = new Date(`${date}T12:00:00Z`)

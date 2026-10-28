@@ -29,7 +29,7 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 - Gökyüzü takvimi (`lib/sky.ts`): haftada bir (bülten gününde) önümüzdeki 35 gün araştırılır, `SkyEvent` tablosunda o aralık yenilenir; geçmiş aylar kalır. `/gokyuzu?ay=YYYY-MM` aylık takvim, türler, simgeler ve önem derecesi (`rank`: 3 kaçırma, 2 öne çıkan) `lib/skyKinds.ts`.
 - Haftalık astronomi özeti sitede (`/astronomi-ozeti`, `lib/weekly.ts`): kaydedilmez, pazartesi–pazar haftası için veriden kurulur; e-postadaki özet o haftanın sayfasına bağlanır.
 - Haber puanları (`writer.ts`, `text.ts`): ön puan (başlık + tarih + `cleanSummary` ile temizlenmiş özetin 500 karakteri, yalnızca seçim) ve önem puanı (yazarken tam metinden, öne çıkarma ≥ 8,0) aynı dört ölçütle (yenilik, etki, kanıt, anlam; 1-5) verilir, toplamı kod hesaplar (`weightedScore`). Mutlak: haberler birbirine göre puanlanmaz. Onda bir tam sayı saklanır (74 = 7,4; `formatScore`). Her haber bir kez puanlanır (`score` 0 = puansız), ön puan satır satır (`parseScores`); seçim kodda (`pickDaily`: eşik, en az/en fazla, istisna, uzay sınırları). Tekrarlar: son 7 günde yazılanların başlıkları modele gider.
-- Arama (`/ara`): yayımlananlar bellekte taranır (`searchScore`); büyürse FTS5.
+- Arama (`/ara`): yayımlananlar bellekte taranır (`searchScore`); büyürse FTS5. Üstteki kutu (`SearchBox`) yazdıkça `/api/ara`dan öneri gösterir, Enter `/ara?q=`ye gider.
 - Ayarlar sekmeli; `saveSettingsAction` yalnızca `SETTINGS_SECTIONS[section]` alanlarını yazar. Yeni ayar: şema + bölüm listesi + `parse` + `backup.ts` FIELDS.
 
 ## Yapılacaklar (kullanıcı onayladı, sonraya)
