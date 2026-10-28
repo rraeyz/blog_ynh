@@ -38,7 +38,8 @@ model Settings {
   imageApiKey       String   @default("") // OpenRouter: kaynağın serbest görseli olmayan yazılara temsili kapak (boşsa üretilmez)
   imageModel        String   @default("black-forest-labs/flux-3-image-klein")
   // Eğitim bölümü: dersler OpenRouter'da (yukarıdaki anahtar) web aramasıyla araştırılarak yazılır
-  lessonModel       String   @default("anthropic/claude-sonnet-5.5")
+  lessonModel       String   @default("anthropic/claude-sonnet-5.5") // dersi yazan model (okurun gördüğü metin)
+  lessonHelperModel String   @default("anthropic/claude-haiku-5.5") // araştırma, plan, denetim, gökyüzü: ucuz model
   lessonWeekdays    String   @default("1,3,5") // Ders yazılan günler (0 = pazar); boşsa ders yazılmaz
   lessonAutoPublish Boolean  @default(true) // denetimden temiz geçen ders kendiliğinden yayımlanır; sorun bulunursa taslak bekler
   updatedAt         DateTime @updatedAt

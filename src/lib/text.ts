@@ -105,16 +105,20 @@ export const unlink = (body: string, dead: Set<string>) =>
 export type SkyEvent = { date: string; time: string; kind: SkyKind; rank: number; title: string; detail: string }
 
 // Gökyüzü takvimi yanıtı: yalnızca istenen aralıktaki, tarihi geçerli olaylar; tarih ve saate göre sıralı
+// Biçim satır satır: "TARİH | SAAT | TÜR | ÖNEM | BAŞLIK | AÇIKLAMA". JSON değil: açıklamadaki bir tırnak bütün yanıtı bozuyordu;
+// burada bozuk satır yalnızca kendisi düşer
 export function parseSkyEvents(text: string, from: string, to: string): SkyEvent[] {
-  const data = extractJson(text) as { events?: Array<Record<string, unknown>> }
-  return (Array.isArray(data.events) ? data.events : [])
-    .map((e) => ({
-      date: String(e.date ?? ''),
-      time: /^\d{2}:\d{2}$/.test(String(e.time ?? '')) ? String(e.time) : '',
-      kind: skyKind(e.kind),
-      rank: skyRank(skyKind(e.kind), e.important),
-      title: String(e.title ?? '').trim().slice(0, 150),
-      detail: String(e.detail ?? '').trim().slice(0, 800),
+  return text
+    .split('\n')
+    .map((line) => line.replace(/^[\s\-*•]+/, '').split('|').map((part) => part.trim()))
+    .filter((parts) => parts.length >= 5)
+    .map(([date, time, kind, importance, title, ...detail]) => ({
+      date,
+      time: /^\d{2}:\d{2}$/.test(time) ? time : '',
+      kind: skyKind(kind),
+      rank: skyRank(skyKind(kind), /önemli|evet|true/i.test(importance)),
+      title: title.replace(/^\*+|\*+$/g, '').slice(0, 150),
+      detail: detail.join(' | ').slice(0, 800),
     }))
     .filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date) && e.date >= from && e.date <= to && e.title)
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))

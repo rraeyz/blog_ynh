@@ -20,6 +20,7 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 - Seviyeler (`lib/levels.ts`): her seri konunun en temel noktasından başlar, dersler ilerledikçe yükselir (temel → orta → ileri, düşmez); tek derslik konu ve istekler "kapsamli" (tek derste temelden ileriye). Okur seviyeyi her yerde görür, `/egitim?seviye=` ile süzer.
 - Süreklilik: her ders "Öğretilenler" satırını `covers`'a yazar; serinin sonraki dersi bunları "okurun bildikleri"nde alır. Bilinmeyen araçlar "Ön bilgiler"de öğretilir, denetim anlaşılırlığı da sınar.
 - Sıra (`nextLesson`): önce istekler, sonra aynı anda yürüyen `ACTIVE`=2 seriden son dersi en eski yazılanınki.
+- Modeller: yazım `lessonModel` (Sonnet), araştırma, plan, denetim ve gökyüzü `lessonHelperModel` (Haiku); maliyetin çoğu araştırmanın okuduğu sayfalardan gelir.
 - Ders üç aşama (`writeLesson`): araştırma (OpenRouter `openrouter:web_search`; en az 3 doğrulanmış kaynak şart) → yalnızca notlardan yazım → notlarla karşılaştırmalı denetim (JSON bulgular). Ciddi bulgu yoksa ve `lessonAutoPublish` açıksa yayımlanır, yoksa taslak + `review`. Açılmayan linkler metne döner.
 - Müfredat: `ensureRoadmap` hep en az 2 bölünmemiş seri tutar; azalınca yapay zekâ alan (TRACKS), seviye ve son 30 günün önemli uzay/fizik haberlerine bakarak seri önerir.
 - Formül ($...$, $$...$$) ve `:::cozum` blokları yalnızca derslerde açılır (`renderMarkdown(body, { math: true })`): haberlerde $ para birimi olabilir.

@@ -166,6 +166,8 @@ test('geçici sağlayıcı hatasında yeniden denenir', async () => {
     req.on('end', () => {
       calls++
       if (calls === 1) return res.writeHead(503, { 'Content-Type': 'application/json' }).end('{"error":{"message":"overloaded"}}')
+      // OpenRouter: 200 ama boş metin (sağlayıcı yanıtı kesti)
+      if (calls === 2) return res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"choices":[{"message":{"content":null},"finish_reason":"error","error":{"message":"provider"}}]}')
       res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { content: 'tamam' } }], usage: { prompt_tokens: 1, completion_tokens: 1 } }))
     })
   })
@@ -173,7 +175,7 @@ test('geçici sağlayıcı hatasında yeniden denenir', async () => {
   const settings = { aiProvider: 'custom', aiModel: 'm', aiApiKey: '', aiBaseUrl: `http://127.0.0.1:${(server.address() as { port: number }).port}` } as never
   try {
     assert.equal((await complete(settings, 's', 'u')).text, 'tamam')
-    assert.equal(calls, 2)
+    assert.equal(calls, 3)
   } finally {
     server.close()
   }
@@ -233,10 +235,18 @@ test('ders seviyeleri: plan ve aralık', () => {
 })
 
 test('gökyüzü takvimi ve arama', () => {
-  const text = '{"events": [{"date": "2026-10-30", "time": "21:00", "kind": "yakinlasma", "title": "Ay ve Satürn", "detail": "Güneydoğu"}, {"date": "2026-10-28", "time": "gece", "kind": "uydurma", "important": true, "title": "Orionid", "detail": ""}, {"date": "2026-11-20", "title": "Aralık dışı"}, {"date": "30 Ekim", "title": "Bozuk tarih"}, {"date": "2026-10-29", "title": ""}]}'
+  const text = [
+    'İşte takvim:',
+    '2026-10-30 | 21:00 | yakinlasma | - | Ay ve Satürn | Güneydoğu; "parlak" | dürbün',
+    '- 2026-10-28 | gece | uydurma | önemli | **Orionid** |',
+    '2026-11-20 | - | meteor | - | Aralık dışı | x',
+    '30 Ekim | - | meteor | - | Bozuk tarih | x',
+    '2026-10-29 | - | meteor | - |  | başlıksız',
+    'bozuk satır',
+  ].join('\n')
   assert.deepEqual(parseSkyEvents(text, '2026-10-27', '2026-11-02'), [
     { date: '2026-10-28', time: '', kind: 'diger', rank: 2, title: 'Orionid', detail: '' },
-    { date: '2026-10-30', time: '21:00', kind: 'yakinlasma', rank: 1, title: 'Ay ve Satürn', detail: 'Güneydoğu' },
+    { date: '2026-10-30', time: '21:00', kind: 'yakinlasma', rank: 1, title: 'Ay ve Satürn', detail: 'Güneydoğu; "parlak" | dürbün' },
   ])
   assert.equal(mondayOf('2026-10-28'), '2026-10-26', 'çarşambanın pazartesisi')
   assert.equal(mondayOf('2026-11-01'), '2026-10-26', 'pazar haftanın son günü')

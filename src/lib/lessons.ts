@@ -45,15 +45,17 @@ const LOOKAHEAD = 2 // müfredatta bekleyen (henüz derslere bölünmemiş) en a
 const ACTIVE = 2 // aynı anda yürüyen seri: uzun seriler bitene kadar öteki alanlar aylarca beklemesin
 const LONG = 15 * 60_000 // uzman seviyesinde uzun ders yazımı dakikalar sürer
 
-// Dersler OpenRouter'da (Ayarlar → Yapay zekâ'daki anahtar) yazılır: web araması orada
-export function lessonSettings(settings: Settings): Settings {
+// Dersler OpenRouter'da (Ayarlar → Yapay zekâ'daki anahtar) yazılır: web araması orada. Maliyetin çoğu araştırmanın okuduğu sayfalardan
+// gelir; bu yüzden araştırma, plan, denetim ve gökyüzü ucuz "yardımcı" modelle, yalnızca okurun gördüğü yazım ders modeliyle yapılır
+export function lessonSettings(settings: Settings, role: 'yazim' | 'yardimci' = 'yardimci'): Settings {
   if (!settings.imageApiKey.trim()) throw new Error('Dersler OpenRouter anahtarını kullanır: Ayarlar → Yapay zekâ bölümüne gir')
-  return { ...settings, aiProvider: 'openrouter', aiModel: settings.lessonModel.trim() || 'anthropic/claude-sonnet-5.5', aiApiKey: settings.imageApiKey, aiBaseUrl: '' }
+  const model = role === 'yazim' ? settings.lessonModel.trim() || 'anthropic/claude-sonnet-5.5' : settings.lessonHelperModel.trim() || 'anthropic/claude-haiku-5.5'
+  return { ...settings, aiProvider: 'openrouter', aiModel: model, aiApiKey: settings.imageApiKey, aiBaseUrl: '' }
 }
-const webSearch = (maxUses: number) => ({ tools: [{ type: 'openrouter:web_search', parameters: { max_uses: maxUses, max_total_results: 50 } }] })
+const webSearch = (maxUses: number) => ({ tools: [{ type: 'openrouter:web_search', parameters: { max_uses: maxUses, max_total_results: 30 } }] })
 
-async function ask(settings: Settings, system: string, user: string, extra: Record<string, unknown>, timeoutMs?: number) {
-  const result = await complete(lessonSettings(settings), system, user, extra, timeoutMs)
+async function ask(settings: Settings, system: string, user: string, extra: Record<string, unknown>, timeoutMs?: number, role: 'yazim' | 'yardimci' = 'yardimci') {
+  const result = await complete(lessonSettings(settings, role), system, user, extra, timeoutMs)
   await addUsage(result.inputTokens, result.outputTokens)
   return result
 }
@@ -320,6 +322,7 @@ export async function writeLesson(lessonId: number, settings: Settings) {
       `${context}\n\nARAŞTIRMA NOTLARI:\n${research.text}\n\nKAYNAKLAR (linkler yalnızca bunlardan):\n${sourceList}\n\nÖNKOŞUL İÇİN DERS LİSTESİ:\n${catalog.map((l, i) => `${i + 1}. ${l.title} (${l.series.title})`).join('\n') || '-'}`,
       { max_tokens: 32_000 },
       LONG,
+      'yazim',
     )
     const parsed = parseLesson(written.text)
     if (!parsed) throw new Error('Ders beklenen biçimde yazılmadı')
