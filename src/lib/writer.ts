@@ -82,15 +82,23 @@ export class LowScore extends Error {}
 
 // Bir makaleden yazı üretir; ayara göre taslak ya da yayımlanmış olarak kaydeder.
 // replacePostId verilirse o yazının metni yeniden yazılır (adresi ve yayın durumu aynı kalır).
-// Önce tam metin ön puanla aynı istemle puanlanır (yazının önem puanı); floor'un altındaysa yazılmaz (LowScore)
-export async function writePost(paperId: number, settings: Settings, publish = settings.autoPublish, replacePostId?: number, floor = 0) {
+// Önce tam metin ön puanla aynı istemle puanlanır (yazının önem puanı). Günlük iş floor verir: puanı floor'un altındaysa
+// ya da son 7 günde yazılan bir haberle aynı gelişmeyse yazılmaz (LowScore). Elle yazımda (floor yok) bu denetim yok
+export async function writePost(paperId: number, settings: Settings, publish = settings.autoPublish, replacePostId?: number, floor?: number) {
   const paper = await prisma.paper.findUniqueOrThrow({ where: { id: paperId } })
   try {
     const text = await paperText(paper, settings.readMode, settings.maxInputChars)
-    let importance = await fullTextScore(paper, text, settings)
+    // Tekrar: 100'lük gruplarla verilen ön puan yalnızca kendi grubundaki tekrarı görür; yazmadan önce o gün yazılanlar dahil bakılır
+    const checked = await fullTextScore(paper, text, settings, floor === undefined ? [] : await recentTitles())
+    let importance = checked.score
+    if (floor !== undefined && checked.repeat) {
+      await prisma.paper.update({ where: { id: paper.id }, data: { status: 'skipped', error: 'Son 7 günde yazılan bir haberle aynı gelişme: yazılmadı' } })
+      throw new LowScore(`son 7 günde yazılan bir haberle aynı gelişme (ön puan ${formatScore(paper.score)})`)
+    }
     // Çıtanın altındaysa bir kez daha puanlanır, ortalaması alınır: tek bir sapan puan iyi haberi elemesin
     // (gerçek denemede aynı metin bir kez 5,3, bir kez 7,1 aldı)
-    if (importance < floor) importance = Math.round((importance + (await fullTextScore(paper, text, settings))) / 2)
+    floor ??= 0
+    if (importance < floor) importance = Math.round((importance + (await fullTextScore(paper, text, settings)).score) / 2)
     if (importance < floor) {
       await prisma.paper.update({ where: { id: paper.id }, data: { status: 'skipped', error: `Tam metin puanı ${formatScore(importance)}, çıta ${formatScore(floor)}: yazılmadı` } })
       throw new LowScore(`tam metin puanı ${formatScore(importance)} (ön puan ${formatScore(paper.score)})`)
@@ -152,22 +160,29 @@ const today = () => new Date().toISOString().slice(0, 10)
 const scoreOf = (c: Criteria, publishedAt: Date) =>
   weightedScore({ ...c, yenilik: Date.now() - publishedAt.getTime() > OLD_NEWS_DAYS * 86_400_000 ? Math.min(2, c.yenilik) : c.yenilik })
 
+const recentList = (titles: string[]) => (titles.length ? `Son yazılanlar:\n${titles.map((title) => `- ${title}`).join('\n')}\n\n` : '')
+
+// Son 7 günde yazılanlar (kaynak başlığıyla: beslemedeki başlıklarla aynı dilde)
+async function recentTitles(): Promise<string[]> {
+  const recent = await prisma.post.findMany({ where: { createdAt: { gte: new Date(Date.now() - 7 * 86_400_000) } }, select: { title: true, paper: { select: { title: true } } } })
+  return recent.map((post) => post.paper?.title || post.title)
+}
+
 // Tam metin puanı: ön puanla aynı istem ve ölçek, özet yerine yazarın okuyacağı metin
-async function fullTextScore(paper: { title: string; publishedAt: Date }, text: string, settings: Settings): Promise<number> {
-  const result = await complete(settings, SCORE_PROMPT, `${interestsLine(settings)}Bugün: ${today()}\n\nHaberler:\n1. ${paper.title} (${paper.publishedAt.toISOString().slice(0, 10)})\n   ${text}`, { temperature: 0 })
+async function fullTextScore(paper: { title: string; publishedAt: Date }, text: string, settings: Settings, recent: string[] = []): Promise<{ score: number; repeat: boolean }> {
+  const result = await complete(settings, SCORE_PROMPT, `${interestsLine(settings)}Bugün: ${today()}\n\n${recentList(recent)}Haberler:\n1. ${paper.title} (${paper.publishedAt.toISOString().slice(0, 10)})\n   ${text}`, { temperature: 0 })
   await addUsage(result.inputTokens, result.outputTokens)
   const line = parseScores(result.text, 1)[0]
   if (!line) throw new Error('Tam metin puanı okunamadı')
-  return scoreOf(line.criteria, paper.publishedAt)
+  return { score: scoreOf(line.criteria, paper.publishedAt), repeat: line.repeat === 'written' }
 }
 
 // Ön puan: başlık, tarih ve temizlenmiş özetin ilk 500 karakteri (haber başına ~150 token). Her haber bir kez puanlanır;
 // puan mutlak olduğundan ertesi günlerin seçiminde de geçerli. Tekrarlar (son 7 günde yazılan ya da listede önce geçen) atlanır
-export async function scorePapers(candidates: Candidate[], settings: Settings, recentTitles: string[]): Promise<{ scored: number; repeats: number }> {
+export async function scorePapers(candidates: Candidate[], settings: Settings, recent: string[]): Promise<{ scored: number; repeats: number }> {
   const list = candidates.map((paper, index) => `${index + 1}. ${paper.title} (${paper.publishedAt.toISOString().slice(0, 10)})\n   ${cleanSummary(paper.abstract).slice(0, 500)}`).join('\n')
-  const recent = recentTitles.length ? `Son yazılanlar:\n${recentTitles.map((title) => `- ${title}`).join('\n')}\n\n` : ''
   // temperature 0: aynı haber iki kez puanlanınca fark yarıya iner (gerçek Haiku denemesinde 0,52 → 0,33)
-  const result = await complete(settings, SCORE_PROMPT, `${interestsLine(settings)}Bugün: ${today()}\n\n${recent}Haberler:\n${list}`, { temperature: 0 })
+  const result = await complete(settings, SCORE_PROMPT, `${interestsLine(settings)}Bugün: ${today()}\n\n${recentList(recent)}Haberler:\n${list}`, { temperature: 0 })
   await addUsage(result.inputTokens, result.outputTokens)
   const lines = parseScores(result.text, candidates.length)
   if (lines.length === 0) throw new Error('Puan yanıtında geçerli satır yok')
@@ -203,14 +218,18 @@ export async function writeDaily(settings: Settings): Promise<{ written: number;
   const summary = { written: 0, failed: 0, skipped: expired.count, budget: false }
   if (settings.postsPerDay <= 0) return summary
   if (unscored.length && (await overBudget(settings))) return { ...summary, budget: true }
-  const recent = await prisma.post.findMany({ where: { createdAt: { gte: new Date(Date.now() - 7 * 86_400_000) } }, select: { title: true, paper: { select: { title: true } } } })
-  const recentTitles = recent.map((post) => post.paper?.title || post.title)
+  const recent = await recentTitles()
   let repeats = 0
-  for (let i = 0; i < unscored.length; i += CHUNK) repeats += (await scorePapers(unscored.slice(i, i + CHUNK), settings, recentTitles)).repeats
+  for (let i = 0; i < unscored.length; i += CHUNK) repeats += (await scorePapers(unscored.slice(i, i + CHUNK), settings, recent)).repeats
   // Ön puanı çok düşük olanlar beklemeden atlanır (Bekliyor listesi dolmasın)
   const low = await prisma.paper.updateMany({ where: { status: 'new', score: { gte: 1, lte: MIN_PRESCORE } }, data: { status: 'skipped' } })
   summary.skipped += low.count + repeats
-  const pool = await prisma.paper.findMany({ where: { status: 'new', createdAt: { gte: cutoff }, score: { gt: MIN_PRESCORE } }, select: { id: true, score: true, space: true } })
+  // En yeni önce: puanlar birkaç değerde yığılır (ör. çok sayıda 7,0), eşit puanda yeni haber önce yazılır (pickDaily sırayı korur)
+  const pool = await prisma.paper.findMany({
+    where: { status: 'new', createdAt: { gte: cutoff }, score: { gt: MIN_PRESCORE } },
+    orderBy: { publishedAt: 'desc' },
+    select: { id: true, score: true, space: true },
+  })
   const options = {
     min: settings.postsMinPerDay,
     max: settings.postsPerDay,

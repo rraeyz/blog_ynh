@@ -38,7 +38,7 @@ export async function dailyTask(): Promise<string> {
   if (result.skipped) parts.push(`${result.skipped} makale atlandı (düşük ön puan, tekrar ya da 3 gün seçilmedi)`)
   if (result.budget) parts.push('aylık token sınırına ulaşıldı')
   const cleaned = await cleanupPapers()
-  if (cleaned) parts.push(`${cleaned} eski makale temizlendi`)
+  if (cleaned) parts.push(`${cleaned} eski makale gizlendi`)
   return parts.join(', ')
 }
 

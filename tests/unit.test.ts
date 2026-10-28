@@ -224,6 +224,8 @@ test('günlük seçim: eşik, en az/en fazla, istisna, uzay sınırları', () =>
   assert.equal(scores(pickDaily([...items([90, 80, 70]), ...items([40], true)], { ...o, max: 3 })), '90 80 U40', 'en az 1 uzay: sondaki diğer haberin yerine')
   assert.equal(scores(pickDaily([...items([90, 88, 86]), ...items([40], true)], { ...o, max: 3, exceptional: 85 })), '90 88 86', 'istisna puanlının yerine uzay geçmez')
   assert.equal(scores(pickDaily([...items([90, 80]), ...items([0], true)], o)), '90 80', 'puansız uzay haberi alınmaz')
+  const tied = [70, 70, 70, 70].map((score, n) => ({ score, space: false, n }))
+  assert.deepEqual(pickDaily(tied, { ...o, max: 2 }).map((p) => p.n), [0, 1], 'eşit puanda giriş sırası (en yeni önce) korunur')
 })
 
 test('arama: Türkçe katlama, kelime başı, başlık önde (FTS5)', async () => {

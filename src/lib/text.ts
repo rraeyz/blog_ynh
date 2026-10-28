@@ -98,7 +98,8 @@ export type PickOptions = { min: number; max: number; threshold: number; excepti
 
 // Günlük seçim, puanlar mutlak olduğu için kodda: eşiği geçenler en yüksekten, en fazla max (istisna puanlılar max'ı aşar,
 // en fazla DAILY_HARD_MAX); eşiği geçen azsa en iyilerle min'e tamamlanır. Uzay haberi normalde spaceNormal'a kadar,
-// spaceImportant ve üstü olanlar spaceMax'a kadar. Uzay haberi spaceMin'den azsa en iyi uzay haberleri eklenir ya da sondakinin yerine geçer
+// spaceImportant ve üstü olanlar spaceMax'a kadar. Uzay haberi spaceMin'den azsa en iyi uzay haberleri eklenir ya da sondakinin yerine geçer.
+// Eşit puanda giriş sırası korunur (sort kararlı): çağıran sırayı belirler
 export function pickDaily<T extends { score: number; space: boolean }>(items: T[], o: PickOptions): T[] {
   const sorted = items.filter((item) => item.score > 0).sort((a, b) => b.score - a.score)
   const picked: T[] = []
