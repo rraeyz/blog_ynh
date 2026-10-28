@@ -1,5 +1,6 @@
 // Makale konusu → Türkçe etiket ve renk. Saf fonksiyonlar: tests/unit.test.ts
 // Konu, arXiv'de birincil kategori (cs.AI, astro-ph.GA), beslemelerde sitenin adresidir (nature.com)
+import { foldText } from './text.ts'
 
 const LABELS: Record<string, string> = {
   'cs.AI': 'Yapay Zekâ', 'cs.LG': 'Makine Öğrenmesi', 'cs.CL': 'Dil Modelleri', 'cs.CV': 'Görüntü İşleme',
@@ -17,9 +18,23 @@ export const CATEGORIES: Record<string, { label: string; hue: number; hint: stri
   fizik: { label: 'Fizik', hue: 220, hint: 'parçacık, kuantum, malzeme fiziği, enerji' },
   teknoloji: { label: 'Teknoloji', hue: 188, hint: 'icatlar, mühendislik, donanım, sensörler, elektronik, robotik' },
   'yapay-zeka': { label: 'Yapay Zekâ', hue: 292, hint: 'yapay zekâ, yazılım, bilgisayar bilimi, siber güvenlik' },
-  saglik: { label: 'Sağlık', hue: 330, hint: 'tıp, biyoloji, genetik, sinirbilim' },
+  saglik: { label: 'Sağlık', hue: 330, hint: 'tıp, hastalıklar, ilaç ve tedavi, aşı, beslenme, halk sağlığı' },
+  biyoloji: { label: 'Biyoloji', hue: 100, hint: 'canlılar, hayvan davranışı, bitkiler, evrim, insanın kökeni, genetik, beyin ve sinirbilim' },
   dunya: { label: 'Dünya ve İklim', hue: 168, hint: 'iklim, çevre, yer bilimleri, ekoloji' },
   bilim: { label: 'Bilim', hue: 18, hint: 'kimya, matematik ve diğer her şey' },
+}
+
+// Yazarın döndürdüğü konu: anahtar ya da etiket, büyük-küçük harf ve Türkçe harf farkı gözetmeden ("Yapay zeka" → yapay-zeka);
+// birden çok konu yazdıysa ilki. Tanınmazsa "bilim": yazı konusuz kalmasın
+export function categoryOf(value: unknown): string {
+  const norm = (text: string) => foldText(text).replace(/[-_\s]+/g, ' ').trim()
+  const given = norm(String(value ?? ''))
+  const topics = Object.entries(CATEGORIES).map(([key, c]) => ({ key, names: [norm(key), norm(c.label)] }))
+  const exact = topics.find((t) => t.names.includes(given))
+  if (exact) return exact.key
+  // "fizik, teknoloji" gibi: metinde ilk geçen konu (tam kelime: "astrofizik" fizik sayılmaz)
+  const position = (t: (typeof topics)[number]) => Math.min(...t.names.map((n) => given.search(new RegExp(`\\b${n}\\b`))).filter((i) => i >= 0))
+  return topics.filter((t) => position(t) < Infinity).sort((a, b) => position(a) - position(b))[0]?.key ?? 'bilim'
 }
 
 export function topicLabel(topic: string): string {

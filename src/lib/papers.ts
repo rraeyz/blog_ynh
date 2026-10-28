@@ -96,12 +96,10 @@ export async function fetchSources(): Promise<number> {
 export async function paperText(paper: { externalId: string; abstract: string; url: string }, readMode: string, maxChars: number): Promise<string> {
   if (readMode === 'full') {
     try {
-      if (paper.externalId.startsWith('arxiv:')) {
-        const text = htmlToText(await fetchText(`https://arxiv.org/html/${paper.externalId.slice(6)}`))
-        if (text.length > paper.abstract.length) return text.slice(0, maxChars)
-      } else {
-        return htmlToText(await fetchText(paper.url)).slice(0, maxChars)
-      }
+      const url = paper.externalId.startsWith('arxiv:') ? `https://arxiv.org/html/${paper.externalId.slice(6)}` : paper.url
+      const text = htmlToText(await fetchText(url))
+      // Özetten kısa metin gerçek sayfa değil: arXiv'de HTML sürümü yok ya da sitede bir engel sayfası ("Just a moment...")
+      if (text.length > paper.abstract.length) return text.slice(0, maxChars)
     } catch {
       // HTML sürümü olmayan makale: özetle devam
     }
