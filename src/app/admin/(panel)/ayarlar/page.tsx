@@ -163,7 +163,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: { m
       </nav>
 
       {section !== 'guvenlik' ? (
-        <form action={saveSettingsAction} className="card space-y-5">
+        // key: sekme değişince form yeniden kurulsun; yoksa React aynı sıradaki kutuyu tutar ve önceki sekmenin değeri görünür (Kaydet'le yazılır)
+        <form key={section} action={saveSettingsAction} className="card space-y-5">
           <input type="hidden" name="section" value={section} />
           <Section section={section} s={s} />
           <button className="btn-primary">Kaydet</button>

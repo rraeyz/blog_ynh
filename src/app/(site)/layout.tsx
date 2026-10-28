@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getSettings } from '@/lib/state'
 import { canSubscribe } from '@/lib/newsletter'
 import { activeTopics, TopicLink } from './parts'
+import { HideOn } from './HideOn'
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const [settings, topics] = await Promise.all([getSettings(), activeTopics()])
@@ -26,12 +27,14 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         </div>
       </header>
       {topics.length > 0 && (
-        // Konu sayfaları: yalnızca bir konuyu okumak isteyen için; telefonda yana kayar
-        <nav aria-label="Konular" className="border-b border-zinc-200/70 dark:border-ink-line">
-          <div className="mx-auto max-w-5xl px-4 py-2.5 flex gap-2 overflow-x-auto">
-            {topics.map(([key, c]) => <TopicLink key={key} slug={key} label={c.label} />)}
-          </div>
-        </nav>
+        // Konu sayfaları: yalnızca bir konuyu okumak isteyen için; telefonda yana kayar. Eğitimde haber konuları yok
+        <HideOn prefix="/egitim">
+          <nav aria-label="Konular" className="border-b border-zinc-200/70 dark:border-ink-line">
+            <div className="mx-auto max-w-5xl px-4 py-2.5 flex gap-2 overflow-x-auto">
+              {topics.map(([key, c]) => <TopicLink key={key} slug={key} label={c.label} />)}
+            </div>
+          </nav>
+        </HideOn>
       )}
       <main className="flex-1">{children}</main>
       <footer className="border-t border-zinc-200/70 dark:border-ink-line mt-20">
