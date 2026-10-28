@@ -67,7 +67,8 @@ export function parseScores(text: string, count: number): ScoreLine[] {
   const seen = new Set<number>()
   const lines: ScoreLine[] = []
   for (const line of text.split('\n')) {
-    const parts = line.replace(/^[\s\-*•]+/, '').split('|').map((part) => part.trim().replace(/^\*+|\*+$/g, ''))
+    // Model satırı bazen tablo gibi "| 3 | 4 | … |" yazar: baştaki çizgi ilk alanı boşaltmasın
+    const parts = line.replace(/^[\s\-*•|]+/, '').replace(/\|\s*$/, '').split('|').map((part) => part.trim().replace(/^\*+|\*+$/g, ''))
     if (parts.length < 6) continue
     const index = parseInt(parts[0], 10) - 1
     const [yenilik, etki, kanit, anlam] = parts.slice(1, 5).map((part) => parseInt(part, 10))
@@ -153,7 +154,7 @@ export type SkyEvent = { date: string; time: string; kind: SkyKind; rank: number
 export function parseSkyEvents(text: string, from: string, to: string): SkyEvent[] {
   return text
     .split('\n')
-    .map((line) => line.replace(/^[\s\-*•]+/, '').split('|').map((part) => part.trim()))
+    .map((line) => line.replace(/^[\s\-*•|]+/, '').replace(/\|\s*$/, '').split('|').map((part) => part.trim()))
     .filter((parts) => parts.length >= 5)
     .map(([date, time, kind, importance, title, ...detail]) => ({
       date,
@@ -187,7 +188,7 @@ export const mondayOf = (date: string) => addDays(date, -((new Date(`${date}T12:
 
 // Ders aşamalarının yanıtları da satır satır: JSON'daki tek bir kaçışsız tırnak bütün planı bozuyordu.
 // "|" ile ayrılmış satırlar; liste işaretleri ve ** atılır, biçime uymayan satır yalnızca kendisi düşer
-const fields = (text: string) => text.split('\n').map((line) => line.replace(/^[\s\-*•\d.)]+(?=\S)/, '').split('|').map((part) => part.trim().replace(/^\*+|\*+$/g, '')))
+const fields = (text: string) => text.split('\n').map((line) => line.replace(/^[\s\-*•|\d.)]+(?=\S)/, '').replace(/\|\s*$/, '').split('|').map((part) => part.trim().replace(/^\*+|\*+$/g, '')))
 
 // Ders planı: "SEVİYE | Başlık | Kapsam"
 export function parsePlan(text: string): Array<{ level: string; title: string; scope: string }> {

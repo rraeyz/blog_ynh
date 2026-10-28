@@ -16,10 +16,10 @@ const PROMOTE_BAND = 10 // eşiğin bu kadar altındakilerin (1,0) tam metnine b
 
 // Ön puan (başlık + özetten, seçim için) ve önem puanı (tam metinden, yazarken) aynı ölçütlerle verilir
 const CRITERIA = `Dört ölçüt, her biri 1-5 arası tam sayı:
-- yenilik: 5 alanında bir ilk ya da çığır açan bulgu; 4 yeni ve somut bir sonuç (keşif, icat, ölçüm, yöntem); 3 bilinen bir konuda yeni veri; 2 önceki bir sonuca küçük bir ek ya da eski bir haber; 1 yeni bir sonuç yok (duyuru, tanıtım, röportaj, yorum, etkinlik).
-- etki: 5 alanını ya da çok sayıda insanı doğrudan değiştirecek; 4 alanında önemli bir ilerleme; 3 kendi alt alanında kayda değer; 2 dar bir uzmanlık için; 1 neredeyse yok. Yalnızca kurulan bir düzenek ya da ileride yapılacak bir ölçümün hedefi anlatılıyor, henüz yeni bir ölçüm ya da sonuç yoksa en fazla 3 (ilk kez çalıştırılıp gösterilen yeni bir yöntem ya da gözlem tekniği ise bir sonuçtur).
-- kanit (kanıt gücü): 5 hakemli yayın ve güçlü veri (büyük örnek, doğrudan ölçüm, bağımsız doğrulama), insanlarda faz 3 deneme ya da düzenleyici onay (FDA vb.); 4 hakemli yayın; 3 ön baskı ya da ilk sonuç; 2 tek gözlem, küçük çalışma ya da yalnızca model; 1 kanıtsız iddia ya da yalnızca basın açıklaması.
-- anlam (okur için anlam; okurlar astronomi öğrencileri ve bilime meraklı okurlar): okurun bu haberden ne kazandığı. 5 herkesin konuşacağı ya da dünyaya bakışı değiştiren; 4 önemli bir kavramı, yöntemi ya da bilimin nasıl işlediğini öğreten; 3 alanını izleyen için ilginç, iyi anlatılırsa herkes için; 2 yalnızca o dar alt alanın uzmanına bir şey söyleyen; 1 okura bir şey katmayan (tanıtım, magazin, eğlence).
+- yenilik: 5 alanında bir ilk ya da çığır açan bulgu; 4 yeni ve somut bir sonuç (keşif, icat, ölçüm, yöntem); 3 bilinen bir konuda yeni veri; 2 önceki bir sonuca küçük bir ek ya da eski bir haber; 1 yeni bir sonuç yok (duyuru, tanıtım, röportaj, yorum, etkinlik). Büyük bir tesisin ya da görevin (teleskop, gözlemevi, uzay görevi, hızlandırıcı) onayı, yapım kararı, ilk ışığı ya da fırlatılması bir kilometre taşıdır: en az 4.
+- etki: 5 alanını ya da çok sayıda insanı doğrudan değiştirecek; 4 alanında önemli bir ilerleme; 3 kendi alt alanında kayda değer; 2 dar bir uzmanlık için; 1 neredeyse yok. Yalnızca bir laboratuvar düzeneğinin kurulduğu ya da ileride yapılacak bir ölçümün hedefi anlatılıyor, henüz yeni bir ölçüm ya da sonuç yoksa en fazla 3 (ilk kez çalıştırılıp gösterilen yeni bir yöntem ya da gözlem tekniği ise bir sonuçtur). Büyük bir tesis ya da görev projesinde etki, gerçekleştiğinde alana ve bölgeye katacağına göre verilir.
+- kanit (kanıt gücü): 5 hakemli yayın ve güçlü veri (büyük örnek, doğrudan ölçüm, bağımsız doğrulama), insanlarda faz 3 deneme ya da düzenleyici onay (FDA vb.); 4 hakemli yayın; 3 ön baskı ya da ilk sonuç; 2 tek gözlem, küçük çalışma ya da yalnızca model; 1 kanıtsız iddia ya da yalnızca basın açıklaması. Büyük bir tesis ya da görevde gerçekleşmiş bir karar ya da olay (resmi onay, ayrılan bütçe, fırlatma, ilk ışık) 4; yalnızca öneri, tasarım ya da plan 2.
+- anlam (okur için anlam; okurlar astronomi öğrencileri ve bilime meraklı okurlar): okurun bu haberden ne kazandığı. 5 herkesin konuşacağı ya da dünyaya bakışı değiştiren; 4 önemli bir kavramı, yöntemi ya da bilimin nasıl işlediğini öğreten; 3 alanını izleyen için ilginç, iyi anlatılırsa herkes için; 2 yalnızca o dar alt alanın uzmanına bir şey söyleyen; 1 okura bir şey katmayan (tanıtım, magazin, eğlence). Okur Türkiye'de: Türkiye'deki bilim ve uzay gelişmeleri (gözlemevleri, uzay programı, araştırmalar) en az 4.
 Temel bilimde gerçek bir ilk (yeni bir ötegezegen ya da süpernova, yeni bir parçacık ya da kuantum olgusu, ilk kez yapılan bir ölçüm, yeni bir gözlem tekniği) teknik görünse bile yeni ve etkilidir: okura anlatılabilir.
 Haberi kendi başına, bu sabit ölçeğe göre puanla; başka haberlerle kıyaslama.`
 
@@ -170,11 +170,14 @@ async function recentTitles(): Promise<string[]> {
 
 // Tam metin puanı: ön puanla aynı istem ve ölçek, özet yerine yazarın okuyacağı metin
 async function fullTextScore(paper: { title: string; publishedAt: Date }, text: string, settings: Settings, recent: string[] = []): Promise<{ score: number; repeat: boolean }> {
-  const result = await complete(settings, SCORE_PROMPT, `${interestsLine(settings)}Bugün: ${today()}\n\n${recentList(recent)}Haberler:\n1. ${paper.title} (${paper.publishedAt.toISOString().slice(0, 10)})\n   ${text}`, { temperature: 0 })
-  await addUsage(result.inputTokens, result.outputTokens)
-  const line = parseScores(result.text, 1)[0]
-  if (!line) throw new Error('Tam metin puanı okunamadı')
-  return { score: scoreOf(line.criteria, paper.publishedAt), repeat: line.repeat === 'written' }
+  // Model nadiren bir ölçütü atlıyor ("1 | 1 | 1 | 3 | diğer"): ikinci istek genelde düzgün gelir
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await complete(settings, SCORE_PROMPT, `${interestsLine(settings)}Bugün: ${today()}\n\n${recentList(recent)}Haberler:\n1. ${paper.title} (${paper.publishedAt.toISOString().slice(0, 10)})\n   ${text}`, { temperature: 0 })
+    await addUsage(result.inputTokens, result.outputTokens)
+    const line = parseScores(result.text, 1)[0]
+    if (line) return { score: scoreOf(line.criteria, paper.publishedAt), repeat: line.repeat === 'written' }
+  }
+  throw new Error('Tam metin puanı okunamadı')
 }
 
 // Ön puan: başlık, tarih ve temizlenmiş özetin ilk 500 karakteri (haber başına ~150 token). Her haber bir kez puanlanır;
