@@ -3,7 +3,7 @@ import { complete } from '@/lib/ai'
 import { paperText } from '@/lib/papers'
 import { cleanSummary, extractJson, formatScore, parseScores, pickDaily, slugify, weightedScore, type Criteria } from '@/lib/text'
 import { addUsage, getState, logJob, overBudget, type Settings } from '@/lib/state'
-import { CATEGORIES } from '@/lib/topics'
+import { CATEGORIES, categoryOf } from '@/lib/topics'
 import { coverIfNeeded } from '@/lib/images'
 
 // Puanlar onda bir (30 = 3,0/10). Ön puanı bu ve altı olan haberler puanlanınca hemen atlanır, en az sayıyı tamamlamaya da girmez
@@ -17,8 +17,8 @@ const PROMOTE_BAND = 10 // eşiğin bu kadar altındakilerin (1,0) tam metnine b
 // Ön puan (başlık + özetten, seçim için) ve önem puanı (tam metinden, yazarken) aynı ölçütlerle verilir
 const CRITERIA = `Dört ölçüt, her biri 1-5 arası tam sayı:
 - yenilik: 5 alanında bir ilk ya da çığır açan bulgu; 4 yeni ve somut bir sonuç (keşif, icat, ölçüm, yöntem); 3 bilinen bir konuda yeni veri; 2 önceki bir sonuca küçük bir ek ya da eski bir haber; 1 yeni bir sonuç yok (duyuru, tanıtım, röportaj, yorum, etkinlik).
-- etki: 5 alanını ya da çok sayıda insanı doğrudan değiştirecek; 4 alanında önemli bir ilerleme; 3 kendi alt alanında kayda değer; 2 dar bir uzmanlık için; 1 neredeyse yok.
-- kanit (kanıt gücü): 5 hakemli yayın ve güçlü veri (büyük örnek, doğrudan ölçüm, bağımsız doğrulama); 4 hakemli yayın; 3 ön baskı ya da ilk sonuç; 2 tek gözlem, küçük çalışma ya da yalnızca model; 1 kanıtsız iddia ya da yalnızca basın açıklaması.
+- etki: 5 alanını ya da çok sayıda insanı doğrudan değiştirecek; 4 alanında önemli bir ilerleme; 3 kendi alt alanında kayda değer; 2 dar bir uzmanlık için; 1 neredeyse yok. Yalnızca kurulan bir düzenek ya da ileride yapılacak bir ölçümün hedefi anlatılıyor, henüz yeni bir ölçüm ya da sonuç yoksa en fazla 3 (ilk kez çalıştırılıp gösterilen yeni bir yöntem ya da gözlem tekniği ise bir sonuçtur).
+- kanit (kanıt gücü): 5 hakemli yayın ve güçlü veri (büyük örnek, doğrudan ölçüm, bağımsız doğrulama), insanlarda faz 3 deneme ya da düzenleyici onay (FDA vb.); 4 hakemli yayın; 3 ön baskı ya da ilk sonuç; 2 tek gözlem, küçük çalışma ya da yalnızca model; 1 kanıtsız iddia ya da yalnızca basın açıklaması.
 - anlam (okur için anlam; okurlar astronomi öğrencileri ve bilime meraklı okurlar): okurun bu haberden ne kazandığı. 5 herkesin konuşacağı ya da dünyaya bakışı değiştiren; 4 önemli bir kavramı, yöntemi ya da bilimin nasıl işlediğini öğreten; 3 alanını izleyen için ilginç, iyi anlatılırsa herkes için; 2 yalnızca o dar alt alanın uzmanına bir şey söyleyen; 1 okura bir şey katmayan (tanıtım, magazin, eğlence).
 Temel bilimde gerçek bir ilk (yeni bir ötegezegen ya da süpernova, yeni bir parçacık ya da kuantum olgusu, ilk kez yapılan bir ölçüm, yeni bir gözlem tekniği) teknik görünse bile yeni ve etkilidir: okura anlatılabilir.
 Haberi kendi başına, bu sabit ölçeğe göre puanla; başka haberlerle kıyaslama.`
@@ -115,7 +115,7 @@ export async function writePost(paperId: number, settings: Settings, publish = s
       excerpt: String(typeof data.brief === 'string' ? data.brief : typeof data.excerpt === 'string' ? data.excerpt : '').trim().slice(0, 500),
       highlights: Array.isArray(data.highlights) ? data.highlights.filter((h): h is string => typeof h === 'string').map((h) => h.trim().replace(/\n/g, ' ')).filter(Boolean).slice(0, 5).join('\n') : '',
       body: data.body.trim(),
-      category: typeof data.category === 'string' && CATEGORIES[data.category] ? data.category : '',
+      category: categoryOf(data.category),
       importance,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,

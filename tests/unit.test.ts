@@ -10,7 +10,7 @@ import { compressImage } from '../src/lib/compress.ts'
 import { complete, RETRY_DELAYS } from '../src/lib/ai.ts'
 import http from 'node:http'
 import sharp from 'sharp'
-import { coverOf, freeImage, periodLabel, readingMinutes, topicHue, topicLabel } from '../src/lib/topics.ts'
+import { categoryOf, coverOf, freeImage, periodLabel, readingMinutes, topicHue, topicLabel } from '../src/lib/topics.ts'
 
 test('konu etiketi, rengi, okuma süresi, dönem', () => {
   assert.equal(topicLabel('cs.AI'), 'Yapay Zekâ')
@@ -226,6 +226,19 @@ test('günlük seçim: eşik, en az/en fazla, istisna, uzay sınırları', () =>
   assert.equal(scores(pickDaily([...items([90, 80]), ...items([0], true)], o)), '90 80', 'puansız uzay haberi alınmaz')
   const tied = [70, 70, 70, 70].map((score, n) => ({ score, space: false, n }))
   assert.deepEqual(pickDaily(tied, { ...o, max: 2 }).map((p) => p.n), [0, 1], 'eşit puanda giriş sırası (en yeni önce) korunur')
+})
+
+test('yazarın konusu tanınır, tanınmazsa Bilim', () => {
+  assert.equal(categoryOf('fizik'), 'fizik')
+  assert.equal(categoryOf(' Sağlık '), 'saglik')
+  assert.equal(categoryOf('Yapay zeka'), 'yapay-zeka')
+  assert.equal(categoryOf('Dünya ve İklim'), 'dunya')
+  assert.equal(categoryOf('Biyoloji'), 'biyoloji')
+  assert.equal(categoryOf('fizik, teknoloji'), 'fizik', 'birden çoksa ilki')
+  assert.equal(categoryOf('teknoloji / fizik'), 'teknoloji')
+  assert.equal(categoryOf('astrofizik'), 'bilim', 'kelimenin parçası sayılmaz')
+  assert.equal(categoryOf('kuantum'), 'bilim')
+  assert.equal(categoryOf(undefined), 'bilim')
 })
 
 test('arama: Türkçe katlama, kelime başı, başlık önde (FTS5)', async () => {
