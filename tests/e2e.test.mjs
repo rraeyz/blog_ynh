@@ -102,7 +102,12 @@ const fake = http.createServer((req, res) => {
         annotations = [cite(1)]
         const [from] = user.match(/\d{4}-\d{2}-\d{2}/)
         const day = (n) => new Date(Date.parse(from) + n * 86_400_000).toISOString().slice(0, 10)
-        content = JSON.stringify({ events: [{ date: day(2), time: '21:30', kind: 'yakinlasma', title: 'Ay ile Satürn yakınlaşıyor', detail: 'Güneydoğuya bak' }, { date: day(0), time: '', kind: 'meteor', title: 'Orionid <b>tepe</b>', detail: 'Gece yarısından sonra' }, { date: day(1), time: '20:00', kind: 'ay-tutulmasi', title: 'Parçalı Ay tutulması', detail: 'Doğuya bak' }, { date: day(40), title: 'Aralık dışı' }] })
+        content = [
+          `${day(2)} | 21:30 | yakinlasma | - | Ay ile Satürn yakınlaşıyor | Güneydoğuya bak`,
+          `${day(0)} | - | meteor | - | Orionid <b>tepe</b> | Gece yarısından sonra`,
+          `${day(1)} | 20:00 | ay-tutulmasi | - | Parçalı Ay tutulması | Doğuya bak`,
+          `${day(40)} | - | diger | - | Aralık dışı | x`,
+        ].join('\n')
       }
       res.writeHead(200, { 'Content-Type': 'application/json' })
       return res.end(JSON.stringify({ choices: [{ message: { content, annotations } }], usage: { prompt_tokens: 1000, completion_tokens: 500 } }))

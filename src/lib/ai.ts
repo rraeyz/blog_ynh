@@ -62,7 +62,10 @@ export async function complete(settings: Settings, system: string, user: string,
       signal: AbortSignal.timeout(timeoutMs),
     })
     const data = await response.json().catch(() => null)
-    if (!response.ok && RETRY_STATUS.has(response.status) && attempt < RETRY_DELAYS.length) {
+    // OpenRouter bazen 200 ile boş metin döndürür (sağlayıcı yanıtı yarıda kesti): geçicidir, yeniden denenir. Sınır dolduysa denemek boşuna
+    const choice = data?.choices?.[0]
+    const empty = response.ok && typeof choice?.message?.content !== 'string' && choice?.finish_reason !== 'length'
+    if (((!response.ok && RETRY_STATUS.has(response.status)) || empty) && attempt < RETRY_DELAYS.length) {
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS[attempt]))
       continue
     }
@@ -73,7 +76,11 @@ export async function complete(settings: Settings, system: string, user: string,
 function completion(provider: string, response: Response, data: any): Completion {
   if (!response.ok) throw new Error(`${PROVIDERS[provider].label} hata ${response.status}: ${String(data?.error?.message ?? data?.error ?? '').slice(0, 200)}`)
   const text = data?.choices?.[0]?.message?.content
-  if (typeof text !== 'string') throw new Error('Modelden metin yanıtı gelmedi')
+  if (typeof text !== 'string') {
+    const choice = data?.choices?.[0]
+    const reason = choice?.finish_reason === 'length' ? 'yanıt sınırı doldu' : choice?.error?.message ?? choice?.finish_reason ?? 'sebep bildirilmedi'
+    throw new Error(`Modelden metin yanıtı gelmedi (${String(reason).slice(0, 120)})`)
+  }
   const annotations: Array<{ type?: string; url_citation?: { url?: unknown; title?: unknown } }> = data?.choices?.[0]?.message?.annotations ?? []
   const citations = annotations.flatMap((a) =>
     a.type === 'url_citation' && typeof a.url_citation?.url === 'string' ? [{ url: a.url_citation.url, title: String(a.url_citation.title ?? '') }] : [],

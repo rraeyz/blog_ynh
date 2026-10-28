@@ -19,9 +19,11 @@ parlak kuyruklu yıldızlar. Güvenilir kaynak kullan (in-the-sky.org, timeandda
 Yalnızca kaynakla doğruladığın ve Türkiye'den gözlenebilen olayları yaz; aralık dışını yazma. Doğrulayamadığın ayrıntıyı hiç yazma;
 metinde araştırma sürecinden ya da kaynaklardan söz etme. Her olay için nasıl ve nereye bakılacağını 1-3 cümleyle anlat (yön, saat,
 çıplak göz/dürbün/teleskop). Türü şunlardan biri olsun: ${Object.keys(SKY_KINDS).join(', ')}. Olağan türde ama olağanüstü bir olaysa
-(ör. çok yakın kavuşum, süper dolunay, yılın en iyi gezegen görünümü) "important": true yaz.
-Yanıtı yalnızca şu JSON biçiminde ver:
-{"events": [{"date": "YYYY-MM-DD", "time": "SS:DD ya da boş", "kind": "tür", "important": false, "title": "Kısa başlık", "detail": "Nasıl gözlenir"}]}`
+(ör. çok yakın kavuşum, süper dolunay, yılın en iyi gezegen görünümü) ÖNEM alanına "önemli" yaz.
+Yanıtta yalnızca olay satırları olsun, her olay tek satırda, alanlar dik çizgiyle ayrılmış (başlık satırı, liste işareti, JSON yok):
+TARİH | SAAT | TÜR | ÖNEM | BAŞLIK | AÇIKLAMA
+TARİH YYYY-AA-GG; SAAT SS:DD ya da -; ÖNEM "önemli" ya da -; başlık ve açıklamada dik çizgi kullanma. Örnek:
+2026-12-14 | 02:00 | meteor | - | İkizler meteor yağmuru tepe noktası | Gece yarısından sonra doğuya bakın; çıplak göz yeterli.`
 
 export async function skySources(): Promise<{ sources: Array<{ title: string; url: string }>; updatedAt: string } | null> {
   try {
