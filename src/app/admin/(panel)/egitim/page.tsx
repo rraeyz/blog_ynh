@@ -5,11 +5,16 @@ import { seedCurriculum, upcomingStage } from '@/lib/lessons'
 import { requirementsOf, stageDone, TRACKS, type Track } from '@/lib/curriculum'
 import { Notice } from '../../Notice'
 import { ConfirmButton } from '../../ConfirmButton'
+import { Tabs } from '../../Tabs'
 import { addStageAction, approveStageAction, deleteStageAction, requestLessonAction, retryLessonAction, runLessonAction } from '../../actions'
 
 const DAY_NAMES = ['pazar', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi']
 
-export default async function EducationAdminPage({ searchParams }: { searchParams: { mesaj?: string } }) {
+// Sekmeler: bugün yapılacaklar, okurlardan gelenler, müfredat
+const TABS = ['bugun', 'okurlar', 'mufredat'] as const
+
+export default async function EducationAdminPage({ searchParams }: { searchParams: { mesaj?: string; bolum?: string } }) {
+  const tab = TABS.find((key) => key === searchParams.bolum) ?? 'bugun'
   await seedCurriculum()
   const [settings, rows, drafts, failed, proposals, request, upcoming, writtenCount, suggestions, reported] = await Promise.all([
     getSettings(),
@@ -36,18 +41,33 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
   return (
     <>
       <Notice message={searchParams.mesaj} />
-      <h1 className="text-xl font-bold mb-2">Eğitim</h1>
-      <p className="text-sm text-zinc-500 mb-4">
+      <h1 className="text-xl font-bold mb-4">Eğitim</h1>
+      <Tabs
+        path="/admin/egitim"
+        active={tab}
+        tabs={[
+          ['bugun', 'Bugün', drafts.length + failed.length],
+          ['okurlar', 'Okurlardan', suggestions.length + reported.length + proposals.length],
+          ['mufredat', 'Müfredat'],
+        ]}
+      />
+
+      {tab === 'bugun' && (
+        <>
+      <details className="card mb-4 text-sm text-zinc-500">
+        <summary className="cursor-pointer font-medium text-zinc-700 dark:text-zinc-300">Nasıl çalışır?</summary>
+      <p className="mt-2">
         Sıradaki ders {days ? `her ${days}` : 'hiçbir gün (Ayarlar → Eğitim)'} günlük işten sonra üç aşamada hazırlanır: web&apos;de araştırılır (en az 3
         doğrulanmış kaynak yoksa yazılmaz), notlardan yazılır, sonra notlarla karşılaştırılarak denetlenir. Denetim ciddi sorun bulmazsa{' '}
         {settings.lessonAutoPublish ? <b>kendiliğinden yayımlanır</b> : <>burada <b>taslak</b> olarak bekler</>}; bulursa bulgularıyla taslak kalır.
       </p>
-      <p className="text-sm text-zinc-500 mb-4">
+      <p className="mt-2">
         Önce istekler yazılır, sonra hatlar sırayla: <b>Uygulama</b> ilk turunda her iki dersten biri, sonra her dört dersten biri; kalan dersler
         Astronomi → Temel bilim → Astronomi → Temel bilim → Kavram döner. Her hat bloklarını sırayla işler; blok sırası gelince araştırılıp derslere
         bölünür. Önkoşulu bitmemiş blok bekler, önce onu bekleten blok yazılır. Haftada bir, önemli haberlerde geçen ama listede olmayan kavramlar
         aşağıda önerilir; onaylamadan yazılmaz.
       </p>
+      </details>
       <div className="card mb-6 text-sm space-y-1">
         <p><b>Sıradaki:</b> {request ? <>istek · {request.title}</> : upcoming ? <>{TRACKS[upcoming.track as Track] ?? upcoming.track} · {upcoming.title}</> : 'yazılacak ders yok'}</p>
         <p><b>Yazım:</b> {settings.lessonModel} · <b>Yardımcı:</b> {settings.lessonHelperModel} · <b>OpenRouter anahtarı:</b> {settings.imageApiKey ? 'girilmiş' : 'yok (Ayarlar → Yapay zekâ)'}</p>
@@ -88,6 +108,12 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
         </section>
       )}
 
+        </>
+      )}
+
+      {tab === 'okurlar' && (
+        <>
+          {proposals.length + reported.length + suggestions.length === 0 && <p className="text-sm text-zinc-500">Okurlardan bekleyen bir şey yok. Okur önerileri, hata bildirimleri ve haberlerden önerilen kavramlar burada görünür.</p>}
       {proposals.length > 0 && (
         <section className="mb-8">
           <h2 className="font-semibold mb-2">Haberlerden önerilen kavramlar</h2>
@@ -131,6 +157,10 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
         </section>
       )}
 
+        </>
+      )}
+
+      {tab === 'bugun' && (
       <section className="mb-8">
         <h2 className="font-semibold mb-2">Ders iste</h2>
         <form action={requestLessonAction} className="card space-y-3">
@@ -141,9 +171,11 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
           <p className="hint">İstekler müfredattan önce yazılır.</p>
         </form>
       </section>
+      )}
 
+      {tab === 'mufredat' && (
       <section>
-        <h2 className="font-semibold mb-2">Müfredat</h2>
+        <h2 className="sr-only">Müfredat</h2>
         <div className="space-y-3">
           {(Object.keys(TRACKS) as Track[]).map((track) => {
             const list = stages.filter((s) => s.track === track)
@@ -188,6 +220,7 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
           <p className="hint">Var olan bir serinin adını yazarsan blok o seriye eklenir. Kavramda aşama yok sayılır.</p>
         </form>
       </section>
+      )}
     </>
   )
 }

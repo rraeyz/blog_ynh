@@ -15,7 +15,7 @@ export default async function StageAdminPage({ params, searchParams }: { params:
   return (
     <>
       <Notice message={searchParams.mesaj} />
-      <p className="text-sm mb-2"><Link href="/admin/egitim" className="hover:underline">← Eğitim</Link> · <Link href={`/admin/egitim/seri/${stage.seriesId}`} className="hover:underline">{stage.series.title}</Link></p>
+      <p className="text-sm mb-2"><Link href="/admin/egitim?bolum=mufredat" className="hover:underline">← Müfredat</Link> · <Link href={`/admin/egitim/seri/${stage.seriesId}`} className="hover:underline">{stage.series.title}</Link></p>
       <h1 className="text-xl font-bold">{stage.title}</h1>
       <p className="text-sm text-zinc-500 mb-4">
         {TRACKS[stage.track as Track] ?? stage.track} · {isLevel(stage.level) ? LEVELS[stage.level].label : stage.level} · anahtar <code>{stage.key}</code>
