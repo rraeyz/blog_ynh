@@ -5,6 +5,7 @@ import { topicHue } from '@/lib/topics'
 import { isLevel, levelRange, LEVELS } from '@/lib/levels'
 import { TRACK_HINTS, TRACKS, type Track } from '@/lib/curriculum'
 import { LevelBadge } from '../parts'
+import { SuggestForm } from './SuggestForm'
 
 export const metadata: Metadata = {
   title: 'Eğitim',
@@ -142,6 +143,12 @@ export default async function EducationPage({ searchParams }: { searchParams: { 
           )}
         </>
       )}
+
+      <section id="oner" className="mt-14 mb-6 max-w-2xl scroll-mt-24 rounded-3xl border border-zinc-200 dark:border-ink-line bg-white dark:bg-ink-card p-6 md:p-8">
+        <h2 className="text-xl font-semibold">Ders öner</h2>
+        <p className="mt-1 mb-4 text-sm text-zinc-500">Öğrenmek istediğin bir konu mu var? Yaz; değerlendirip müfredata uygunsa ekleyelim.</p>
+        <SuggestForm />
+      </section>
     </div>
   )
 }
