@@ -19,7 +19,8 @@ const FIELDS = {
   posts: ['id', 'slug', 'title', 'excerpt', 'highlights', 'category', 'importance', 'image', 'featuredAt', 'body', 'status', 'publishedAt', 'paperId', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
   digests: ['id', 'createdAt', 'subject', 'body', 'status', 'sentAt', 'result'],
   series: ['id', 'slug', 'title', 'summary', 'track', 'level', 'position', 'planned', 'createdAt'],
-  lessons: ['id', 'seriesId', 'position', 'slug', 'title', 'scope', 'sourceUrls', 'excerpt', 'body', 'sources', 'research', 'review', 'prerequisites', 'level', 'covers', 'status', 'error', 'publishedAt', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
+  stages: ['id', 'key', 'seriesId', 'track', 'level', 'title', 'summary', 'position', 'requires', 'approved', 'planned', 'createdAt'],
+  lessons: ['id', 'seriesId', 'stageId', 'position', 'slug', 'title', 'scope', 'sourceUrls', 'excerpt', 'body', 'sources', 'research', 'review', 'prerequisites', 'level', 'covers', 'status', 'error', 'publishedAt', 'writtenAt', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
   skyEvents: ['date', 'time', 'kind', 'rank', 'title', 'detail', 'createdAt'],
 } as const
 
@@ -34,13 +35,14 @@ const rows = (value: unknown, fields: readonly string[]) => {
 }
 
 export async function createBackup() {
-  const [settings, sources, papers, posts, digests, series, lessons, skyEvents] = await Promise.all([
+  const [settings, sources, papers, posts, digests, series, stages, lessons, skyEvents] = await Promise.all([
     prisma.settings.findUnique({ where: { id: 1 } }),
     prisma.source.findMany({ orderBy: { id: 'asc' } }),
     prisma.paper.findMany({ orderBy: { id: 'asc' } }),
     prisma.post.findMany({ orderBy: { id: 'asc' } }),
     prisma.digest.findMany({ orderBy: { id: 'asc' } }),
     prisma.series.findMany({ orderBy: { id: 'asc' } }),
+    prisma.stage.findMany({ orderBy: { id: 'asc' } }),
     prisma.lesson.findMany({ orderBy: { id: 'asc' } }),
     prisma.skyEvent.findMany({ orderBy: { date: 'asc' }, select: { date: true, time: true, kind: true, rank: true, title: true, detail: true, createdAt: true } }),
   ])
@@ -60,6 +62,7 @@ export async function createBackup() {
     posts,
     digests,
     series,
+    stages,
     lessons,
     skyEvents,
     images,
@@ -81,6 +84,7 @@ export async function restoreBackup(data: unknown) {
   const digests = rows(backup.digests, FIELDS.digests)
   // Eğitim bölümünden önceki yedeklerde bu alanlar yok
   const series = rows(backup.series ?? [], FIELDS.series)
+  const stages = rows(backup.stages ?? [], FIELDS.stages)
   const lessons = rows(backup.lessons ?? [], FIELDS.lessons)
   const skyEvents = rows(backup.skyEvents ?? [], FIELDS.skyEvents)
   // Dosya adı denetlenir: yedekten gelen ad klasör dışına yazamasın
@@ -91,7 +95,7 @@ export async function restoreBackup(data: unknown) {
   // Hepsi ya da hiçbiri: hata olursa veritabanı değişmeden kalır
   await prisma.$transaction(async (tx) => {
     await tx.post.deleteMany()
-    await tx.series.deleteMany() // dersler seriyle birlikte silinir
+    await tx.series.deleteMany() // bloklar ve dersler seriyle birlikte silinir
     await tx.digest.deleteMany()
     await tx.skyEvent.deleteMany()
     await tx.paper.deleteMany()
@@ -103,6 +107,7 @@ export async function restoreBackup(data: unknown) {
     if (posts.length) await tx.post.createMany({ data: posts as never })
     if (digests.length) await tx.digest.createMany({ data: digests as never })
     if (series.length) await tx.series.createMany({ data: series as never })
+    if (stages.length) await tx.stage.createMany({ data: stages as never })
     if (lessons.length) await tx.lesson.createMany({ data: lessons as never })
     if (skyEvents.length) await tx.skyEvent.createMany({ data: skyEvents as never })
     await tx.appState.upsert({ where: { key: SCORES_TENTHS }, update: {}, create: { key: SCORES_TENTHS, value: '1' } })

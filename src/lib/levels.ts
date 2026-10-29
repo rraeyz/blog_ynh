@@ -1,9 +1,9 @@
-// Ders seviyeleri. Her seri konunun en temel noktasından başlar, dersler ilerledikçe seviye yükselir;
-// tek derslik konu kendi içinde temelden uzmanlığa gider ("kapsamli"). Okur seviyeyi görüp dersini seçer
+// Ders seviyeleri, matematikle tanımlı: okur hangi dersi okuyabileceğini buradan anlar.
+// Her serinin aşamaları temel → orta → ileri; tek derslik konu (kavram, istek) kendi içinde temelden ileriye gider ("kapsamli")
 export const LEVELS = {
-  temel: { label: 'Temel', hint: 'Konuya giriş: kavramlar ve sezgi; lise matematiği yeter' },
-  orta: { label: 'Orta', hint: 'Yöntemin matematiği ve uygulaması; serinin önceki dersleri bilinir' },
-  ileri: { label: 'İleri', hint: 'Uzman seviyesi: tam türetmeler, gerçek veri, araştırmada kullanım' },
+  temel: { label: 'Temel', hint: 'Lise matematiği yeter; türev ve integral yok' },
+  orta: { label: 'Orta', hint: 'Türev, integral, vektörler, basit diferansiyel denklemler' },
+  ileri: { label: 'İleri', hint: 'Fourier dönüşümü, kısmi türevli denklemler, kuantum, istatistiksel çıkarım' },
   kapsamli: { label: 'Temelden ileriye', hint: 'Tek derste baştan uzman seviyesine' },
 } as const
 
@@ -11,16 +11,6 @@ export type Level = keyof typeof LEVELS
 export const isLevel = (value: unknown): value is Level => typeof value === 'string' && Object.hasOwn(LEVELS, value)
 
 const ORDER: Level[] = ['temel', 'orta', 'ileri']
-
-// Planlanan derslerin seviyeleri: tek ders "kapsamli"; seride seviye sırayla düşmez, bilinmeyen değer öncekini sürdürür
-export function planLevels(raw: unknown[]): Level[] {
-  if (raw.length === 1) return ['kapsamli']
-  let floor = 0
-  return raw.map((value) => {
-    floor = Math.max(floor, ORDER.indexOf(value as Level))
-    return ORDER[floor]
-  })
-}
 
 // Serinin seviye aralığı ("Temel → İleri"); seviyesi olmayan seri için boş
 export function levelRange(levels: string[]): string {

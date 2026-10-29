@@ -108,24 +108,47 @@ model Post {
   @@index([status, publishedAt])
 }
 
-// Eğitim bölümü (/egitim): müfredattaki seriler ve sıralı dersleri
+// Eğitim bölümü (/egitim): müfredat lib/curriculum.ts'te; seriler, aşamaları (bloklar) ve sıralı dersleri
 model Series {
   id        Int      @id @default(autoincrement())
-  slug      String   @unique
+  slug      String   @unique // katalog serilerinde kalıcı katalog anahtarı
   title     String
-  summary   String   @default("") // Serinin kapsamı; ders planı buna göre çıkarılır
-  track     String   @default("") // Alan (Gözlem teknikleri, Yıldız astrofiziği...): yeni seri önerirken denge için
-  level     String   @default("") // Giriş seviyesi (temel | orta | ileri); dersler buradan yükselir
-  position  Int      @default(0) // Müfredattaki sıra (küçük önce; "Tek dersler" -1)
-  planned   Boolean  @default(false) // Ders listesi çıkarıldı mı
+  summary   String   @default("") // Serinin kapsamı
+  track     String   @default("") // Hat: uygulama | astronomi | temel | kavram ("" istekler)
+  level     String   @default("") // Eski müfredattan kaldı; kullanılmıyor
+  position  Int      @default(0) // Sayfadaki sıra (küçük önce; "Tek dersler" -1)
+  planned   Boolean  @default(false) // Eski müfredattan kaldı; kullanılmıyor
   createdAt DateTime @default(now())
   lessons   Lesson[]
+  stages    Stage[]
+}
+
+// Müfredat bloğu: bir serinin bir aşaması (ya da tek kavram dersi). Hattında sırası gelince derslere bölünür
+model Stage {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique // kalıcı katalog anahtarı: "fotometri/orta", "kavram/nyquist"; derslerdeki [[anahtar]] bağlantıları buna
+  seriesId  Int
+  series    Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  track     String // uygulama | astronomi | temel | kavram
+  level     String // temel | orta | ileri | kapsamli
+  title     String
+  summary   String   @default("") // Önerilen dersler ve kapsam: ders listesi buna göre çıkarılır
+  position  Int      @default(0) // Hattaki sıra (küçük önce)
+  requires  String   @default("") // Önce bitmesi gereken blokların anahtarları (virgüllü)
+  approved  Boolean  @default(true) // Haberlerden önerilen kavram, onaylanana kadar sıraya girmez
+  planned   Boolean  @default(false) // Derslere bölündü mü
+  createdAt DateTime @default(now())
+  lessons   Lesson[]
+
+  @@index([track, position])
 }
 
 model Lesson {
   id           Int       @id @default(autoincrement())
   seriesId     Int
   series       Series    @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  stageId      Int? // Müfredat bloğu (istenen derslerde yok)
+  stage        Stage?    @relation(fields: [stageId], references: [id], onDelete: SetNull)
   position     Int       @default(0) // Seri içindeki sıra
   slug         String    @unique
   title        String
@@ -142,6 +165,7 @@ model Lesson {
   status       String    @default("planned") // planned | draft | published | failed
   error        String    @default("")
   publishedAt  DateTime?
+  writtenAt    DateTime? // Yazıldığı an: hatların dönüşümü buna göre (lib/curriculum.ts nextTracks)
   inputTokens  Int       @default(0)
   outputTokens Int       @default(0)
   createdAt    DateTime  @default(now())

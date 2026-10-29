@@ -14,7 +14,8 @@ import { coverMissing, generateCover, removeImage } from '@/lib/images'
 import { createWeeklyDigest, digestBody, sendDigest } from '@/lib/newsletter'
 import { CATEGORIES } from '@/lib/topics'
 import { isLevel } from '@/lib/levels'
-import { addLesson, addSeries, lessonTask, planSeries, requestLesson, seedStarterSeries, writeLesson } from '@/lib/lessons'
+import { addLesson, addStage, lessonTask, planStage, requestLesson, writeLesson } from '@/lib/lessons'
+import { catalogStages, isTrack } from '@/lib/curriculum'
 import { astroDigestTask, dailyTask, isJobRunning, runExclusive, weeklyTask } from '@/lib/jobs'
 import { skyTask } from '@/lib/sky'
 import { PROVIDERS } from '@/lib/ai'
@@ -407,6 +408,7 @@ export async function runSkyAction() {
 
 const lessonPath = (lessonId: number) => `/admin/egitim/ders/${lessonId}`
 const seriesPath = (seriesId: number) => `/admin/egitim/seri/${seriesId}`
+const stagePath = (stageId: number) => `/admin/egitim/blok/${stageId}`
 const sourceList = (value: string) => value.split('\n').map((l) => l.trim()).filter((l) => /^https?:\/\/\S+$/.test(l)).slice(0, 5).join('\n')
 
 export async function runLessonAction() {
@@ -416,27 +418,12 @@ export async function runLessonAction() {
   inBackground('/admin/egitim', 'Ders', () => lessonTask(settings), 'Sıradaki ders araştırılıp yazılıyor; birkaç dakika sürer (sonuç Genel → İş günlüğünde)')
 }
 
-export async function seedSeriesAction() {
-  await requireAdmin()
-  if ((await prisma.series.count()) > 0) back('/admin/egitim', 'Müfredat zaten var')
-  await seedStarterSeries()
-  back('/admin/egitim', 'Başlangıç müfredatı eklendi')
-}
-
 export async function requestLessonAction(form: FormData) {
   await requireAdmin()
   const title = text(form, 'title').slice(0, 200)
   if (!title) back('/admin/egitim', 'Ders başlığı gir')
   await requestLesson(title, text(form, 'scope').slice(0, 1000), sourceList(text(form, 'sourceUrls')))
   back('/admin/egitim', 'İstek sıranın en önüne eklendi')
-}
-
-export async function addSeriesAction(form: FormData) {
-  await requireAdmin()
-  const title = text(form, 'title').slice(0, 200)
-  if (!title) back('/admin/egitim', 'Seri adı gir')
-  const series = await addSeries(title, text(form, 'summary').slice(0, 1000))
-  back(seriesPath(series.id), 'Seri eklendi; ders listesi sırası gelince çıkarılır (ya da şimdi çıkar)')
 }
 
 export async function saveSeriesAction(form: FormData) {
@@ -454,23 +441,69 @@ export async function deleteSeriesAction(form: FormData) {
   back('/admin/egitim', 'Seri ve dersleri silindi')
 }
 
-export async function planSeriesAction(form: FormData) {
-  await requireAdmin()
-  const seriesId = id(form)
-  if (await prisma.lesson.count({ where: { seriesId } })) back(seriesPath(seriesId), 'Bu serinin dersleri zaten var')
-  const settings = await getSettings()
-  inBackground(seriesPath(seriesId), 'Seri planı', async () => `${await planSeries(seriesId, settings)} ders planlandı`, 'Ders listesi araştırılıp çıkarılıyor; bir dakika sonra yenile')
-}
-
+// Bloğa elle ders: bloğun sırası gelince ya da "Şimdi yaz" ile yazılır
 export async function addLessonAction(form: FormData) {
   await requireAdmin()
-  const seriesId = id(form)
+  const stage = await prisma.stage.findUniqueOrThrow({ where: { id: id(form) } })
   const title = text(form, 'title').slice(0, 200)
-  if (!title) back(seriesPath(seriesId), 'Ders başlığı gir')
+  if (!title) back(stagePath(stage.id), 'Ders başlığı gir')
+  await addLesson(stage.seriesId, title, text(form, 'scope').slice(0, 1000), sourceList(text(form, 'sourceUrls')), undefined, isLevel(stage.level) ? stage.level : 'kapsamli', stage.id)
+  await prisma.stage.update({ where: { id: stage.id }, data: { planned: true } })
+  back(stagePath(stage.id), 'Ders eklendi')
+}
+
+export async function addStageAction(form: FormData) {
+  await requireAdmin()
+  const track = text(form, 'track')
+  const title = text(form, 'title').slice(0, 200)
   const level = text(form, 'level')
-  await addLesson(seriesId, title, text(form, 'scope').slice(0, 1000), sourceList(text(form, 'sourceUrls')), undefined, isLevel(level) ? level : 'kapsamli')
-  await prisma.series.update({ where: { id: seriesId }, data: { planned: true } })
-  back(seriesPath(seriesId), 'Ders eklendi')
+  if (!isTrack(track) || !title || (track !== 'kavram' && !['temel', 'orta', 'ileri'].includes(level))) back('/admin/egitim', 'Hat, ad ve aşama gir')
+  const stage = await addStage(track, title, isLevel(level) ? level : 'kapsamli', text(form, 'summary').slice(0, 1000)).catch((error: Error) => back('/admin/egitim', error.message))
+  back(stagePath(stage.id), 'Blok hattın sonuna eklendi; sırasını buradan değiştirebilirsin')
+}
+
+export async function saveStageAction(form: FormData) {
+  await requireAdmin()
+  const stageId = id(form)
+  const title = text(form, 'title').slice(0, 200)
+  if (!title) back(stagePath(stageId), 'Ad boş olamaz')
+  const requires = text(form, 'requires').split(/[\s,]+/).filter((k) => /^[a-z0-9-]+\/[a-z0-9-]+$/.test(k)).join(',')
+  await prisma.stage.update({ where: { id: stageId }, data: { title, summary: text(form, 'summary').slice(0, 1000), position: Number.parseInt(text(form, 'position'), 10) || 0, requires } })
+  back(stagePath(stageId), 'Kaydedildi')
+}
+
+export async function planStageAction(form: FormData) {
+  await requireAdmin()
+  const stageId = id(form)
+  const settings = await getSettings()
+  if (!settings.imageApiKey.trim()) back(stagePath(stageId), 'Önce Ayarlar → Yapay zekâ bölümüne OpenRouter anahtarını gir')
+  inBackground(stagePath(stageId), 'Blok planı', async () => `${await planStage(stageId, settings)} ders planlandı`, 'Ders listesi araştırılıp çıkarılıyor; bir dakika sonra yenile')
+}
+
+// Atlanan blok bitmiş sayılır (dersi yoksa): sıra bir sonrakine geçer, ona bağlı bloklar beklemez
+export async function skipStageAction(form: FormData) {
+  await requireAdmin()
+  const stage = await prisma.stage.findUniqueOrThrow({ where: { id: id(form) }, include: { _count: { select: { lessons: true } } } })
+  if (stage._count.lessons > 0) back(stagePath(stage.id), 'Dersleri olan blok atlanamaz')
+  await prisma.stage.update({ where: { id: stage.id }, data: { planned: !stage.planned } })
+  back(stagePath(stage.id), stage.planned ? 'Blok yeniden sıraya alındı' : 'Blok atlandı')
+}
+
+// Haberlerden önerilen kavram onaylanınca kavram sırasının başına geçer (haberle ilgisi tazeyken yazılsın)
+export async function approveStageAction(form: FormData) {
+  await requireAdmin()
+  const first = await prisma.stage.aggregate({ where: { track: 'kavram', approved: true, planned: false }, _min: { position: true } })
+  await prisma.stage.update({ where: { id: id(form) }, data: { approved: true, position: (first._min.position ?? 10) - 1 } })
+  back('/admin/egitim', 'Kavram onaylandı; kavram sırasının başında')
+}
+
+export async function deleteStageAction(form: FormData) {
+  await requireAdmin()
+  const stage = await prisma.stage.findUniqueOrThrow({ where: { id: id(form) }, include: { _count: { select: { lessons: true } } } })
+  if (catalogStages().some((s) => s.key === stage.key)) back(stagePath(stage.id), 'Katalogdaki blok silinmez (yeniden eklenirdi); istemiyorsan atla')
+  if (stage._count.lessons > 0) back(stagePath(stage.id), 'Önce bloğun derslerini sil')
+  await prisma.stage.delete({ where: { id: stage.id } })
+  back('/admin/egitim', stage.approved ? 'Blok silindi' : 'Öneri silindi')
 }
 
 export async function saveLessonAction(form: FormData) {

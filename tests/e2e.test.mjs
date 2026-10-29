@@ -89,9 +89,14 @@ const fake = http.createServer((req, res) => {
       const cite = (n) => ({ type: 'url_citation', url_citation: { url: `${FAKE}/kaynak${n}`, title: `Ders notu ${n}` } })
       let content = ''
       let annotations = []
-      if (system.includes('dersleri planlıyorsun')) {
+      if (system.includes('derslere bölüyorsun')) {
         // Kapsamdaki tırnak eskiden JSON'u bozuyordu
-        content = 'Araştırdım.\n1. temel | Kırınım ve Airy diski | "Airy diski" ve kırınım\n2. orta | Seeing | Atmosfer\n3. ileri | Zernike polinomları | Dalga cephesi'
+        const series = user.match(/^Seri: (.+?) —/m)[1]
+        content = series.startsWith('Python')
+          ? 'Araştırdım.\n1. DERS | Kırınım ve Airy diski | "Airy diski" ve kırınım\n2. DERS | Seeing | Atmosfer\n3. DERS | Zernike polinomları | Dalga cephesi'
+          : `DERS | ${series} 1 | Giriş\nDERS | ${series} 2 | Devam`
+      } else if (system.includes('eğitim sitesinin editörüsün')) {
+        content = 'KAVRAM | Kozmik anafor | Kediler haberi\nKAVRAM | Seeing ve görüş | x'
       } else if (system.includes('araştırma asistanısın')) {
         if (!user.includes('Ders: Kaynaksız')) {
           annotations = [cite(1), cite(2), cite(3)]
@@ -101,11 +106,19 @@ const fake = http.createServer((req, res) => {
         content = [
           'Önce notları okudum.',
           'Özet: Airy diski, dairesel bir açıklıktan geçen ışığın kırınım deseninin merkezidir.',
-          'Önkoşul: 1',
+          'Önkoşul: python/temel, yok/anahtar',
           'Öğretilenler: kırınım, Airy diski',
           '',
+          '## Bu dersten aklında kalacaklar',
+          '- Çözünürlük açıklıkla artar',
           '## Nedir?',
           `Çözünürlük sınırı $\\theta = 1.22 \\lambda / D$ ile verilir.${user.includes('Ders: Denetimli') ? ' DENETIM-HATASI' : ''}`,
+          ':::bilmen',
+          'Açıklık büyüdükçe ayırma gücü artar; ayrıntı için [[kavram/bessel|Bessel fonksiyonları]].',
+          ':::',
+          ':::merak',
+          'Uzun türetme burada.',
+          ':::',
           '$$',
           'I(\\theta) = I_0 \\left( \\frac{2 J_1(x)}{x} \\right)^2',
           '$$',
@@ -453,22 +466,31 @@ test('yetkisiz form gönderimi reddedilir', async () => {
   assert.ok(aiCalls >= 1)
 })
 
-test('eğitim: araştırma → yazım → denetim, otomatik yayın', async () => {
+const lessonCalls = (calls) => calls.filter((r) => !r.body.messages[0].content.includes('eğitim sitesinin editörüsün'))
+
+test('eğitim: müfredat, araştırma → yazım → denetim, otomatik yayın', async () => {
   const before = openRouterRequests.length
+  const empty = (await get('/admin/egitim')).html
+  assert.match(empty, /Sıradaki:<\/b> (<!-- -->)?Uygulama(<!-- -->)? · (<!-- -->)?Python ile Astronomi · Temel/, 'katalog eklenir, ilk ders uygulama hattından')
+  assert.match(empty, /Astronomi[\s\S]*Yıldızlar · Orta[\s\S]*önkoşul: (<!-- -->)?[^<]*isi\/orta/, 'önkoşulu bitmemiş blok bekliyor')
   assert.match(await submit('/admin/egitim', 'Sıradaki dersi şimdi yaz'), /araştırılıp yazılıyor/)
   await waitFor(async () => /Ders: (&quot;|")Kırınım ve Airy diski(&quot;|") yayımlandı \(denetim temiz\)/.test((await get('/admin')).html), 'ders yazımı')
-  const admin = (await get('/admin/egitim')).html
-  assert.match(admin, /Optik ve Görüntü Oluşumu[\s\S]*Optik ve enstrümantasyon · temel[\s\S]*Görüntü İşleme ve OpenCV/, 'başlangıç müfredatı alan ve seviyesiyle eklendi')
-  assert.match((await get('/admin')).html, /(&quot;|")Optik ve Görüntü Oluşumu(&quot;|") serisi 3 derse bölündü/)
-  const calls = openRouterRequests.slice(before)
+  assert.match((await get('/admin')).html, /(&quot;|")Python ile Astronomi · Temel(&quot;|") 3 derse bölündü/)
+  const calls = lessonCalls(openRouterRequests.slice(before))
   assert.equal(calls.length, 4, 'plan, araştırma, yazım, denetim')
-  assert.ok(calls.every((r) => r.auth === 'Bearer or-anahtari'))
+  assert.ok(openRouterRequests.slice(before).every((r) => r.auth === 'Bearer or-anahtari'))
   assert.deepEqual(calls.map((r) => r.body.model), ['test/yardimci', 'test/yardimci', 'test/ders-modeli', 'test/yardimci'], 'yalnızca yazım ders modeliyle; plan, araştırma, denetim yardımcıyla')
   assert.deepEqual(calls.map((r) => r.body.tools?.[0]?.type ?? '-'), ['openrouter:web_search', 'openrouter:web_search', '-', '-'], 'yalnızca plan ve araştırma web araması yapar')
-  assert.match(calls[2].body.messages[1].content, /ARAŞTIRMA NOTLARI:\nNotlar: çözünürlük/, 'yazım notlardan')
-  assert.match(calls[3].body.messages[1].content, /DERS:\n## Nedir\?/, 'denetim yazılan dersi görür')
+  assert.match(calls[0].body.messages[1].content, /Aşama: Temel — lise matematiği[\s\S]*Önerilen dersler: 4 ders: terminal/, 'blok önerisiyle bölünür')
+  const write = calls[2].body.messages[1].content
+  assert.match(write, /Hat: Uygulama[\s\S]*ARAŞTIRMA NOTLARI:\nNotlar: çözünürlük/, 'yazım notlardan')
+  assert.match(write, /BAĞLANTI LİSTESİ[\s\S]*kavram\/bessel — Bessel fonksiyonları[\s\S]*TERİM LİSTESİ: akı \(flux\)[\s\S]*GÖSTERİM KURALLARI/)
+  assert.match(calls[3].body.messages[1].content, /TERİM LİSTESİ[\s\S]*DERS:\n## Bu dersten aklında kalacaklar/, 'denetim yazılan dersi ve terimleri görür')
 
-  const lessonId = (await get('/admin/egitim/seri/1')).html.match(/href="\/admin\/egitim\/ders\/(\d+)"/)[1]
+  const admin = (await get('/admin/egitim')).html
+  assert.match(admin, /Python ile Astronomi · Temel[\s\S]{0,400}1\/3(<!-- -->)? · (<!-- -->)?Yürüyor/)
+  const stageId = admin.match(/href="\/admin\/egitim\/blok\/(\d+)"[^>]*>Python ile Astronomi · Temel/)[1]
+  const lessonId = (await get(`/admin/egitim/blok/${stageId}`)).html.match(/href="\/admin\/egitim\/ders\/(\d+)"/)[1]
   const lessonAdmin = (await get(`/admin/egitim/ders/${lessonId}`)).html
   assert.match(lessonAdmin, /Denetim sorun bulmadı/)
   assert.match(lessonAdmin, /Araştırma notları[\s\S]*çözünürlük/)
@@ -482,18 +504,32 @@ test('eğitim: araştırma → yazım → denetim, otomatik yayın', async () =>
     assert.match(page, /<ol><li>Dalgaboyunu seç<\/li>/)
     assert.match(page, /<div class="table"><table>/)
     assert.match(page, /<details class="solution"><summary>Çözümü göster/)
+    assert.match(page, /<aside class="box box-bilmen">[\s\S]*Bessel fonksiyonları <span class="later">\(ileride\)<\/span>/, 'kutu; yazılmamış derse bağlantı "ileride"')
+    assert.match(page, /<details class="box box-merak"><summary>Merak edene/)
     assert.match(page, /href="http:\/\/127\.0\.0\.1:3901\/kaynak1"/)
     assert.match(page, /href="http:\/\/127\.0\.0\.1:3901\/kaynak4"/, 'araştırmada bulunan, açılan link kalır')
     assert.ok(!page.includes(`${FAKE}/yok`) && page.includes('ölü kaynak'), 'açılmayan link metne döner')
     assert.match(page, /Bu dersin kaynakları[\s\S]*Ders notu 2[\s\S]*kaynak4/)
-    assert.doesNotMatch(page, /Başlamadan önce/, 'önkoşul dersi yayında değilse kutu yok')
+    assert.doesNotMatch(page, /Başlamadan önce/, 'kendi bloğu önkoşul sayılmaz')
+    assert.match(page, /Uygulama · Python ile Astronomi · Ders 1/)
     const education = (await get('/egitim')).html
-    assert.match(education, /Optik ve enstrümantasyon<\/h2>[\s\S]*Optik ve Görüntü Oluşumu[\s\S]*Temel → İleri[\s\S]*1(<!-- -->)? \/ (<!-- -->)?3(<!-- -->)? ders yayında/, 'alan başlığı, seviye aralığı')
-    assert.match(page, /Temel<\/span>/, 'ders sayfasında seviye')
-    assert.match((await get(preview.split('/').slice(0, 3).join('/'))).html, /Kırınım ve Airy diski[\s\S]*Temel[\s\S]*Seeing[\s\S]*Orta[\s\S]*Zernike polinomları[\s\S]*İleri/, 'seri sayfasında ders seviyeleri')
+    assert.match(education, /Uygulama<\/h2>[\s\S]*Python ile Astronomi[\s\S]*Temel[\s\S]*1(<!-- -->)? \/ (<!-- -->)?3(<!-- -->)? ders yayında/, 'hat başlığı, seviye')
+    const series = (await get(preview.split('/').slice(0, 3).join('/'))).html
+    assert.match(series, /Temel[\s\S]*Kırınım ve Airy diski[\s\S]*Seeing[\s\S]*Orta[\s\S]*Sırası gelince derslere bölünecek: 4 ders: Astropy tabloları/, 'seri sayfasında aşamalar ve yol haritası')
   } finally {
     cookie = saved
   }
+})
+
+test('eğitim: haberden kavram önerisi onaylanınca sıraya girer', async () => {
+  const admin = (await get('/admin/egitim')).html
+  assert.match(admin, /Haberlerden önerilen kavramlar[\s\S]*Kozmik anafor[\s\S]*Haberde geçti: Kediler haberi/)
+  assert.match((await get('/admin')).html, /2 kavram önerildi/)
+  const proposalId = admin.match(/Kozmik anafor[\s\S]*?name="id" value="(\d+)"/)[1]
+  assert.match(await submit('/admin/egitim', `value="${proposalId}"/><button class="btn-primary">Onayla`), /Kavram onaylandı/)
+  const after = (await get('/admin/egitim')).html
+  assert.doesNotMatch(after.split('Ders iste')[0], /Kozmik anafor/, 'öneri listesinden çıkar')
+  assert.match(after, /Kavramlar[\s\S]*Kozmik anafor[\s\S]*Uzaklık birimleri/, 'kavram sırasının başında')
 })
 
 test('eğitim: denetimde sorun çıkan ders taslak kalır, önkoşul kutusu', async () => {
@@ -505,6 +541,7 @@ test('eğitim: denetimde sorun çıkan ders taslak kalır, önkoşul kutusu', as
   const lessonId = admin.match(/href="\/admin\/egitim\/ders\/(\d+)"[^>]*>Denetimli ders/)[1]
   const lessonAdmin = (await get(`/admin/egitim/ders/${lessonId}`)).html
   assert.match(lessonAdmin, /<strong>Ciddi<\/strong> · Nedir\?: Katsayı yanlış → 1\.22 olmalı/)
+  assert.match(lessonAdmin, /önkoşul: (<!-- -->)?python\/temel</, 'bilinmeyen anahtar önkoşul olmaz')
   const preview = lessonAdmin.match(/href="(\/egitim\/[^"]+)"/)[1]
   const saved = cookie
   cookie = ''
@@ -513,10 +550,10 @@ test('eğitim: denetimde sorun çıkan ders taslak kalır, önkoşul kutusu', as
     cookie = saved
     assert.match(await submit(`/admin/egitim/ders/${lessonId}`, 'Yayımla'), /Yayımlandı/)
     cookie = ''
-    // Önkoşul listesinde 1 numara yayındaki "Kırınım ve Airy diski"
-    assert.match((await get(preview)).html, /Başlamadan önce[\s\S]*href="\/egitim\/optik-ve-goruntu-olusumu\/kirinim-ve-airy-diski"/)
+    // Önkoşul anahtarı bloğun yayındaki ilk dersine bağlanır
+    assert.match((await get(preview)).html, /Başlamadan önce[\s\S]*href="\/egitim\/python\/kirinim-ve-airy-diski"/)
     const education = (await get('/egitim')).html
-    assert.match(education, /Tek derslik konular[\s\S]*Denetimli ders[\s\S]*Temelden ileriye/, 'istenen ders tek derslik konu, kapsamlı seviye')
+    assert.match(education, /İstenen dersler[\s\S]*Denetimli ders[\s\S]*Temelden ileriye/, 'istenen ders ayrı listede, kapsamlı seviye')
     const temel = (await get('/egitim?seviye=temel')).html
     assert.match(temel, /Temel dersler[\s\S]*Kırınım ve Airy diski/)
     assert.doesNotMatch(temel, /Denetimli ders/, 'seviye süzgeci')
@@ -530,17 +567,27 @@ test('eğitim: denetimde sorun çıkan ders taslak kalır, önkoşul kutusu', as
   await waitFor(async () => /Yazılamayan dersler[\s\S]*Kaynaksız ders[\s\S]*doğrulanmış kaynak/.test((await get('/admin/egitim')).html), 'kaynaksız ders reddi')
 })
 
-test('eğitim: iki seri sırayla ilerler, öğretilenler sonraki derse geçer', async () => {
+test('eğitim: hatlar sırayla ilerler, öğretilenler sonraki derse geçer', async () => {
   const before = openRouterRequests.length
+  assert.match((await get('/admin/egitim')).html, /Sıradaki:<\/b> (<!-- -->)?Astronomi(<!-- -->)? · (<!-- -->)?Gökyüzünde Konum ve Zaman · Temel/, 'uygulamadan sonra astronomi')
   assert.match(await submit('/admin/egitim', 'Sıradaki dersi şimdi yaz'), /araştırılıp yazılıyor/)
-  await waitFor(async () => /Ders: (&quot;|")Kırınım ve Airy diski(&quot;|") yayımlandı[\s\S]*(&quot;|")Uyarlamalı Optik ve Koronagraflar(&quot;|") serisi 3 derse bölündü/.test((await get('/admin')).html), 'ikinci seri')
-  assert.match((await get('/admin/egitim')).html, /Yürüyor[\s\S]*Yürüyor/, 'iki seri yürüyor')
+  await waitFor(async () => /Ders: (&quot;|")Gökyüzünde Konum ve Zaman 1(&quot;|") yayımlandı/.test((await get('/admin')).html), 'astronomi dersi')
+  assert.match((await get('/admin/egitim')).html, /Sıradaki:<\/b> (<!-- -->)?Uygulama/, 'ilk turda her iki dersten biri uygulama')
   assert.match(await submit('/admin/egitim', 'Sıradaki dersi şimdi yaz'), /araştırılıp yazılıyor/)
-  await waitFor(async () => /Ders: (&quot;|")Seeing(&quot;|") yayımlandı/.test((await get('/admin')).html), 'birinci serinin ikinci dersi')
+  await waitFor(async () => /Ders: (&quot;|")Seeing(&quot;|") yayımlandı/.test((await get('/admin')).html), 'uygulama bloğunun ikinci dersi')
   const writes = openRouterRequests.slice(before).filter((r) => r.body.messages[0].content.includes('öğretim üyesisin'))
   assert.equal(writes.length, 2)
-  assert.doesNotMatch(writes[0].body.messages[1].content, /önceki derslerinde öğrendikleri/, 'yeni serinin ilk dersi')
-  assert.match(writes[1].body.messages[1].content, /Bu dersin seviyesi: Orta[\s\S]*serinin önceki derslerinde öğrendikleri: kırınım, Airy diski/)
+  assert.match(writes[0].body.messages[1].content, /Hat: Astronomi/)
+  assert.doesNotMatch(writes[0].body.messages[1].content, /önceki derslerde öğrendikleri/, 'yeni serinin ilk dersi')
+  assert.match(writes[1].body.messages[1].content, /Hat: Uygulama\nBu dersin seviyesi: Temel[\s\S]*önceki derslerde öğrendikleri: kırınım, Airy diski/)
+
+  // Elle blok: hattın sonuna girer, atlanabilir
+  const added = await submit('/admin/egitim', 'name="track"', { track: 'astronomi', title: 'Meteoroloji', level: 'temel', summary: '2 ders: bulutlar' })
+  assert.match(added, /\/admin\/egitim\/blok\/\d+\?mesaj=Blok hattın sonuna eklendi/)
+  const stagePath = added.split('?')[0]
+  assert.match(await submit(stagePath, 'Bu bloğu atla'), /Blok atlandı/)
+  assert.match((await get('/admin/egitim')).html, /Meteoroloji · Temel[\s\S]{0,300}Atlandı/)
+  assert.match(await submit(stagePath, '>Sil<'), /Blok silindi/)
 })
 
 test('gökyüzü takvimi', async () => {

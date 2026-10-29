@@ -6,6 +6,8 @@ import { isAdmin } from '@/lib/auth'
 import { headings, renderMarkdown } from '@/lib/markdown'
 import { readingMinutes, topicHue } from '@/lib/topics'
 import { isLevel, LEVELS } from '@/lib/levels'
+import { lessonLinks } from '@/lib/lessons'
+import { TRACKS, type Track } from '@/lib/curriculum'
 import { coverStyle } from '../../../parts'
 import { ReadingProgress } from '../../../yazi/[slug]/ReadingProgress'
 
@@ -13,7 +15,7 @@ import { ReadingProgress } from '../../../yazi/[slug]/ReadingProgress'
 async function findLesson(seri: string, ders: string) {
   const lesson = await prisma.lesson.findUnique({
     where: { slug: ders },
-    include: { series: { include: { lessons: { where: { status: 'published' }, orderBy: { position: 'asc' }, select: { id: true, slug: true, title: true, position: true } } } } },
+    include: { stage: { select: { track: true } }, series: { include: { lessons: { where: { status: 'published' }, orderBy: { position: 'asc' }, select: { id: true, slug: true, title: true, position: true } } } } },
   })
   if (!lesson || lesson.series.slug !== seri || (lesson.status !== 'published' && !(await isAdmin()))) return null
   return lesson
@@ -36,10 +38,9 @@ export default async function LessonPage({ params }: { params: { seri: string; d
     const [title, url] = line.split('\t')
     return { title: title || url, url }
   }).filter((s) => /^https?:\/\//.test(s.url ?? ''))
-  const prerequisiteIds = lesson.prerequisites.split(',').map(Number).filter(Boolean)
-  const prerequisites = prerequisiteIds.length
-    ? await prisma.lesson.findMany({ where: { id: { in: prerequisiteIds }, status: 'published' }, select: { slug: true, title: true, series: { select: { slug: true, title: true } } } })
-    : []
+  // Önkoşul ve gövdedeki [[anahtar]] bağlantıları: yalnızca yayımlanmış derse link olur
+  const links = await lessonLinks()
+  const prerequisites = lesson.prerequisites.split(',').map((key) => links[key.trim()]).filter((l): l is { title: string; href: string } => !!l?.href)
   const accent = { ['--h' as string]: topicHue(lesson.series.slug) } as React.CSSProperties
 
   return (
@@ -52,7 +53,7 @@ export default async function LessonPage({ params }: { params: { seri: string; d
         <Link href={`/egitim/${lesson.series.slug}`} className="text-violet-600 dark:text-violet-300 hover:underline">{lesson.series.title}</Link>
       </p>
       <header className="mt-4 overflow-hidden rounded-3xl p-7 md:p-12 text-white" style={coverStyle(lesson.series.slug, lesson.slug)}>
-        <p className="text-sm text-white/75">{lesson.series.title} · Ders {lesson.position}</p>
+        <p className="text-sm text-white/75">{lesson.stage?.track === 'kavram' ? 'Kavram' : `${lesson.stage ? `${TRACKS[lesson.stage.track as Track] ?? ''} · ` : ''}${lesson.series.title} · Ders ${lesson.position}`}</p>
         <h1 className="mt-2 text-3xl md:text-5xl font-semibold leading-tight drop-shadow-sm">{lesson.title}</h1>
         <p className="mt-4 text-sm text-white/80">
           {isLevel(lesson.level) && <span title={LEVELS[lesson.level].hint} className="mr-2 rounded-full bg-white/20 px-2.5 py-0.5 font-medium">{LEVELS[lesson.level].label}</span>}
@@ -67,11 +68,11 @@ export default async function LessonPage({ params }: { params: { seri: string; d
             <aside className="mt-8 card">
               <p className="text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">Başlamadan önce</p>
               <ul className="mt-2 space-y-1 text-sm">
-                {prerequisites.map((p) => <li key={p.slug}><Link href={`/egitim/${p.series.slug}/${p.slug}`} className="hover:text-violet-500">{p.title}</Link><span className="text-zinc-500"> · {p.series.title}</span></li>)}
+                {prerequisites.map((p) => <li key={p.href}><Link href={p.href} className="hover:text-violet-500">{p.title}</Link></li>)}
               </ul>
             </aside>
           )}
-          <div className="prose-body lesson-body mt-8" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.body, { math: true }) }} />
+          <div className="prose-body lesson-body mt-8" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.body, { math: true, links }) }} />
 
           {sources.length > 0 && (
             <aside className="mt-12 card">

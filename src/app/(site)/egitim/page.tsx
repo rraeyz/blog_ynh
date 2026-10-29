@@ -3,11 +3,12 @@ import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { topicHue } from '@/lib/topics'
 import { isLevel, levelRange, LEVELS } from '@/lib/levels'
+import { TRACK_HINTS, TRACKS, type Track } from '@/lib/curriculum'
 import { LevelBadge } from '../parts'
 
 export const metadata: Metadata = {
   title: 'Eğitim',
-  description: 'Astronomi ve astrofizikte yöntemleri, mantığı ve kullanıldıkları yerleri temelden uzman seviyesine anlatan ders serileri.',
+  description: 'Astronomi ve astrofizikte uygulama, kuram ve kavramları temelden uzman seviyesine anlatan dersler.',
 }
 
 type LessonRow = { id: number; slug: string; title: string; excerpt: string; level: string; series: { slug: string; title: string } }
@@ -26,7 +27,8 @@ const LessonList = ({ lessons, showSeries = true }: { lessons: LessonRow[]; show
   </ul>
 )
 
-// Dersler çoğaldıkça: seriler alanlarına göre gruplu, tek derslik konular ayrı listede, seviyeye göre süzülebilir (?seviye=temel)
+// Seriler hatlarına göre gruplu (uygulama, astronomi, temel bilim), kavramlar A–Z sayfasında, istekler ayrı listede;
+// seviyeye göre süzülebilir (?seviye=temel)
 export default async function EducationPage({ searchParams }: { searchParams: { seviye?: string } }) {
   const level = isLevel(searchParams.seviye) ? searchParams.seviye : null
   const lessonFields = { id: true, slug: true, title: true, excerpt: true, level: true, series: { select: { slug: true, title: true } } } as const
@@ -41,11 +43,11 @@ export default async function EducationPage({ searchParams }: { searchParams: { 
       ? prisma.lesson.findMany({ where: { status: 'published', level }, orderBy: [{ series: { position: 'asc' } }, { position: 'asc' }], select: lessonFields })
       : Promise.resolve([]),
   ])
-  // Tek derslik konular (ve elle istenen dersler) seri kartı yerine listede
-  const single = series.filter((s) => s.position < 0 || s.lessons.length === 1)
-  const singles = single.flatMap((s) => s.lessons.filter((l) => l.status === 'published').map((l) => ({ ...l, series: { slug: s.slug, title: s.title } })))
-  const tracks = new Map<string, typeof series>()
-  for (const s of series.filter((s) => !single.includes(s))) tracks.set(s.track || 'Diğer', [...(tracks.get(s.track || 'Diğer') ?? []), s])
+  // İstenen dersler seri kartı yerine listede
+  const singles = series.filter((s) => s.position < 0).flatMap((s) => s.lessons.filter((l) => l.status === 'published').map((l) => ({ ...l, series: { slug: s.slug, title: s.title } })))
+  const concepts = series.find((s) => s.track === 'kavram')
+  const conceptLessons = concepts ? concepts.lessons.filter((l) => l.status === 'published') : []
+  const tracks = (['uygulama', 'astronomi', 'temel'] as Track[]).map((track) => [track, series.filter((s) => s.track === track)] as const).filter(([, list]) => list.length > 0)
 
   return (
     <div className="mx-auto max-w-5xl px-4">
@@ -53,8 +55,10 @@ export default async function EducationPage({ searchParams }: { searchParams: { 
         <p className="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-700 dark:text-violet-300">Ders serileri</p>
         <h1 className="mt-5 text-4xl md:text-5xl font-semibold leading-[1.08]">Eğitim</h1>
         <p className="mt-4 text-lg text-zinc-600 dark:text-zinc-400">
-          Astronomide kullanılan yöntemleri, aletleri ve kuramları öğreten dersler. Her seri konunun en temel noktasından başlar ve uzman seviyesine
-          kadar götürür; tek derslik konular baştan sona tek derste anlatılır. Her ders kaynaklara dayanır; kaynaklar dersin sonunda.
+          Astronomide elle yapılan işi (yazılım, gözlem, veri indirgeme, fotometri, tayf), astronominin konularını, dayandığı fizik ve
+          matematiği ve bir astronomun bilmesi gereken kavramları öğreten dersler. Her seri temelden başlar ve aşama aşama uzman seviyesine
+          götürür; her derste neyi bilmen, neyi hesaplayabilmen gerektiği ve neyi ezberlemene gerek olmadığı ayrı kutularda. Her ders
+          kaynaklara dayanır; kaynaklar dersin sonunda.
         </p>
       </header>
 
@@ -84,9 +88,10 @@ export default async function EducationPage({ searchParams }: { searchParams: { 
         <p className="mt-10 rounded-3xl border border-dashed border-zinc-300 dark:border-ink-line p-10 text-center text-zinc-500">İlk dersler hazırlanıyor.</p>
       ) : (
         <>
-          {Array.from(tracks, ([track, list]) => (
+          {tracks.map(([track, list]) => (
             <section key={track} className="mt-12">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">{track}</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">{TRACKS[track]}</h2>
+              <p className="mt-1 text-sm text-zinc-500">{TRACK_HINTS[track]}</p>
               <div className="mt-4 grid gap-5 md:grid-cols-2">
                 {list.map((s) => {
                   const published = s.lessons.filter((l) => l.status === 'published').length
@@ -111,9 +116,20 @@ export default async function EducationPage({ searchParams }: { searchParams: { 
             </section>
           ))}
 
+          {concepts && conceptLessons.length > 0 && (
+            <section className="mt-12">
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">{TRACKS.kavram}</h2>
+                <Link href={`/egitim/${concepts.slug}`} className="text-sm text-violet-600 dark:text-violet-300 hover:underline">Kavramlar A–Z ({conceptLessons.length}) →</Link>
+              </div>
+              <p className="mt-1 text-sm text-zinc-500">{TRACK_HINTS.kavram}</p>
+              <LessonList lessons={conceptLessons.slice(-6).reverse().map((l) => ({ ...l, series: { slug: concepts.slug, title: concepts.title } }))} showSeries={false} />
+            </section>
+          )}
+
           {singles.length > 0 && (
             <section className="mt-12">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">Tek derslik konular</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">İstenen dersler</h2>
               <LessonList lessons={singles} showSeries={false} />
             </section>
           )}

@@ -50,6 +50,21 @@ h1, h2, h3 { @apply font-display tracking-tight; }
 .prose-body details.solution { @apply my-5 rounded-2xl border border-zinc-200 dark:border-white/10 px-5 py-3; }
 .prose-body details.solution > summary { color: hsl(var(--h) 75% 50%); @apply cursor-pointer text-sm font-semibold; }
 .prose-body details.solution[open] > summary { @apply mb-3; }
+/* Ders kutuları: bilinmesi gereken, yapılabilmesi gereken hesap, ezber gerektirmeyen ayrıntı (soluk, kapalı) */
+.prose-body .box { @apply my-6 rounded-2xl border px-5 py-4; }
+.prose-body .box > :last-child { @apply mb-0; }
+.prose-body .box-title { margin: 0 0 0.5rem; @apply text-xs font-semibold uppercase tracking-wider; }
+.prose-body .box-bilmen { border-color: hsl(var(--h) 80% 60% / 0.45); background: hsl(var(--h) 85% 60% / 0.08); }
+.prose-body .box-bilmen .box-title { color: hsl(var(--h) 75% 50%); }
+.prose-body .box-hesap { @apply border-amber-400/50 bg-amber-400/10; }
+.prose-body .box-hesap .box-title { @apply text-amber-700 dark:text-amber-300; }
+.prose-body details.box-merak { @apply border-dashed border-zinc-300 dark:border-white/15 text-[0.95rem] text-zinc-500 dark:text-zinc-400; }
+.prose-body details.box-merak > summary { @apply cursor-pointer text-sm font-semibold text-zinc-600 dark:text-zinc-300; }
+.prose-body details.box-merak > summary span { @apply font-normal text-zinc-500; }
+.prose-body details.box-merak[open] > summary { @apply mb-3; }
+.prose-body .later { @apply text-xs text-zinc-500; }
+@media (prefers-color-scheme: dark) { :root:not(.light) .prose-body .box-bilmen .box-title, :root:not(.light) .prose-body details.solution > summary { color: hsl(var(--h) 85% 75%); } }
+:root.dark .prose-body .box-bilmen .box-title, :root.dark .prose-body details.solution > summary { color: hsl(var(--h) 85% 75%); }
 /* Kalın terimler fosforlu kalemle çizilmiş gibi */
 .prose-body strong { background: linear-gradient(transparent 58%, hsl(var(--h) 90% 60% / 0.3) 58%); @apply font-semibold text-zinc-900 dark:text-white; }
 .prose-body a { color: hsl(var(--h) 75% 50%); @apply underline underline-offset-4; }
