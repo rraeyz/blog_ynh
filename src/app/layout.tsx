@@ -17,9 +17,15 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
+// Okurun seçtiği tema boyanmadan önce uygulanır (yoksa sayfa bir an cihazın temasıyla görünür); ThemeToggle.tsx
+const THEME_SCRIPT = `try{var t=localStorage.getItem('tema');if(t==='light'||t==='dark')document.documentElement.classList.add(t)}catch(e){}`
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr">
+    <html lang="tr" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>{children}</body>
     </html>
   )
