@@ -32,6 +32,7 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 - Konular (`lib/topics.ts` CATEGORIES): yazar seçer, `categoryOf` anahtar/etiketi harf farkı gözetmeden tanır, tanımazsa "bilim" (yazı konusuz kalmaz). Biyoloji (canlılar, hayvan davranışı, evrim) Sağlık'tan (tıp) ayrı.
 - Arama (`/ara`, `lib/search.ts`): SQLite FTS5 dizini (Prisma şemasında yok, ilk aramada kurulur); yayımlananların sayısı ya da son güncellemesi değişince baştan kurulur. Metin `foldText` ile katlanır, sorgu `ftsQuery` (kelime başı); bütün kelimeleri başlığında geçenler önce. Üstteki kutu (`SearchBox`) yazdıkça `/api/ara`dan öneri gösterir, Enter `/ara?q=`ye gider.
 - Panel listeleri (Makaleler, Yazılar) 100'lük sayfalar (`admin/Pager.tsx`); listedeki düğmeler `BackTo` ile bulunduğu adresi gönderir, eylem `returnTo` ile oraya döner (yalnızca panel liste adresleri kabul edilir).
+- Tema (`app/ThemeToggle.tsx`, site ve panel sağ üst): Otomatik (cihaza göre, varsayılan) → Açık → Koyu; seçim localStorage `tema`, `<html class="light|dark">`. Tailwind `darkMode` iki seçicili: cihaz koyu ve `.light` yok ya da `.dark` var; Otomatik JavaScript'siz çalışır, seçimi layout.tsx'teki betik boyamadan önce uygular. Elle yazılan koyu CSS de aynı iki koşulu kullanmalı (globals.css).
 - Ayarlar sekmeli; `saveSettingsAction` yalnızca `SETTINGS_SECTIONS[section]` alanlarını yazar. Yeni ayar: şema + bölüm listesi + `parse` + `backup.ts` FIELDS.
 
 ## Yapılacaklar (kullanıcı onayladı, sonraya)

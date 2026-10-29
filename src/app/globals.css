@@ -3,6 +3,8 @@
 @tailwind utilities;
 
 :root { color-scheme: light dark; }
+:root.light { color-scheme: light; }
+:root.dark { color-scheme: dark; }
 /* Süs bulanıklıkları kenardan taşar; yatay kaydırma çıkmasın */
 body { @apply bg-paper text-zinc-900 dark:bg-ink dark:text-zinc-100 antialiased overflow-x-clip; }
 h1, h2, h3 { @apply font-display tracking-tight; }
@@ -51,7 +53,8 @@ h1, h2, h3 { @apply font-display tracking-tight; }
 /* Kalın terimler fosforlu kalemle çizilmiş gibi */
 .prose-body strong { background: linear-gradient(transparent 58%, hsl(var(--h) 90% 60% / 0.3) 58%); @apply font-semibold text-zinc-900 dark:text-white; }
 .prose-body a { color: hsl(var(--h) 75% 50%); @apply underline underline-offset-4; }
-@media (prefers-color-scheme: dark) { .prose-body a { color: hsl(var(--h) 85% 75%); } }
+@media (prefers-color-scheme: dark) { :root:not(.light) .prose-body a { color: hsl(var(--h) 85% 75%); } }
+:root.dark .prose-body a { color: hsl(var(--h) 85% 75%); }
 .prose-body blockquote {
   border-color: hsl(var(--h) 80% 60%);
   background: linear-gradient(135deg, hsl(var(--h) 85% 60% / 0.16), hsl(calc(var(--h) + 45) 85% 60% / 0.06));

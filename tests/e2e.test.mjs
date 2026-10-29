@@ -602,6 +602,10 @@ test('site içi arama', async () => {
   cookie = ''
   try {
     assert.match((await get('/ara?q=KEDİLER')).html, /Yazılar[\s\S]*href="\/yazi\/kediler-neden-cok-uyur"/)
+    // Tema düğmesi ve seçimi boyamadan önce uygulayan betik (davranış tarayıcıda denendi)
+    const homeHtml = (await get('/')).html
+    assert.match(homeHtml, /aria-label="Tema: Otomatik \(cihaza göre\)"/)
+    assert.match(homeHtml, /localStorage\.getItem\('tema'\)/)
     assert.match((await get('/ara?q=airy%20kirinim')).html, /Dersler[\s\S]*Kırınım ve Airy diski/, 'Türkçe harfsiz de bulur')
     // Üstteki kutunun anlık önerileri
     const live = JSON.parse((await get('/api/ara?q=kedi')).html).results

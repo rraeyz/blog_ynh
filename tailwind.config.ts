@@ -3,6 +3,8 @@ import type { Config } from 'tailwindcss'
 // Renkler ve yazı tipi Künye'nin (rraeyz.me) temasıyla aynı: mor #8b5cf6 / #c4b5fd, Sora
 const config: Config = {
   content: ['./src/**/*.{ts,tsx}'],
+  // Tema: varsayılan cihazınki; okur seçtiyse <html class="light|dark"> (ThemeToggle). Otomatik durum JavaScript'siz çalışır
+  darkMode: ['variant', ['@media (prefers-color-scheme: dark) { &:not(.light *) }', '&:is(.dark *)']],
   theme: {
     extend: {
       colors: {

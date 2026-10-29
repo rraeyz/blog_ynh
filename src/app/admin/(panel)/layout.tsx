@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { requireAdmin } from '@/lib/auth'
+import { ThemeToggle } from '../../ThemeToggle'
 import { logoutAction } from '../actions'
 
 const NAV = [
@@ -26,7 +27,8 @@ export default async function PanelLayout({ children }: { children: React.ReactN
           <nav className="flex flex-wrap gap-1 text-sm">
             {NAV.map(([href, label]) => <Link key={href} href={href} className="rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">{label}</Link>)}
           </nav>
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <a href="/" className="btn">Siteyi aç</a>
             <form action={logoutAction}><button className="btn">Çıkış</button></form>
           </div>
