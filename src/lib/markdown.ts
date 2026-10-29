@@ -6,8 +6,19 @@ import katex from 'katex'
 import hljs from 'highlight.js/lib/common'
 import { slugify } from './text.ts'
 
-// Haber yazılarında $ işareti para birimi olabilir; formül yalnızca derslerde açılır
-type Options = { math?: boolean }
+// Derslerdeki [[anahtar|metin]] bağlantıları: müfredat anahtarı → yayımlanmış ders adresi (yoksa null: "ileride")
+export type LessonLinks = Record<string, { title: string; href: string | null }>
+
+// Haber yazılarında $ işareti para birimi olabilir; formül ve ders kutuları yalnızca derslerde açılır
+type Options = { math?: boolean; links?: LessonLinks }
+
+// Ders bağlantısı adresle değil anahtarla yazılır: hedef ders yayımlanınca eski derslerdeki bağlantı kendiliğinden açılır
+function lessonLink(key: string, label: string | undefined, links: LessonLinks | undefined): string {
+  const target = links?.[key]
+  const text = label ?? target?.title ?? key
+  if (target?.href) return `<a href="${escapeHtml(target.href)}">${text}</a>`
+  return target ? `${text} <span class="later">(ileride)</span>` : text
+}
 
 const tex = (source: string, displayMode: boolean) => katex.renderToString(source, { displayMode, throwOnError: false })
 
@@ -21,7 +32,7 @@ const escapeHtml = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 
 // Tek satırlık metin için (ör. "Kısaca" maddeleri): kalın, italik, kod ve link; HTML kaçışlanır
-export function inline(text: string, { math }: Options = {}): string {
+export function inline(text: string, { math, links }: Options = {}): string {
   // Formüller önce yer tutucuya alınır: içlerindeki * ve _ kalın/italik sanılmasın
   const formulas: string[] = []
   const source = math ? text.replace(/\$([^$\s](?:[^$]*?[^$\s])?)\$/g, (_, f: string) => `\u0000${formulas.push(f) - 1}\u0000`) : text
@@ -29,6 +40,7 @@ export function inline(text: string, { math }: Options = {}): string {
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<em>$2</em>')
+    .replace(/\[\[([a-z0-9-]+(?:\/[a-z0-9-]+)?)(?:\|([^\]]+))?\]\]/g, (_, key: string, label?: string) => lessonLink(key, label, links))
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" rel="noopener noreferrer" target="_blank">$1</a>')
     .replace(/\u0000(\d+)\u0000/g, (_, i: string) => tex(formulas[Number(i)], false))
 }
@@ -36,6 +48,15 @@ export function inline(text: string, { math }: Options = {}): string {
 // İçindekiler için: "## Ne yaptılar?" → { id: 'ne-yaptilar', text: 'Ne yaptılar?' }
 export function headings(source: string): Array<{ id: string; text: string }> {
   return Array.from(source.matchAll(/^##\s+(.+)$/gm), (m) => ({ id: slugify(m[1]), text: m[1].trim() }))
+}
+
+// Derslerde ":::ad" ile ":::" arası kutular: çözüm ve "merak edene" tıklayınca açılır. Anlamı metinde, görünüşü burada ve CSS'te:
+// tasarım değişince yazılmış dersleri yeniden yazmak gerekmez
+const BOXES: Record<string, [string, string]> = {
+  cozum: ['<details class="solution"><summary>Çözümü göster</summary>', '</details>'],
+  bilmen: ['<aside class="box box-bilmen"><p class="box-title">Bilmen gereken</p>', '</aside>'],
+  hesap: ['<aside class="box box-hesap"><p class="box-title">Hesabını bil</p>', '</aside>'],
+  merak: ['<details class="box box-merak"><summary>Merak edene <span>· ezberlemen gerekmez</span></summary>', '</details>'],
 }
 
 // Her "##" bölümü <section> içine alınır: sayfada numaralı ve farklı renkte kartlar olarak gösterilir
@@ -48,7 +69,7 @@ export function renderMarkdown(source: string, options: Options = {}): string {
   let code: { lang: string; lines: string[] } | null = null
   let display: string[] | null = null
   let inSection = false
-  let inSolution = false
+  let box: string | null = null
   let paragraph: string[] = []
   let list: string[] = []
   let ordered = false
@@ -99,17 +120,19 @@ export function renderMarkdown(source: string, options: Options = {}): string {
       else display = [rest]
       continue
     }
-    // Derslerde alıştırma çözümleri: ":::cozum" ile ":::" arası tıklayınca açılır
-    if (options.math && /^:::\s*(cozum|çözüm)$/i.test(line)) {
+    const opener = options.math && line.match(/^:::\s*(cozum|çözüm|bilmen|hesap|merak)$/i)
+    if (opener) {
       flush()
-      if (!inSolution) html.push('<details class="solution"><summary>Çözümü göster</summary>')
-      inSolution = true
+      // Model kapatmayı unutursa yeni kutu öncekini kapatır
+      if (box) html.push(BOXES[box][1])
+      box = opener[1].toLowerCase().replace('çözüm', 'cozum')
+      html.push(BOXES[box][0])
       continue
     }
-    if (options.math && line === ':::' && inSolution) {
+    if (options.math && line === ':::' && box) {
       flush()
-      html.push('</details>')
-      inSolution = false
+      html.push(BOXES[box][1])
+      box = null
       continue
     }
     const heading = line.match(/^(#{2,3})\s+(.+)$/)
@@ -120,7 +143,7 @@ export function renderMarkdown(source: string, options: Options = {}): string {
     else if (heading) {
       flush()
       const level = heading[1].length
-      if (level === 2 && !inSolution) {
+      if (level === 2 && !box) {
         if (inSection) html.push('</section>')
         html.push('<section>')
         inSection = true
@@ -144,7 +167,7 @@ export function renderMarkdown(source: string, options: Options = {}): string {
   flush()
   if (code) html.push(codeBlock(code.lang, code.lines))
   if (display) html.push(`<div class="math">${tex(display.join('\n'), true)}</div>`)
-  if (inSolution) html.push('</details>')
+  if (box) html.push(BOXES[box][1])
   if (inSection) html.push('</section>')
   return html.join('\n')
 }

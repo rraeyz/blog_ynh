@@ -3,9 +3,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { addDays, mondayOf, extractJson, markdownLinks, parseIssues, parseLesson, parsePlan, parseProposal, parseScores, parseSkyEvents, pickDaily, weightedScore, cleanSummary, formatScore, DAILY_HARD_MAX, foldText, ftsQuery, slugify, unlink } from '../src/lib/text.ts'
+import { addDays, mondayOf, extractJson, markdownLinks, parseIssues, parseConcepts, parseLesson, parsePlan, parseScores, parseSkyEvents, pickDaily, weightedScore, cleanSummary, formatScore, DAILY_HARD_MAX, foldText, ftsQuery, slugify, unlink } from '../src/lib/text.ts'
 import { isPrivateIp, safeFetch } from '../src/lib/net.ts'
-import { levelRange, planLevels } from '../src/lib/levels.ts'
+import { levelRange } from '../src/lib/levels.ts'
+import { catalogStages, FIRST_ROUND, nextTracks, pickStage, requirementsOf, stageDone, type StageState } from '../src/lib/curriculum.ts'
 import { compressImage } from '../src/lib/compress.ts'
 import { complete, RETRY_DELAYS } from '../src/lib/ai.ts'
 import http from 'node:http'
@@ -283,27 +284,89 @@ test('ders: numaralı liste, tablo, açılır çözüm', () => {
   assert.doesNotMatch(renderMarkdown('| <b>x</b> |\n|---|\n| y |'), /<b>/, 'tablo hücresi kaçışlanır')
 })
 
+test('ders kutuları ve anahtarla bağlantılar', () => {
+  const links = { 'fotometri/temel': { title: 'Fotometri · Temel', href: '/egitim/fotometri/aki-ve-kadir' }, 'kavram/bessel': { title: 'Bessel', href: null } }
+  const html = renderMarkdown('## Mantığı\n:::bilmen\nAkı **toplam** enerjidir; bkz. [[fotometri/temel|fotometri]].\n:::\n:::hesap\n$m = -2.5 \\log F$\n:::\n:::merak\n## Türetme\nUzun [[kavram/bessel]] ve [[yok/anahtar|bilinmeyen]]\n:::cozum\nkapatılmamış kutu\n:::\n## Sonra', { math: true, links })
+  assert.match(html, /<aside class="box box-bilmen"><p class="box-title">Bilmen gereken<\/p>\s*<p>Akı <strong>toplam<\/strong> enerjidir; bkz\. <a href="\/egitim\/fotometri\/aki-ve-kadir">fotometri<\/a>\.<\/p>\s*<\/aside>/)
+  assert.match(html, /<aside class="box box-hesap">[\s\S]*class="katex"[\s\S]*<\/aside>/)
+  assert.match(html, /<details class="box box-merak"><summary>Merak edene <span>· ezberlemen gerekmez<\/span><\/summary>\s*<h2 id="turetme">Türetme<\/h2>\s*<p>Uzun Bessel <span class="later">\(ileride\)<\/span> ve bilinmeyen<\/p>\s*<\/details>\s*<details class="solution">/, 'yazılmamış ders "ileride", bilinmeyen anahtar düz metin; kapanmayan kutuyu yenisi kapatır')
+  assert.equal((html.match(/<section>/g) ?? []).length, 2, 'kutu içindeki başlık bölüm açmaz')
+  assert.doesNotMatch(renderMarkdown(':::bilmen\nA\n:::'), /<aside/, 'haberlerde kutu yok')
+  assert.match(renderMarkdown('[[fotometri/temel|ölçüm]]', { math: true }), /^<p>ölçüm<\/p>$/, 'bağlantı listesi verilmezse düz metin')
+})
+
+test('müfredat kataloğu tutarlı', () => {
+  const stages = catalogStages()
+  const keys = new Set(stages.map((s) => s.key))
+  assert.equal(keys.size, stages.length, 'anahtarlar tekil')
+  for (const s of stages) for (const r of s.requires.split(',').filter(Boolean)) assert.ok(keys.has(r), `${s.key} → ${r}`)
+  for (const key of FIRST_ROUND) assert.ok(key.endsWith('/temel'), key)
+  // Döngü yok: her blok bir gün yazılabilir
+  const states = stages.map((s, i) => ({ ...s, id: i + 1, seriesId: s.series === 'kavramlar' ? 0 : [...new Set(stages.map((x) => x.series))].indexOf(s.series) + 1, approved: true, planned: false, pending: 0 }))
+  const history: string[] = []
+  for (let n = 0; n < stages.length; n++) {
+    const done = FIRST_ROUND.every((k) => stageDone(states.find((s) => s.key === k)!))
+    const stage = nextTracks(history, done).map((t) => pickStage(states, t)).find(Boolean)
+    assert.ok(stage, `${n}. blokta sıra tıkandı`)
+    stage!.planned = true
+    history.unshift(stage!.track)
+  }
+  assert.ok(states.every(stageDone))
+})
+
+test('müfredat sırası: hat dönüşümü, önkoşul, yarım blok', () => {
+  assert.deepEqual(nextTracks([], false)[0], 'uygulama', 'ilk ders uygulama')
+  assert.notEqual(nextTracks(['uygulama'], false)[0], 'uygulama')
+  assert.equal(nextTracks(['astronomi', 'uygulama'], false)[0], 'uygulama', 'ilk turda iki dersten biri')
+  assert.notEqual(nextTracks(['astronomi', 'temel', 'uygulama'], true)[0], 'uygulama')
+  assert.equal(nextTracks(['astronomi', 'temel', 'astronomi', 'uygulama'], true)[0], 'uygulama', 'sonra dört dersten biri')
+  assert.deepEqual(nextTracks(['uygulama'], true).slice(0, 3), ['astronomi', 'temel', 'kavram'])
+  assert.deepEqual(nextTracks(['astronomi', 'uygulama'], true).slice(0, 3), ['temel', 'astronomi', 'kavram'])
+  assert.deepEqual(nextTracks(['kavram', 'temel', 'astronomi', 'temel', 'astronomi'], true).slice(0, 2), ['uygulama', 'astronomi'], 'beşlik dönüşüm başa döner')
+
+  const st = (key: string, track: string, level: string, seriesId: number, position: number, extra: Partial<StageState> = {}): StageState => ({ key, track, level, seriesId, position, id: position, requires: '', approved: true, planned: false, pending: 0, ...extra })
+  const stages = [
+    st('yildizlar/temel', 'astronomi', 'temel', 1, 10, { planned: true }),
+    st('yildizlar/orta', 'astronomi', 'orta', 1, 20, { requires: 'isi/orta' }),
+    st('galaksiler/temel', 'astronomi', 'temel', 2, 30),
+    st('degisim/orta', 'temel', 'orta', 3, 5, { planned: true }),
+    st('isi/temel', 'temel', 'temel', 4, 40),
+    st('isi/orta', 'temel', 'orta', 4, 50),
+  ]
+  assert.deepEqual(requirementsOf(stages[1], stages), ['yildizlar/temel', 'degisim/orta', 'isi/orta'], 'serinin önceki aşaması, seviyenin matematiği, katalog')
+  assert.equal(pickStage(stages, 'astronomi')?.key, 'isi/temel', 'bekleyen bloğun zincirinin başı öne çekilir')
+  stages[4].planned = true
+  assert.equal(pickStage(stages, 'astronomi')?.key, 'isi/orta')
+  stages[5].planned = true
+  assert.equal(pickStage(stages, 'astronomi')?.key, 'yildizlar/orta', 'önkoşul bitince bloğa dönülür')
+  stages[2].planned = true
+  stages[2].pending = 2
+  assert.equal(pickStage(stages, 'astronomi')?.key, 'galaksiler/temel', 'yarım kalan blok önce biter')
+  stages[2].approved = false
+  assert.equal(pickStage(stages, 'astronomi')?.key, 'yildizlar/orta', 'onaysız blok sıraya girmez')
+  assert.equal(pickStage(stages, 'kavram'), null)
+})
+
 test('ders aşamalarının satır yanıtları', () => {
-  assert.deepEqual(parsePlan('Araştırdım:\n1. temel | Işık "dalga"dır | Faz, girişim | yarık\n- **orta** | Seeing |\nbozuk satır\nuzman | Yanlış seviye | x'), [
-    { level: 'temel', title: 'Işık "dalga"dır', scope: 'Faz, girişim | yarık' },
-    { level: 'orta', title: 'Seeing', scope: '' },
+  assert.deepEqual(parsePlan('Araştırdım:\n1. DERS | Işık "dalga"dır | Faz, girişim | yarık\n- **ders** | Seeing |\nbozuk satır\nKonu | Yanlış işaret | x'), [
+    { title: 'Işık "dalga"dır', scope: 'Faz, girişim | yarık' },
+    { title: 'Seeing', scope: '' },
   ])
-  assert.deepEqual(parsePlan('| temel | Seeing | atmosfer |'), [{ level: 'temel', title: 'Seeing', scope: 'atmosfer' }], 'tablo biçimindeki satır')
+  assert.deepEqual(parsePlan('| DERS | Seeing | atmosfer |'), [{ title: 'Seeing', scope: 'atmosfer' }], 'tablo biçimindeki satır')
   assert.deepEqual(parseIssues('ciddi | Nedir? | "1.22" yerine 1.12 | 1.22\n- Küçük | Özet | eksik\nnot: başka'), {
     issues: [{ major: true, where: 'Nedir?', problem: '"1.22" yerine 1.12', fix: '1.22' }, { major: false, where: 'Özet', problem: 'eksik', fix: '' }],
     readable: true,
   })
   assert.deepEqual(parseIssues('SORUN YOK'), { issues: [], readable: true })
   assert.deepEqual(parseIssues('Her şey güzel görünüyor.'), { issues: [], readable: false }, 'biçimsiz yanıt temiz sayılmaz')
-  assert.deepEqual(parseProposal('**Başlık:** Kütleçekim "dalgaları"\nKapsam: LIGO, girişimölçer\nAlan: Yüksek enerji\nSeviye: Orta'), { title: 'Kütleçekim "dalgaları"', summary: 'LIGO, girişimölçer', track: 'Yüksek enerji', level: 'orta' })
-  assert.equal(parseProposal('Öneri yok'), null)
+  assert.deepEqual(parseConcepts('Öneriler:\nKAVRAM | Kütleçekim "dalgaları" | LIGO haberi\n- kavram | Kozmik ışın |\nYOK'), [
+    { title: 'Kütleçekim "dalgaları"', reason: 'LIGO haberi' },
+    { title: 'Kozmik ışın', reason: '' },
+  ])
+  assert.deepEqual(parseConcepts('YOK'), [])
 })
 
-test('ders seviyeleri: plan ve aralık', () => {
-  assert.deepEqual(planLevels(['ileri']), ['kapsamli'], 'tek ders kendi içinde temelden ileriye')
-  assert.deepEqual(planLevels(['temel', 'orta', 'temel', 'ileri', 'saçma']), ['temel', 'orta', 'orta', 'ileri', 'ileri'], 'seviye düşmez, bilinmeyen öncekini sürdürür')
-  assert.deepEqual(planLevels(['orta', 'ileri']), ['orta', 'ileri'], 'doğası gereği ileri konu ortadan başlayabilir')
-  assert.deepEqual(planLevels([undefined, 'orta']), ['temel', 'orta'])
+test('ders seviyeleri: aralık', () => {
   assert.equal(levelRange(['temel', 'ileri', 'orta']), 'Temel → İleri')
   assert.equal(levelRange(['orta', 'orta']), 'Orta')
   assert.equal(levelRange(['kapsamli']), 'Temelden ileriye')
@@ -332,7 +395,7 @@ test('gökyüzü takvimi ve arama', () => {
 })
 
 test('ders çıktısı, linkler ve iç ağ adresleri', () => {
-  assert.deepEqual(parseLesson('Araştırdım.\nÖzet: Airy diski kırınımdır.\nÖnkoşul: 3, 7\nÖğretilenler: kırınım, Airy diski\n\n## Nedir?\nMetin'), { excerpt: 'Airy diski kırınımdır.', body: '## Nedir?\nMetin', prerequisites: [3, 7], covers: 'kırınım, Airy diski' })
+  assert.deepEqual(parseLesson('Araştırdım.\nÖzet: Airy diski kırınımdır.\nÖnkoşul: [[fotometri/temel]], kavram/nyquist-piksel-olcegi\nÖğretilenler: kırınım, Airy diski\n\n## Nedir?\nMetin'), { excerpt: 'Airy diski kırınımdır.', body: '## Nedir?\nMetin', prerequisites: ['fotometri/temel', 'kavram/nyquist-piksel-olcegi'], covers: 'kırınım, Airy diski' })
   assert.deepEqual(parseLesson('Özet: X\nÖnkoşul: yok\n## Nedir?\nA')?.prerequisites, [])
   assert.equal(parseLesson('Başlıksız metin'), null)
   const body = 'Bak [ESO](https://eso.org/a) ve [yok](https://x.com/404) ve tekrar [ESO](https://eso.org/a)'

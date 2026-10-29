@@ -8,7 +8,7 @@ import { ConfirmButton } from '../../../../ConfirmButton'
 import { deleteLessonAction, publishLessonAction, rewriteLessonAction, saveLessonAction } from '../../../../actions'
 
 export default async function LessonAdminPage({ params, searchParams }: { params: { id: string }; searchParams: { mesaj?: string } }) {
-  const lesson = await prisma.lesson.findUnique({ where: { id: Number(params.id) || 0 }, include: { series: true } })
+  const lesson = await prisma.lesson.findUnique({ where: { id: Number(params.id) || 0 }, include: { series: true, stage: { select: { title: true } } } })
   if (!lesson) notFound()
   const published = lesson.status === 'published'
   const written = !!lesson.body.trim()
@@ -16,7 +16,7 @@ export default async function LessonAdminPage({ params, searchParams }: { params
   return (
     <>
       <Notice message={searchParams.mesaj} />
-      <p className="text-sm mb-2"><Link href={`/admin/egitim/seri/${lesson.seriesId}`} className="hover:underline">← {lesson.series.title}</Link></p>
+      <p className="text-sm mb-2"><Link href={lesson.stageId ? `/admin/egitim/blok/${lesson.stageId}` : `/admin/egitim/seri/${lesson.seriesId}`} className="hover:underline">← {lesson.stage?.title ?? lesson.series.title}</Link></p>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <h1 className="text-xl font-bold flex-1">{published ? 'Yayındaki ders' : written ? 'Taslak ders' : 'Henüz yazılmadı'}</h1>
         {written && <a href={`/egitim/${lesson.series.slug}/${lesson.slug}`} className="btn" target="_blank">Önizle</a>}
@@ -25,7 +25,7 @@ export default async function LessonAdminPage({ params, searchParams }: { params
         <form action={deleteLessonAction}><input type="hidden" name="id" value={lesson.id} /><ConfirmButton question="Ders silinsin mi?" className="btn-danger">Sil</ConfirmButton></form>
       </div>
       {lesson.error && <p className="text-sm text-red-600 mb-4">Son deneme: {lesson.error}</p>}
-      {written && <p className="text-sm text-zinc-500 mb-4">{lesson.inputTokens + lesson.outputTokens} token · {sources.length} kaynak{lesson.prerequisites && ` · önkoşul ders no: ${lesson.prerequisites}`}</p>}
+      {written && <p className="text-sm text-zinc-500 mb-4">{lesson.inputTokens + lesson.outputTokens} token · {sources.length} kaynak{lesson.prerequisites && ` · önkoşul: ${lesson.prerequisites}`}</p>}
       {written && (
         <section className="card mb-4 text-sm">
           <p className="font-medium mb-2">Denetim bulguları</p>
@@ -45,7 +45,7 @@ export default async function LessonAdminPage({ params, searchParams }: { params
         <div>
           <label className="label" htmlFor="body">Ders (Markdown)</label>
           <textarea id="body" name="body" defaultValue={lesson.body} rows={28} className="input font-mono" />
-          <p className="hint">## başlık, - liste, **kalın**, `kod`, ```python kod bloğu```, $satır içi formül$, $$ayrı satırda formül$$, [metin](https://link)</p>
+          <p className="hint">## başlık, - liste, **kalın**, `kod`, ```python kod bloğu```, $satır içi formül$, $$ayrı satırda formül$$, [metin](https://link), [[anahtar|metin]] (başka derse bağlantı), :::bilmen · :::hesap · :::merak · :::cozum kutuları (::: ile kapanır)</p>
         </div>
         <button className="btn-primary">Kaydet</button>
       </form>

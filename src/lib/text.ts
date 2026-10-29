@@ -127,14 +127,15 @@ export function pickDaily<T extends { score: number; space: boolean }>(items: T[
 
 export const monthKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 
-// Ders çıktısı: "Özet: ...", "Önkoşul: 3, 7" ve "Öğretilenler: ..." satırları ile ilk "## " başlığından başlayan gövde
-// (öncesindeki "araştırdım…" gibi sözler atılır). Önkoşul numaraları modele verilen ders listesindeki sıradır
-export function parseLesson(text: string): { excerpt: string; body: string; prerequisites: number[]; covers: string } | null {
+// Ders çıktısı: "Özet: ...", "Önkoşul: anahtar, anahtar" ve "Öğretilenler: ..." satırları ile ilk "## " başlığından başlayan gövde
+// (öncesindeki "araştırdım…" gibi sözler atılır)
+export function parseLesson(text: string): { excerpt: string; body: string; prerequisites: string[]; covers: string } | null {
   const start = text.search(/^##\s/m)
   if (start < 0) return null
   const head = text.slice(0, start)
   const excerpt = head.match(/^\s*\**Özet:?\**:?\s*(.+)$/m)?.[1].trim() ?? ''
-  const prerequisites = (head.match(/^\s*\**Önkoşul(?:lar)?:?\**:?\s*(.+)$/m)?.[1] ?? '').match(/\d+/g)?.map(Number) ?? []
+  // Önkoşullar müfredat anahtarlarıyla ("fotometri/temel, kavram/nyquist"); köşeli parantezle yazılsa da tanınır
+  const prerequisites = (head.match(/^\s*\**Önkoşul(?:lar)?:?\**:?\s*(.+)$/m)?.[1] ?? '').match(/[a-z0-9-]+\/[a-z0-9-]+/g) ?? []
   const covers = head.match(/^\s*\**Öğretilenler:?\**:?\s*(.+)$/m)?.[1].trim() ?? ''
   return { excerpt: excerpt.slice(0, 500), body: text.slice(start).trim(), prerequisites, covers: covers.slice(0, 1000) }
 }
@@ -190,11 +191,11 @@ export const mondayOf = (date: string) => addDays(date, -((new Date(`${date}T12:
 // "|" ile ayrılmış satırlar; liste işaretleri ve ** atılır, biçime uymayan satır yalnızca kendisi düşer
 const fields = (text: string) => text.split('\n').map((line) => line.replace(/^[\s\-*•|\d.)]+(?=\S)/, '').replace(/\|\s*$/, '').split('|').map((part) => part.trim().replace(/^\*+|\*+$/g, '')))
 
-// Ders planı: "SEVİYE | Başlık | Kapsam"
-export function parsePlan(text: string): Array<{ level: string; title: string; scope: string }> {
+// Ders planı: "DERS | Başlık | Kapsam" satırları (baştaki işaret, araya giren başka satırları ayırır)
+export function parsePlan(text: string): Array<{ title: string; scope: string }> {
   return fields(text)
-    .filter((parts) => parts.length >= 2 && /^(temel|orta|ileri)$/i.test(parts[0]) && parts[1])
-    .map(([level, title, ...scope]) => ({ level: level.toLowerCase(), title: title.slice(0, 200), scope: scope.join(' | ').slice(0, 1000) }))
+    .filter((parts) => parts.length >= 2 && /^ders$/i.test(parts[0]) && parts[1])
+    .map(([, title, ...scope]) => ({ title: title.slice(0, 200), scope: scope.join(' | ').slice(0, 1000) }))
     .slice(0, 15)
 }
 
@@ -206,9 +207,10 @@ export function parseIssues(text: string): { issues: Array<{ major: boolean; whe
   return { issues, readable: issues.length > 0 || /SORUN YOK/i.test(text) }
 }
 
-// Yeni seri önerisi: "Başlık: …", "Kapsam: …", "Alan: …", "Seviye: …" satırları
-export function parseProposal(text: string): { title: string; summary: string; track: string; level: string } | null {
-  const field = (name: string) => text.match(new RegExp(`^[\\s*-]*\\**${name}\\**\\s*:\\**\\s*(.+)$`, 'im'))?.[1].trim().replace(/\*+$/, '') ?? ''
-  const title = field('Başlık')
-  return title ? { title: title.slice(0, 200), summary: field('Kapsam').slice(0, 1000), track: field('Alan').slice(0, 100), level: field('Seviye').toLowerCase().slice(0, 20) } : null
+// Haberlerden kavram önerisi: "KAVRAM | Başlık | Hangi haberde geçti" satırları
+export function parseConcepts(text: string): Array<{ title: string; reason: string }> {
+  return fields(text)
+    .filter((parts) => parts.length >= 2 && /^kavram$/i.test(parts[0]) && parts[1])
+    .map(([, title, ...reason]) => ({ title: title.slice(0, 200), reason: reason.join(' | ').slice(0, 500) }))
+    .slice(0, 3)
 }
