@@ -348,6 +348,9 @@ test('makale → taslak yazı → yayın', async () => {
   assert.match((await get('/admin/yazilar?durum=taslak')).html, /Bu süzgece uyan yazı yok/)
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkar'), /Öne çıkarıldı/)
   assert.match(await submit(`/admin/yazilar/${postId}`, 'Öne çıkanlardan kaldır'), /kaldırıldı/)
+  // Listedeki ☆ süzgeçli sayfaya geri döner
+  assert.match(await submit('/admin/yazilar?durum=yayinda&sira=onem', 'aria-label="Öne çıkar"'), /\/admin\/yazilar\?durum=yayinda&sira=onem&sayfa=1&mesaj=Öne çıkarıldı/)
+  assert.match(await submit('/admin/yazilar?durum=yayinda&sira=onem', 'aria-label="Öne çıkanlardan kaldır"'), /durum=yayinda&sira=onem&sayfa=1&mesaj=Öne çıkanlardan kaldırıldı/)
 })
 
 test('yazıyı abonelere gönder (Künye)', async () => {
@@ -632,6 +635,10 @@ test('günlük iş: büyük yığılmada bütün haberler parça parça puanlan�
   assert.ok(last >= 6, `sayfa sayısı: ${last}`)
   assert.match(first, /href="\/admin\/makaleler\?durum=new&amp;sayfa=2"/)
   assert.match((await get(`/admin/makaleler?durum=new&sayfa=${last}`)).html, /Yazıya dönüştür[\s\S]*Sonraki →<\/span>/, 'son sayfada da makaleler var, sonraki yok')
+  // Listedeki düğme bulunduğu sayfaya döner; başka bir adrese yönlendiremez
+  assert.match(await submit('/admin/makaleler?durum=new&sayfa=2', '>Atla<'), /\/admin\/makaleler\?durum=new&sayfa=2&mesaj=Atlandı/)
+  const evil = await submit('/admin/makaleler?durum=new&sayfa=2', '>Atla<', { back: 'https://ornek.com/x' })
+  assert.ok(evil.includes('/admin/makaleler?mesaj=Atlandı') && !evil.includes('ornek.com'), evil)
   assert.match((await get('/admin/makaleler?durum=new&sayfa=999')).html, new RegExp(`name="sayfa" value="${last}"`), 'sınır dışı numara son sayfaya')
   // İlk seçilenin tam metin puanı düşük: yazılmaz, yerine sıradaki; yine 2 yazı
   assert.match(log, /tam metin puanı 3,3 \(ön puan 7,8\), yazılmadı; yerine sıradaki/)
