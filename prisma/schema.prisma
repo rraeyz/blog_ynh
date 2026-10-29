@@ -165,6 +165,7 @@ model Lesson {
   status       String    @default("planned") // planned | draft | published | failed
   error        String    @default("")
   publishedAt  DateTime?
+  reports      LessonReport[]
   writtenAt    DateTime? // Yazıldığı an: hatların dönüşümü buna göre (lib/curriculum.ts nextTracks)
   inputTokens  Int       @default(0)
   outputTokens Int       @default(0)
@@ -213,4 +214,15 @@ model Suggestion {
   detail    String   @default("")
   analysis  String   @default("") // yapay zekâ değerlendirmesi, satır satır (lib/text.ts parseSuggestion)
   createdAt DateTime @default(now())
+}
+
+// Okurun derste bildirdiği hata ya da anlaşılmayan yer: panelde görünür, "Araştırıp yeniden yaz"da yazara girdi olur, sonra silinir
+model LessonReport {
+  id        Int      @id @default(autoincrement())
+  lessonId  Int
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  note      String
+  createdAt DateTime @default(now())
+
+  @@index([lessonId])
 }

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { isLevel, LEVELS, levelRange } from '@/lib/levels'
 import { coverStyle, LevelBadge } from '../../parts'
+import { ReadCheck, SeriesProgress } from '../Progress'
 
 const RANK = ['temel', 'orta', 'ileri', 'kapsamli']
 const lessonFields = { id: true, slug: true, title: true, scope: true, status: true, level: true, stageId: true } as const
@@ -27,7 +28,7 @@ const LessonRow = ({ seriesSlug, lesson, n }: { seriesSlug: string; lesson: Row;
     <>
       <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${open ? 'bg-violet-600 text-white' : 'bg-zinc-200 text-zinc-500 dark:bg-white/10'}`}>{n}</span>
       <span className="min-w-0">
-        <span className="flex flex-wrap items-center gap-2"><span className={`font-semibold ${open ? '' : 'text-zinc-500'}`}>{lesson.title}</span><LevelBadge level={lesson.level} /></span>
+        <span className="flex flex-wrap items-center gap-2"><span className={`font-semibold ${open ? '' : 'text-zinc-500'}`}>{lesson.title}</span><LevelBadge level={lesson.level} />{open && <ReadCheck id={lesson.id} />}</span>
         <span className="block text-sm text-zinc-500 mt-0.5">{open ? lesson.scope : `Yakında · ${lesson.scope}`}</span>
       </span>
     </>
@@ -60,7 +61,7 @@ function Concepts({ slug, lessons }: { slug: string; lessons: Row[] }) {
         <section key={letter} id={`harf-${letter}`} className="mt-8">
           <h2 className="text-2xl font-semibold">{letter}</h2>
           <ul className="mt-3 divide-y divide-zinc-200/70 dark:divide-ink-line">
-            {list.map((l) => <li key={l.id} className="py-2.5"><Link href={`/egitim/${slug}/${l.slug}`} className="font-medium hover:text-violet-600 dark:hover:text-violet-300">{l.title}</Link></li>)}
+            {list.map((l) => <li key={l.id} className="flex flex-wrap items-center gap-2 py-2.5"><Link href={`/egitim/${slug}/${l.slug}`} className="font-medium hover:text-violet-600 dark:hover:text-violet-300">{l.title}</Link><ReadCheck id={l.id} /></li>)}
           </ul>
         </section>
       ))}
@@ -85,6 +86,7 @@ export default async function SeriesPage({ params }: { params: { seri: string } 
         <p className="mt-3 text-white/85">{series.summary}</p>
         {!kavram && levelRange(series.lessons.map((l) => l.level)) && <p className="mt-4 text-sm text-white/75">{series.lessons.length} ders · {levelRange(series.lessons.map((l) => l.level))}</p>}
       </header>
+      <SeriesProgress ids={series.lessons.filter((l) => l.status === 'published').map((l) => l.id)} />
       {kavram ? (
         <Concepts slug={series.slug} lessons={series.lessons} />
       ) : (

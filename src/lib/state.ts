@@ -15,15 +15,19 @@ export async function getSettings() {
 
 export type Settings = Awaited<ReturnType<typeof getSettings>>
 
-// Aylık token kullanımı (giriş + çıkış), bütçe sınırı için: AppState "usage.2026-10"
-export async function getUsage(month = monthKey()): Promise<{ input: number; output: number }> {
+// Aylık kullanım, AppState "usage.2026-10": toplam token (bütçe sınırı için) ve kaleme göre çağrı, token, ücret (maliyet tablosu)
+export type UsageKind = 'haber' | 'ders' | 'gokyuzu' | 'oneri' | 'gorsel'
+type Tally = { calls: number; input: number; output: number; cost: number }
+export async function getUsage(month = monthKey()): Promise<{ input: number; output: number; kinds: Partial<Record<UsageKind, Tally>> }> {
   const raw = await getState(`usage.${month}`)
-  return raw ? JSON.parse(raw) : { input: 0, output: 0 }
+  return { input: 0, output: 0, kinds: {}, ...(raw ? JSON.parse(raw) : {}) }
 }
 
-export async function addUsage(input: number, output: number): Promise<void> {
+export async function addUsage(result: { inputTokens: number; outputTokens: number; cost: number }, kind: UsageKind): Promise<void> {
   const usage = await getUsage()
-  await setState(`usage.${monthKey()}`, JSON.stringify({ input: usage.input + input, output: usage.output + output }))
+  const tally = usage.kinds[kind] ?? { calls: 0, input: 0, output: 0, cost: 0 }
+  usage.kinds[kind] = { calls: tally.calls + 1, input: tally.input + result.inputTokens, output: tally.output + result.outputTokens, cost: tally.cost + result.cost }
+  await setState(`usage.${monthKey()}`, JSON.stringify({ input: usage.input + result.inputTokens, output: usage.output + result.outputTokens, kinds: usage.kinds }))
 }
 
 export async function overBudget(settings: Settings): Promise<boolean> {

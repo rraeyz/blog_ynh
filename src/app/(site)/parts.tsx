@@ -229,3 +229,8 @@ export function LevelBadge({ level }: { level: string }) {
   if (!isLevel(level)) return null
   return <span title={LEVELS[level].hint} className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${LEVEL_COLORS[level]}`}>{LEVELS[level].label}</span>
 }
+
+// Arama motorları için yapılandırılmış veri (schema.org). "<" kaçışlanır: metin script etiketini kapatamasın
+export function JsonLd({ data }: { data: Record<string, unknown> }) {
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({ '@context': 'https://schema.org', ...data }).replace(/</g, '\\u003c') }} />
+}
