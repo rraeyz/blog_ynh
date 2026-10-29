@@ -683,7 +683,9 @@ test('arama motorları: site haritası, robots, yapılandırılmış veri', asyn
     assert.match(xml, /<loc>https:\/\/blog\.example\.com\/egitim\/python<\/loc>/)
     assert.doesNotMatch(xml, /zernike|admin/i, 'yayımlanmamış ders ve panel yok')
     const robots = await (await fetch(`${B}/robots.txt`)).text()
-    assert.match(robots, /Disallow: \/admin[\s\S]*Sitemap: https:\/\/blog\.example\.com\/sitemap\.xml/)
+    assert.match(robots, /Sitemap: https:\/\/blog\.example\.com\/sitemap\.xml/)
+    assert.doesNotMatch(robots, /admin/, 'panelin adresi ilan edilmez')
+    assert.match((await get('/admin/giris')).html, /<meta name="robots" content="noindex, nofollow"\/>/, 'panel dizine girmez')
     assert.match((await get('/yazi/kediler-neden-cok-uyur')).html, /<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@type":"NewsArticle","headline":"Kediler Neden Çok Uyur\?"/)
     assert.match((await get('/egitim/python/kirinim-ve-airy-diski')).html, /"@type":"LearningResource"[^<]*"isPartOf":\{"@type":"Course","name":"Python ile Astronomi"/)
   } finally {
