@@ -6,6 +6,7 @@ import { isLevel, levelRange, LEVELS } from '@/lib/levels'
 import { TRACK_HINTS, TRACKS, type Track } from '@/lib/curriculum'
 import { LevelBadge } from '../parts'
 import { SuggestForm } from './SuggestForm'
+import { ReadCheck, SeriesProgress } from './Progress'
 
 export const metadata: Metadata = {
   title: 'Eğitim',
@@ -21,6 +22,7 @@ const LessonList = ({ lessons, showSeries = true }: { lessons: LessonRow[]; show
         <div className="flex flex-wrap items-center gap-2">
           <Link href={`/egitim/${l.series.slug}/${l.slug}`} className="font-semibold hover:text-violet-600 dark:hover:text-violet-300">{l.title}</Link>
           <LevelBadge level={l.level} />
+          <ReadCheck id={l.id} />
         </div>
         <p className="text-xs text-zinc-500 mt-0.5 line-clamp-2">{[showSeries && l.series.title, l.excerpt].filter(Boolean).join(' · ')}</p>
       </li>
@@ -110,6 +112,7 @@ export default async function EducationPage({ searchParams }: { searchParams: { 
                       <span className="mt-2 block h-1 overflow-hidden rounded-full bg-zinc-200 dark:bg-white/10">
                         <span className="block h-full rounded-full" style={{ width: `${Math.round((published / Math.max(1, s.lessons.length)) * 100)}%`, background: `hsl(${hue} 80% 60%)` }} />
                       </span>
+                      <SeriesProgress ids={s.lessons.filter((l) => l.status === 'published').map((l) => l.id)} />
                     </Link>
                   )
                 })}

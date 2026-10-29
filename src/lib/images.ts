@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { compressImage } from '@/lib/compress'
 import { PROVIDERS } from '@/lib/ai'
 import { freeImage } from '@/lib/topics'
-import { logJob, type Settings } from '@/lib/state'
+import { addUsage, logJob, type Settings } from '@/lib/state'
 
 // Yapay zekâ kapakları veritabanının yanında durur (YunoHost veri klasörü); JSON yedeğe base64 olarak girer
 export const IMAGE_DIR = path.join(path.dirname((process.env.DATABASE_URL || 'file:/app/prisma/dev.db').replace(/^file:/, '')), 'gorseller')
@@ -40,7 +40,9 @@ export async function generateCover(postId: number, settings: Settings): Promise
   await writeFile(path.join(IMAGE_DIR, name), await compressImage(Buffer.from(image.b64_json, 'base64')))
   await prisma.post.update({ where: { id: post.id }, data: { image: name } })
   await removeImage(post.image)
-  return typeof data.usage?.cost === 'number' ? `${name} (${data.usage.cost.toFixed(3)} $)` : name
+  if (typeof data.usage?.cost !== 'number') return name
+  await addUsage({ inputTokens: 0, outputTokens: 0, cost: data.usage.cost }, 'gorsel')
+  return `${name} (${data.usage.cost.toFixed(3)} $)`
 }
 
 // Yeni yazıda: kaynağın serbest görseli yoksa ve anahtar girilmişse. Görsel hatası yazıyı düşürmez, günlüğe yazılır

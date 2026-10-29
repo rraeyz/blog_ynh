@@ -11,7 +11,7 @@ const DAY_NAMES = ['pazar', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cu
 
 export default async function EducationAdminPage({ searchParams }: { searchParams: { mesaj?: string } }) {
   await seedCurriculum()
-  const [settings, rows, drafts, failed, proposals, request, upcoming, writtenCount, suggestions] = await Promise.all([
+  const [settings, rows, drafts, failed, proposals, request, upcoming, writtenCount, suggestions, reported] = await Promise.all([
     getSettings(),
     prisma.stage.findMany({ where: { approved: true }, orderBy: [{ position: 'asc' }, { id: 'asc' }], include: { lessons: { select: { status: true } } } }),
     prisma.lesson.findMany({ where: { status: 'draft' }, orderBy: { updatedAt: 'desc' }, include: { series: { select: { title: true } } } }),
@@ -21,6 +21,7 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
     upcomingStage(),
     prisma.lesson.count({ where: { writtenAt: { not: null } } }),
     prisma.suggestion.findMany({ orderBy: { createdAt: 'desc' }, take: 100, select: { id: true, title: true, analysis: true, createdAt: true } }),
+    prisma.lesson.findMany({ where: { reports: { some: {} } }, select: { id: true, title: true, _count: { select: { reports: true } } } }),
   ])
   const days = settings.lessonWeekdays.split(',').filter(Boolean).map((d) => DAY_NAMES[Number(d)]).join(', ')
   const stages = rows.map((s) => ({ ...s, pending: s.lessons.filter((l) => l.status === 'planned').length }))
@@ -96,6 +97,20 @@ export default async function EducationAdminPage({ searchParams }: { searchParam
                 <span className="flex-1 min-w-0"><b>{p.title}</b><span className="block text-xs text-zinc-500">{p.summary}</span></span>
                 <form action={approveStageAction}><input type="hidden" name="id" value={p.id} /><button className="btn-primary">Onayla</button></form>
                 <form action={deleteStageAction}><input type="hidden" name="id" value={p.id} /><ConfirmButton question="Öneri silinsin mi?" className="btn">Sil</ConfirmButton></form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {reported.length > 0 && (
+        <section className="mb-8">
+          <h2 className="font-semibold mb-2">Okur bildirimi olan dersler</h2>
+          <ul className="card divide-y divide-zinc-200/70 dark:divide-ink-line text-sm">
+            {reported.map((l) => (
+              <li key={l.id} className="flex items-center gap-3 py-2">
+                <Link href={`/admin/egitim/ders/${l.id}`} className="flex-1 min-w-0 truncate hover:underline">{l.title}</Link>
+                <span className="shrink-0 text-xs text-amber-700 dark:text-amber-300">{l._count.reports} bildirim</span>
               </li>
             ))}
           </ul>

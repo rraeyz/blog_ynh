@@ -8,7 +8,9 @@ import { readingMinutes, topicHue } from '@/lib/topics'
 import { isLevel, LEVELS } from '@/lib/levels'
 import { lessonLinks } from '@/lib/lessons'
 import { TRACKS, type Track } from '@/lib/curriculum'
-import { coverStyle } from '../../../parts'
+import { coverStyle, JsonLd } from '../../../parts'
+import { ReadMark } from '../../Progress'
+import { ReportForm } from '../../ReportForm'
 import { ReadingProgress } from '../../../yazi/[slug]/ReadingProgress'
 
 // Yayımlanmamış ders yalnızca giriş yapmış yöneticiye görünür (önizleme)
@@ -46,6 +48,17 @@ export default async function LessonPage({ params }: { params: { seri: string; d
   return (
     <article className="mx-auto max-w-5xl px-4" style={accent}>
       <ReadingProgress />
+      <JsonLd data={{
+        '@type': 'LearningResource',
+        name: lesson.title,
+        description: lesson.excerpt,
+        inLanguage: 'tr',
+        learningResourceType: 'Ders',
+        ...(isLevel(lesson.level) ? { educationalLevel: LEVELS[lesson.level].label } : {}),
+        ...(lesson.publishedAt ? { datePublished: lesson.publishedAt.toISOString() } : {}),
+        dateModified: lesson.updatedAt.toISOString(),
+        isPartOf: { '@type': 'Course', name: lesson.series.title, description: lesson.series.summary },
+      }} />
       {lesson.status !== 'published' && <p className="mt-6 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300 px-4 py-2 text-sm">Taslak önizlemesi: henüz yayımlanmadı.</p>}
       <p className="mt-8 text-sm">
         <Link href="/egitim" className="text-violet-600 dark:text-violet-300 hover:underline">Eğitim</Link>
@@ -73,6 +86,7 @@ export default async function LessonPage({ params }: { params: { seri: string; d
             </aside>
           )}
           <div className="prose-body lesson-body mt-8" dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.body, { math: true, links }) }} />
+          <ReadMark id={lesson.id} />
 
           {sources.length > 0 && (
             <aside className="mt-12 card">
@@ -88,6 +102,7 @@ export default async function LessonPage({ params }: { params: { seri: string; d
             {previous ? <Link href={`/egitim/${lesson.series.slug}/${previous.slug}`} className="card hover:border-violet-500">← Önceki ders<span className="block font-semibold mt-1">{previous.title}</span></Link> : <span />}
             {next && <Link href={`/egitim/${lesson.series.slug}/${next.slug}`} className="card hover:border-violet-500 sm:text-right">Sonraki ders →<span className="block font-semibold mt-1">{next.title}</span></Link>}
           </nav>
+          {lesson.status === 'published' && <ReportForm lessonId={lesson.id} />}
           <p className="mt-6 text-sm text-zinc-500">Başka bir konuyu öğrenmek ister misin? <Link href="/egitim#oner" className="text-violet-600 dark:text-violet-300 hover:underline">Ders öner →</Link></p>
         </div>
         {toc.length > 1 && (

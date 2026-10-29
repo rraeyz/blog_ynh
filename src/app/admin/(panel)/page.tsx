@@ -1,18 +1,25 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { formatScore } from '@/lib/text'
-import { getSettings, getState, getUsage } from '@/lib/state'
+import { getSettings, getState, getUsage, type UsageKind } from '@/lib/state'
+import { monthKey } from '@/lib/text'
 import { isJobRunning } from '@/lib/jobs'
 import { aiConfig, PROVIDERS } from '@/lib/ai'
 import { runAstroDigestAction, runDailyAction, runSkyAction, runWeeklyAction } from '../actions'
 import { Notice } from '../Notice'
 
+const KINDS: Record<UsageKind, string> = { haber: 'Haberler (puanlama, yazım)', ders: 'Dersler (plan, araştırma, yazım, denetim)', gokyuzu: 'Gökyüzü takvimi', oneri: 'Kavram ve okur önerileri', gorsel: 'Kapak görselleri' }
+const dollars = (cost: number) => `${cost.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`
+
 const DAYS = ['pazar', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 'cumartesi']
 
 export default async function DashboardPage({ searchParams }: { searchParams: { mesaj?: string } }) {
-  const [settings, usage, log, drafts, published, newPapers, sources, digests] = await Promise.all([
+  const lastMonth = new Date()
+  lastMonth.setDate(0)
+  const [settings, usage, previous, log, drafts, published, newPapers, sources, digests] = await Promise.all([
     getSettings(),
     getUsage(),
+    getUsage(monthKey(lastMonth)),
     getState('job.log'),
     prisma.post.count({ where: { status: 'draft' } }),
     prisma.post.count({ where: { status: 'published' } }),
@@ -52,6 +59,36 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
         </p>
         <p><b>Otomatik:</b> her gün {settings.dailyHour}:00&apos;da tarama ve ön puanı {formatScore(settings.scoreThreshold)}+ olan {settings.postsMinPerDay}-{settings.postsPerDay} yazı ({settings.autoPublish ? 'doğrudan yayımlanır' : 'taslak olarak bekler'}{settings.autoFeature && `, önem puanı ${formatScore(settings.featureScore)}+ olanlar öne çıkar`}); her {DAYS[settings.digestWeekday]} haftalık bülten
           {settings.astroDigest && `, her ${DAYS[settings.astroDigestWeekday]} astronomi özeti`} ({settings.autoNewsletter ? 'otomatik gönderilir' : 'taslak olarak bekler'}){settings.skyEnabled && '; haftada bir gökyüzü takvimi'}.</p>
+      </section>
+
+      <section className="card mb-6 text-sm">
+        <h2 className="font-semibold mb-2">Bu ayın harcaması</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="text-xs text-zinc-500"><tr><th className="py-1 pr-3 font-medium">Kalem</th><th className="py-1 pr-3 font-medium text-right">Çağrı</th><th className="py-1 pr-3 font-medium text-right">Token</th><th className="py-1 font-medium text-right">Ücret</th></tr></thead>
+            <tbody className="divide-y divide-zinc-200/70 dark:divide-ink-line">
+              {(Object.keys(KINDS) as UsageKind[]).map((kind) => {
+                const tally = usage.kinds[kind]
+                return (
+                  <tr key={kind}>
+                    <td className="py-1.5 pr-3">{KINDS[kind]}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums">{tally?.calls ?? 0}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums">{((tally?.input ?? 0) + (tally?.output ?? 0)).toLocaleString('tr-TR')}</td>
+                    <td className="py-1.5 text-right tabular-nums">{tally?.cost ? dollars(tally.cost) : '—'}</td>
+                  </tr>
+                )
+              })}
+              <tr className="font-semibold">
+                <td className="py-1.5 pr-3">Toplam</td><td /><td className="py-1.5 pr-3 text-right tabular-nums">{total.toLocaleString('tr-TR')}</td>
+                <td className="py-1.5 text-right tabular-nums">{dollars(Object.values(usage.kinds).reduce((sum, t) => sum + (t?.cost ?? 0), 0))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="hint mt-2">
+          Geçen ay: {dollars(Object.values(previous.kinds).reduce((sum, t) => sum + (t?.cost ?? 0), 0))}. Ücret OpenRouter&apos;ın her çağrıda bildirdiği tutardır; başka
+          sağlayıcıda (ör. haber yazımı doğrudan Claude ya da Gemini ile) ücret bilinmez, &quot;—&quot; görünür, token sayılır. Kesin tutar OpenRouter hesabında.
+        </p>
       </section>
 
       <section className="flex flex-wrap gap-2 mb-6">

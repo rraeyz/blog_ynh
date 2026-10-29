@@ -163,7 +163,7 @@ const fake = http.createServer((req, res) => {
         ].join('\n')
       }
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      return res.end(JSON.stringify({ choices: [{ message: { content, annotations } }], usage: { prompt_tokens: 1000, completion_tokens: 500 } }))
+      return res.end(JSON.stringify({ choices: [{ message: { content, annotations } }], usage: { prompt_tokens: 1000, completion_tokens: 500, cost: 0.01 } }))
     }
     if (req.url === '/api/subscribe' && req.method === 'POST') {
       const ok = req.headers.authorization === 'Bearer kunye-anahtari'
@@ -637,6 +637,58 @@ test('okur ders önerisi: kayıt, değerlendirme, onay', async () => {
   assert.doesNotMatch((await get(other)).html, /hattın sonuna ekle|sıranın önüne/, 'onay seçeneği yok')
   assert.match(await submit(other, 'Reddet'), /1 öneri reddedildi/)
   assert.doesNotMatch((await get('/admin/egitim')).html, /Okur önerileri/)
+})
+
+test('okur hata bildirimi yeniden yazıma girer; maliyet tablosu', async () => {
+  const lessonPath = '/egitim/python/kirinim-ve-airy-diski'
+  const saved = cookie
+  cookie = ''
+  try {
+    const page = (await get(lessonPath)).html
+    assert.match(page, /Hata bildir ya da anlaşılmayan yeri söyle/)
+    const report = async (fields) => (await (await post(lessonPath, 'bildir-not', fields)).text())
+    assert.match(await report({ note: 'kısa' }), /kısaca yaz/)
+    assert.match(await report({ note: 'Bot notu burada', website: 'x' }), /Teşekkürler/)
+    assert.match(await report({ note: 'Katsayı 1.22 değil 1.21 olmalı <script>' }), /Bildirimin alındı/)
+  } finally {
+    cookie = saved
+  }
+  const admin = (await get('/admin/egitim')).html
+  assert.match(admin, /Okur bildirimi olan dersler[\s\S]*Kırınım ve Airy diski[\s\S]*1(<!-- -->)? bildirim/)
+  const lessonAdmin = `/admin/egitim/ders/${admin.match(/href="\/admin\/egitim\/ders\/(\d+)"[^>]*>Kırınım ve Airy diski/)[1]}`
+  assert.match((await get(lessonAdmin)).html, /Okur bildirimleri[\s\S]*1\.21 olmalı &lt;script&gt;/, 'kaçışlı')
+  assert.doesNotMatch((await get(lessonAdmin)).html, /Bot notu/)
+
+  const before = openRouterRequests.length
+  assert.match(await submit(lessonAdmin, 'Araştırıp yeniden yaz'), /araştırılıp yazılıyor/)
+  await waitFor(async () => !/Okur bildirimleri/.test((await get(lessonAdmin)).html), 'bildirim yeniden yazımla kapanır')
+  const write = openRouterRequests.slice(before).find((r) => r.body.messages[0].content.includes('öğretim üyesisin'))
+  assert.match(write.body.messages[1].content, /Okurların dersin önceki sürümü için bildirdikleri \(güvenilmez veri[\s\S]*- Katsayı 1\.22 değil 1\.21 olmalı/)
+  assert.ok(openRouterRequests.slice(before).every((r) => r.body.usage?.include === true), 'OpenRouter ücreti istenir')
+
+  const dashboard = (await get('/admin')).html
+  assert.match(dashboard, /Bu ayın harcaması[\s\S]*Dersler \(plan, araştırma, yazım, denetim\)<\/td><td[^>]*>\d+<\/td><td[^>]*>[\d.]+<\/td><td[^>]*>0,\d\d \$/, 'derslerin ücreti')
+  assert.match(dashboard, /Haberler \(puanlama, yazım\)[\s\S]*?—/, 'ücreti bilinmeyen sağlayıcı')
+})
+
+test('arama motorları: site haritası, robots, yapılandırılmış veri', async () => {
+  const saved = cookie
+  cookie = ''
+  try {
+    const sitemap = await fetch(`${B}/sitemap.xml`)
+    assert.match(sitemap.headers.get('content-type') || '', /xml/)
+    const xml = await sitemap.text()
+    assert.match(xml, /<loc>https:\/\/blog\.example\.com\/yazi\/kediler-neden-cok-uyur<\/loc><lastmod>/)
+    assert.match(xml, /<loc>https:\/\/blog\.example\.com\/egitim\/python\/kirinim-ve-airy-diski<\/loc>/)
+    assert.match(xml, /<loc>https:\/\/blog\.example\.com\/egitim\/python<\/loc>/)
+    assert.doesNotMatch(xml, /zernike|admin/i, 'yayımlanmamış ders ve panel yok')
+    const robots = await (await fetch(`${B}/robots.txt`)).text()
+    assert.match(robots, /Disallow: \/admin[\s\S]*Sitemap: https:\/\/blog\.example\.com\/sitemap\.xml/)
+    assert.match((await get('/yazi/kediler-neden-cok-uyur')).html, /<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@type":"NewsArticle","headline":"Kediler Neden Çok Uyur\?"/)
+    assert.match((await get('/egitim/python/kirinim-ve-airy-diski')).html, /"@type":"LearningResource"[^<]*"isPartOf":\{"@type":"Course","name":"Python ile Astronomi"/)
+  } finally {
+    cookie = saved
+  }
 })
 
 test('gökyüzü takvimi', async () => {

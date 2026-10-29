@@ -613,3 +613,10 @@ export async function approveSuggestionAction(form: FormData) {
   await closeSuggestions(form)
   back('/admin/egitim', message)
 }
+
+export async function deleteReportAction(form: FormData) {
+  await requireAdmin()
+  const report = await prisma.lessonReport.findUnique({ where: { id: id(form) }, select: { lessonId: true } })
+  await prisma.lessonReport.deleteMany({ where: { id: id(form) } })
+  back(report ? lessonPath(report.lessonId) : '/admin/egitim', 'Bildirim silindi')
+}

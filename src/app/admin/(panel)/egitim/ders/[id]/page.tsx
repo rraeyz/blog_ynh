@@ -5,10 +5,10 @@ import { renderMarkdown } from '@/lib/markdown'
 import { LEVELS } from '@/lib/levels'
 import { Notice } from '../../../../Notice'
 import { ConfirmButton } from '../../../../ConfirmButton'
-import { deleteLessonAction, publishLessonAction, rewriteLessonAction, saveLessonAction } from '../../../../actions'
+import { deleteLessonAction, deleteReportAction, publishLessonAction, rewriteLessonAction, saveLessonAction } from '../../../../actions'
 
 export default async function LessonAdminPage({ params, searchParams }: { params: { id: string }; searchParams: { mesaj?: string } }) {
-  const lesson = await prisma.lesson.findUnique({ where: { id: Number(params.id) || 0 }, include: { series: true, stage: { select: { title: true } } } })
+  const lesson = await prisma.lesson.findUnique({ where: { id: Number(params.id) || 0 }, include: { series: true, stage: { select: { title: true } }, reports: { orderBy: { id: 'asc' } } } })
   if (!lesson) notFound()
   const published = lesson.status === 'published'
   const written = !!lesson.body.trim()
@@ -26,6 +26,20 @@ export default async function LessonAdminPage({ params, searchParams }: { params
       </div>
       {lesson.error && <p className="text-sm text-red-600 mb-4">Son deneme: {lesson.error}</p>}
       {written && <p className="text-sm text-zinc-500 mb-4">{lesson.inputTokens + lesson.outputTokens} token · {sources.length} kaynak{lesson.prerequisites && ` · önkoşul: ${lesson.prerequisites}`}</p>}
+      {lesson.reports.length > 0 && (
+        <section className="card mb-4 text-sm border-amber-400/60">
+          <p className="font-medium mb-2">Okur bildirimleri ({lesson.reports.length})</p>
+          <ul className="space-y-2">
+            {lesson.reports.map((r) => (
+              <li key={r.id} className="flex items-start gap-3">
+                <span className="flex-1 whitespace-pre-line">{r.note}<span className="block text-xs text-zinc-500">{r.createdAt.toLocaleDateString('tr-TR')}</span></span>
+                <form action={deleteReportAction}><input type="hidden" name="id" value={r.id} /><button className="btn">Sil</button></form>
+              </li>
+            ))}
+          </ul>
+          <p className="hint mt-2">&quot;Araştırıp yeniden yaz&quot; bu bildirimleri yazara verir (gerçekse düzeltir); yazım başarılı olunca bildirimler kapanır. Elle düzelttiysen tek tek sil.</p>
+        </section>
+      )}
       {written && (
         <section className="card mb-4 text-sm">
           <p className="font-medium mb-2">Denetim bulguları</p>

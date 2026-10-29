@@ -27,6 +27,8 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 - Ders üç aşama (`writeLesson`): araştırma (OpenRouter `openrouter:web_search`; en az 3 doğrulanmış kaynak şart) → yalnızca notlardan yazım → notlarla karşılaştırmalı denetim. Model yanıtları (plan, denetim, kavram önerisi, gökyüzü) JSON değil "|" ile ayrılmış satırlar (`parsePlan` "DERS |", `parseIssues`, `parseConcepts` "KAVRAM |", `parseSkyEvents`): bir tırnak bütün yanıtı bozmasın; okunamayan denetim yayımlatmaz. Ciddi bulgu yoksa ve `lessonAutoPublish` açıksa yayımlanır, yoksa taslak + `review`. Açılmayan linkler metne döner.
 - "Haberin arkasındaki bilim": haftada bir (ders gününde) önemli uzay/fizik haberlerinde geçen, listede olmayan kavramlar onaysız blok olarak önerilir (`approved` false); panelde onaylanınca kavram sırasının başına geçer.
 - Okur ders önerisi: `/egitim#oner` formu (`suggestAction`; yalnızca kaydedilir, bot tuzağı, IP başına sınır, en fazla 500 bekleyen; e-posta alınmaz) → `Suggestion`. Panelde "Analiz et" (`analyzeSuggestion`, Haiku; öneri güvenilmez veri) katalogla karşılaştırır: var (bloğu hattın başına al) / tek (istek) / seri (hat, 1-3 aşama, önkoşul) / uygun değil; `parseSuggestion` satırları. Öneri formda düzenlenip onaylanır; onay ya da ret öneriyi ve BENZER önerileri siler.
+- Okur hata bildirimi: ders sonunda kapalı "Hata bildir" kutusu (`reportAction`, `LessonReport`; bot tuzağı, IP sınırı). Panelde dersin sayfasında ve Eğitim'de listelenir; "Araştırıp yeniden yaz" bildirimleri yazara (güvenilmez veri olarak) verir, yazım başarılı olunca silinir.
+- Okuma ilerlemesi (`egitim/Progress.tsx`): yalnızca tarayıcıda, localStorage `okunan` (ders id'leri); sunucuya gitmez. Dersin sonuna ulaşan ve sayfada en az 30 saniye kalan okur için ders kendiliğinden okundu sayılır (`ReadMark`); seri sayfasında ve kartlarda yeşil çubuk (`SeriesProgress`), listelerde "Okundu" (`ReadCheck`).
 - Site: `/egitim` hatlara göre seriler, Kavramlar A–Z (`/egitim/kavramlar`), istenen dersler; seri sayfası aşamalara göre, bölünmemiş aşama yol haritası olarak.
 
 ## Diğer
@@ -37,6 +39,9 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 - Arama (`/ara`, `lib/search.ts`): SQLite FTS5 dizini (Prisma şemasında yok, ilk aramada kurulur); yayımlananların sayısı ya da son güncellemesi değişince baştan kurulur. Metin `foldText` ile katlanır, sorgu `ftsQuery` (kelime başı); bütün kelimeleri başlığında geçenler önce. Üstteki kutu (`SearchBox`) yazdıkça `/api/ara`dan öneri gösterir, Enter `/ara?q=`ye gider.
 - Panel listeleri (Makaleler, Yazılar) 100'lük sayfalar (`admin/Pager.tsx`); listedeki düğmeler `BackTo` ile bulunduğu adresi gönderir, eylem `returnTo` ile oraya döner (yalnızca panel liste adresleri kabul edilir).
 - Tema (`app/ThemeToggle.tsx`, site ve panel sağ üst): Otomatik (cihaza göre, varsayılan) → Açık → Koyu; seçim localStorage `tema`, `<html class="light|dark">`. Tailwind `darkMode` iki seçicili: cihaz koyu ve `.light` yok ya da `.dark` var; Otomatik JavaScript'siz çalışır, seçimi layout.tsx'teki betik boyamadan önce uygular. Elle yazılan koyu CSS de aynı iki koşulu kullanmalı (globals.css).
+- Arama motorları: `/sitemap.xml` ve `/robots.txt` route'ları (panel, `/api/`, `/ara` dışarıda); yazılarda NewsArticle, derslerde LearningResource yapılandırılmış verisi (`parts.tsx` `JsonLd`, `<` kaçışlanır).
+- Maliyet: `addUsage(result, kind)` aylık AppState `usage.AY`'a toplam token (bütçe sınırı) ve kaleme göre (haber, ders, gokyuzu, oneri, gorsel) çağrı, token, ücret yazar. Ücret OpenRouter'ın yanıtta bildirdiği `usage.cost` (`usage: { include: true }` istenir); başka sağlayıcıda 0, tabloda "—". Panel ana sayfasında "Bu ayın harcaması".
+- Herkese açık formların (abonelik, öneri, bildirim) IP sınırı form başına ayrı (`app/actions.ts` `limited`).
 - Ayarlar sekmeli; `saveSettingsAction` yalnızca `SETTINGS_SECTIONS[section]` alanlarını yazar. Yeni ayar: şema + bölüm listesi + `parse` + `backup.ts` FIELDS.
 
 ## Yapılacaklar (kullanıcı onayladı, sonraya)
@@ -45,4 +50,4 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 
 ## Düşünülenler (karar bekliyor)
 - Seriye abonelik: okur e-postasıyla bir seriye abone olur, yeni ders yayımlanınca Künye etiketiyle e-posta (üyelik sistemi olmadan).
-- Okuma ilerlemesi: bitirilen dersler ve seri ilerleme çubuğu (yeşil). Öneri: önce tarayıcıda (localStorage, kişisel veri yok); cihazlar arası eşitleme gerekirse sonra e-postayla giriş bağlantısı.
+- Okuma ilerlemesini cihazlar arası eşitleme: gerekirse e-postayla giriş bağlantısı (şimdilik yalnızca tarayıcıda).

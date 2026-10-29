@@ -55,7 +55,7 @@ export async function skyTask(settings: Settings): Promise<string> {
     { tools: [{ type: 'openrouter:web_search', parameters: { max_uses: 5, max_total_results: 25 } }], max_tokens: 32_000 },
     10 * 60_000,
   )
-  await addUsage(result.inputTokens, result.outputTokens)
+  await addUsage(result, 'gokyuzu')
   const events = parseSkyEvents(result.text, from, to)
   if (events.length === 0) throw new Error('Bu aralık için doğrulanmış gökyüzü olayı bulunamadı')
   await prisma.$transaction([prisma.skyEvent.deleteMany({ where: { date: { gte: from, lte: to } } }), prisma.skyEvent.createMany({ data: events })])

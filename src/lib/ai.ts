@@ -19,6 +19,8 @@ export interface Completion {
   outputTokens: number
   // OpenRouter web aramasının kullandığı sayfalar (url_citation); diğer sağlayıcılarda boş
   citations: Array<{ url: string; title: string }>
+  // OpenRouter'ın bildirdiği ücret ($); diğer sağlayıcılarda 0 (bilinmiyor)
+  cost: number
 }
 
 const TIMEOUT = 5 * 60 * 1000
@@ -50,7 +52,7 @@ export async function complete(settings: Settings, system: string, user: string,
     })
     if (response.stop_reason === 'refusal') throw new Error('Model bu isteği yanıtlamayı reddetti')
     const text = response.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('')
-    return { text, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, citations: [] }
+    return { text, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, citations: [], cost: 0 }
   }
 
   if (!baseUrl) throw new Error('Özel sağlayıcı için API adresi girilmemiş')
@@ -58,7 +60,8 @@ export async function complete(settings: Settings, system: string, user: string,
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
-      body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], ...extra }),
+      // OpenRouter yanıtta ücreti de bildirsin (maliyet tablosu)
+      body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], ...(provider === 'openrouter' ? { usage: { include: true } } : {}), ...extra }),
       signal: AbortSignal.timeout(timeoutMs),
     })
     const data = await response.json().catch(() => null)
@@ -85,5 +88,5 @@ function completion(provider: string, response: Response, data: any): Completion
   const citations = annotations.flatMap((a) =>
     a.type === 'url_citation' && typeof a.url_citation?.url === 'string' ? [{ url: a.url_citation.url, title: String(a.url_citation.title ?? '') }] : [],
   )
-  return { text, inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0, citations }
+  return { text, inputTokens: data.usage?.prompt_tokens ?? 0, outputTokens: data.usage?.completion_tokens ?? 0, citations, cost: typeof data.usage?.cost === 'number' ? data.usage.cost : 0 }
 }

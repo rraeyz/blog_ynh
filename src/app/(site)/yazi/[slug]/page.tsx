@@ -6,7 +6,7 @@ import { isAdmin } from '@/lib/auth'
 import { getSettings } from '@/lib/state'
 import { headings, inline, renderMarkdown } from '@/lib/markdown'
 import { coverOf, readingMinutes, topicHue } from '@/lib/topics'
-import { CardPost, CoverImage, coverStyle, PAPER_FIELDS, postDate, SubscribeBox, TopicChip, topicOf } from '../../parts'
+import { CardPost, CoverImage, coverStyle, JsonLd, PAPER_FIELDS, postDate, SubscribeBox, TopicChip, topicOf } from '../../parts'
 import { ReadingProgress } from './ReadingProgress'
 
 // Taslak yazıyı yalnızca giriş yapmış yönetici görebilir (önizleme)
@@ -49,6 +49,15 @@ export default async function PostPage({ params }: { params: { slug: string } })
   return (
     <article className="mx-auto max-w-5xl px-4" style={accent}>
       <ReadingProgress />
+      <JsonLd data={{
+        '@type': 'NewsArticle',
+        headline: post.title,
+        description: post.excerpt,
+        datePublished: (post.publishedAt ?? post.createdAt).toISOString(),
+        dateModified: post.updatedAt.toISOString(),
+        ...(image ? { image: new URL(image.src, settings.siteUrl || 'http://localhost').href } : {}),
+        publisher: { '@type': 'Organization', name: settings.siteTitle },
+      }} />
       {post.status !== 'published' && <p className="mt-6 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-300 px-4 py-2 text-sm">Taslak önizlemesi: henüz yayımlanmadı.</p>}
 
       <header className="relative mt-8 overflow-hidden rounded-3xl p-7 md:p-12 text-white min-h-72 md:min-h-96 flex flex-col justify-end" style={coverStyle(topic, post.slug)}>

@@ -105,7 +105,7 @@ export async function writePost(paperId: number, settings: Settings, publish = s
     }
     const user = `Başlık: ${paper.title}\nYazarlar: ${paper.authors || '-'}\nLink: ${paper.url}\n\nMetin:\n${text}`
     const result = await complete(settings, SYSTEM, user)
-    await addUsage(result.inputTokens, result.outputTokens)
+    await addUsage(result, 'haber')
     const data = extractJson(result.text) as { title?: unknown; brief?: unknown; excerpt?: unknown; highlights?: unknown; body?: unknown; category?: unknown }
     if (typeof data.title !== 'string' || typeof data.body !== 'string' || !data.title.trim() || !data.body.trim()) {
       throw new Error('Model beklenen biçimde yanıt vermedi')
@@ -173,7 +173,7 @@ async function fullTextScore(paper: { title: string; publishedAt: Date }, text: 
   // Model nadiren bir ölçütü atlıyor ("1 | 1 | 1 | 3 | diğer"): ikinci istek genelde düzgün gelir
   for (let attempt = 0; attempt < 2; attempt++) {
     const result = await complete(settings, SCORE_PROMPT, `${interestsLine(settings)}Bugün: ${today()}\n\n${recentList(recent)}Haberler:\n1. ${paper.title} (${paper.publishedAt.toISOString().slice(0, 10)})\n   ${text}`, { temperature: 0 })
-    await addUsage(result.inputTokens, result.outputTokens)
+    await addUsage(result, 'haber')
     const line = parseScores(result.text, 1)[0]
     if (line) return { score: scoreOf(line.criteria, paper.publishedAt), repeat: line.repeat === 'written' }
   }
@@ -186,7 +186,7 @@ export async function scorePapers(candidates: Candidate[], settings: Settings, r
   const list = candidates.map((paper, index) => `${index + 1}. ${paper.title} (${paper.publishedAt.toISOString().slice(0, 10)})\n   ${cleanSummary(paper.abstract).slice(0, 500)}`).join('\n')
   // temperature 0: aynı haber iki kez puanlanınca fark yarıya iner (gerçek Haiku denemesinde 0,52 → 0,33)
   const result = await complete(settings, SCORE_PROMPT, `${interestsLine(settings)}Bugün: ${today()}\n\n${recentList(recent)}Haberler:\n${list}`, { temperature: 0 })
-  await addUsage(result.inputTokens, result.outputTokens)
+  await addUsage(result, 'haber')
   const lines = parseScores(result.text, candidates.length)
   if (lines.length === 0) throw new Error('Puan yanıtında geçerli satır yok')
   const scores = new Map(lines.map((line) => [line.index, scoreOf(line.criteria, candidates[line.index].publishedAt)]))
