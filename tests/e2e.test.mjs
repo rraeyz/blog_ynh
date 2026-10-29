@@ -628,10 +628,11 @@ test('günlük iş: büyük yığılmada bütün haberler parça parça puanlan�
   assert.match((await get('/admin/makaleler?durum=new')).html, /ön puan (<!-- -->)?7,8(<!-- -->)?\/10/)
   // Bekleyen 600'den fazla: 100'lük sayfalar, son sayfaya gidilebilir
   const first = (await get('/admin/makaleler?durum=new')).html
-  const last = Number(first.match(/Sayfa (?:<!-- -->)?1(?:<!-- -->)? \/ (?:<!-- -->)?(\d+)/)?.[1])
+  const last = Number(first.match(/max="(\d+)"[^>]*name="sayfa"/)?.[1])
   assert.ok(last >= 6, `sayfa sayısı: ${last}`)
   assert.match(first, /href="\/admin\/makaleler\?durum=new&amp;sayfa=2"/)
   assert.match((await get(`/admin/makaleler?durum=new&sayfa=${last}`)).html, /Yazıya dönüştür[\s\S]*Sonraki →<\/span>/, 'son sayfada da makaleler var, sonraki yok')
+  assert.match((await get('/admin/makaleler?durum=new&sayfa=999')).html, new RegExp(`name="sayfa" value="${last}"`), 'sınır dışı numara son sayfaya')
   // İlk seçilenin tam metin puanı düşük: yazılmaz, yerine sıradaki; yine 2 yazı
   assert.match(log, /tam metin puanı 3,3 \(ön puan 7,8\), yazılmadı; yerine sıradaki/)
   assert.match(log, /Günlük iş \(elle\): 70\d yeni makale, 2 yazı (taslak|yayımlandı)/, 'yine 2 yazı')

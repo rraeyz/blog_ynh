@@ -10,18 +10,22 @@ const PAGE = 100
 
 export default async function PapersPage({ searchParams }: { searchParams: { mesaj?: string; durum?: string; sayfa?: string } }) {
   const status = STATUS[searchParams.durum ?? ''] ? searchParams.durum! : 'new'
-  const page = Math.max(1, Math.floor(Number(searchParams.sayfa)) || 1)
-  const [papers, counts] = await Promise.all([
-    prisma.paper.findMany({ where: { status }, orderBy: [{ score: 'desc' }, { publishedAt: 'desc' }], skip: (page - 1) * PAGE, take: PAGE, include: { post: { select: { id: true, title: true } } } }),
-    prisma.paper.groupBy({ by: ['status'], _count: true }),
-  ])
+  const counts = await prisma.paper.groupBy({ by: ['status'], _count: true })
   const count = (key: string) => counts.find((row) => row.status === key)?._count ?? 0
   const pages = Math.max(1, Math.ceil(count(status) / PAGE))
+  // Elle yazılan numara sınırların dışındaysa en yakın sayfa
+  const page = Math.min(pages, Math.max(1, Math.floor(Number(searchParams.sayfa)) || 1))
+  const papers = await prisma.paper.findMany({ where: { status }, orderBy: [{ score: 'desc' }, { publishedAt: 'desc' }], skip: (page - 1) * PAGE, take: PAGE, include: { post: { select: { id: true, title: true } } } })
   const pageLink = (n: number) => `/admin/makaleler?durum=${status}&sayfa=${n}`
   const pager = pages > 1 && (
-    <nav aria-label="Sayfalar" className="flex flex-wrap items-center gap-3 my-4 text-sm">
+    <nav aria-label="Sayfalar" className="flex items-center justify-between gap-2 my-4 text-sm">
       {page > 1 ? <Link href={pageLink(page - 1)} className="btn whitespace-nowrap">← Önceki</Link> : <span className="btn whitespace-nowrap opacity-40">← Önceki</span>}
-      <span className="text-stone-500">Sayfa {page} / {pages} · {(page - 1) * PAGE + 1}–{Math.min(page * PAGE, count(status))} arası</span>
+      <form action="/admin/makaleler" className="flex items-center gap-1.5">
+        <input type="hidden" name="durum" value={status} />
+        <input name="sayfa" type="number" min={1} max={pages} defaultValue={page} aria-label="Sayfa numarası" className="input w-16 py-1 text-center" />
+        <span className="whitespace-nowrap text-stone-500">/ {pages}</span>
+        <button className="btn">Git</button>
+      </form>
       {page < pages ? <Link href={pageLink(page + 1)} className="btn whitespace-nowrap">Sonraki →</Link> : <span className="btn whitespace-nowrap opacity-40">Sonraki →</span>}
     </nav>
   )
