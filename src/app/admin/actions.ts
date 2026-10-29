@@ -26,6 +26,11 @@ function back(path: string, message: string): never {
 }
 
 const text = (form: FormData, name: string) => String(form.get(name) ?? '').trim()
+// Listedeki düğmenin geldiği sayfa (Pager.tsx BackTo); yalnızca panelin liste adresleri: başka bir adrese yönlendirilemesin
+const returnTo = (form: FormData, fallback: string) => {
+  const value = text(form, 'back')
+  return /^\/admin\/(makaleler|yazilar)(\?[\w=&%.+-]*)?$/.test(value) ? value : fallback
+}
 const id = (form: FormData) => {
   const value = Number(form.get('id'))
   if (!Number.isInteger(value)) throw new Error('Geçersiz istek')
@@ -216,7 +221,7 @@ export async function writePaperAction(form: FormData) {
   await requireAdmin()
   const paperId = id(form)
   const settings = await getSettings()
-  inBackground('/admin/makaleler', 'Yazı üretimi', async () => {
+  inBackground(returnTo(form, '/admin/makaleler'), 'Yazı üretimi', async () => {
     const post = await writePost(paperId, settings, false)
     return `"${post.title}" taslak olarak hazır`
   }, 'Yazı arka planda hazırlanıyor; bitince Yazılar\'da taslak olarak görünür')
@@ -225,7 +230,7 @@ export async function writePaperAction(form: FormData) {
 export async function skipPaperAction(form: FormData) {
   await requireAdmin()
   await prisma.paper.update({ where: { id: id(form) }, data: { status: 'skipped' } })
-  back('/admin/makaleler', 'Atlandı')
+  back(returnTo(form, '/admin/makaleler'), 'Atlandı')
 }
 
 const PAPER_TAB = (status: string) => `/admin/makaleler?durum=${status}`
@@ -234,7 +239,7 @@ export async function deletePaperAction(form: FormData) {
   await requireAdmin()
   const status = text(form, 'status')
   await hidePapers(status, id(form))
-  back(PAPER_TAB(status), 'Silindi')
+  back(returnTo(form, PAPER_TAB(status)), 'Silindi')
 }
 
 // Sekmedekilerin hepsi: Bekliyor ve Hata atlanır, Atlandı silinir
@@ -289,7 +294,7 @@ export async function coverPostAction(form: FormData) {
 export async function featurePostAction(form: FormData) {
   await requireAdmin()
   const post = await prisma.post.findUniqueOrThrow({ where: { id: id(form) } })
-  const path = text(form, 'from') === 'list' ? '/admin/yazilar' : `/admin/yazilar/${post.id}`
+  const path = returnTo(form, `/admin/yazilar/${post.id}`)
   if (post.featuredAt) {
     await prisma.post.update({ where: { id: post.id }, data: { featuredAt: null } })
     back(path, 'Öne çıkanlardan kaldırıldı')
@@ -315,7 +320,7 @@ export async function deletePostAction(form: FormData) {
   await requireAdmin()
   const post = await prisma.post.findUnique({ where: { id: id(form) }, select: { id: true, image: true } })
   if (post) await prisma.post.delete({ where: { id: post.id } }).then(() => removeImage(post.image))
-  back('/admin/yazilar', 'Yazı silindi')
+  back(returnTo(form, '/admin/yazilar'), 'Yazı silindi')
 }
 
 // Yayındakiler toplu silinmez (okurların linkleri kırılır); onlar tek tek silinir

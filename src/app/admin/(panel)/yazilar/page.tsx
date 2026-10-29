@@ -3,11 +3,13 @@ import { prisma } from '@/lib/prisma'
 import { Notice } from '../../Notice'
 import { coverMissingAction, deleteDraftsAction, deletePostAction, featurePostAction } from '../../actions'
 import { ConfirmButton } from '../../ConfirmButton'
+import { BackTo, Pager, pageOf } from '../../Pager'
 import { CATEGORIES, freeImage, topicLabel } from '@/lib/topics'
 import { getSettings } from '@/lib/state'
 import { formatScore } from '@/lib/text'
 
-type Filters = { mesaj?: string; durum?: string; konu?: string; onem?: string; sira?: string }
+type Filters = { mesaj?: string; durum?: string; konu?: string; onem?: string; sira?: string; sayfa?: string }
+const PAGE = 100
 
 // Süzgeçler adreste (?durum=yayinda&konu=uzay&onem=7&sira=onem): sayfa yenilense de kalır, JavaScript gerekmez
 export default async function PostsPage({ searchParams }: { searchParams: Filters }) {
@@ -22,12 +24,20 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
   } as const
   const sort = searchParams.sira && Object.hasOwn(SORTS, searchParams.sira) ? (searchParams.sira as keyof typeof SORTS) : null
   const paper = { select: { title: true, url: true, imageUrl: true } }
+  const where = { ...status, ...(category !== undefined ? { category } : {}), ...(minImportance ? { importance: { gte: minImportance * 10 } } : {}) }
+  const total = await prisma.post.count({ where })
+  const pages = Math.max(1, Math.ceil(total / PAGE))
+  const page = pageOf(searchParams.sayfa, pages)
+  // Süzgeçler sayfa değişince de, düğmelerden dönünce de kalsın
+  const params = Object.fromEntries(Object.entries({ durum: searchParams.durum, konu: searchParams.konu, onem: searchParams.onem, sira: searchParams.sira }).filter((entry): entry is [string, string] => !!entry[1]))
+  const here = `/admin/yazilar?${new URLSearchParams({ ...params, sayfa: String(page) })}`
   const [posts, published, { featureScore }] = await Promise.all([
     prisma.post.findMany({
-      where: { ...status, ...(category !== undefined ? { category } : {}), ...(minImportance ? { importance: { gte: minImportance * 10 } } : {}) },
+      where,
       // Varsayılan: taslaklar üstte (onay bekleyenler), sonra en yeni
       orderBy: sort ? [...SORTS[sort]] : [{ status: 'asc' }, { createdAt: 'desc' }],
-      take: 200,
+      skip: (page - 1) * PAGE,
+      take: PAGE,
       include: { paper },
     }),
     prisma.post.findMany({ where: { status: 'published', image: '' }, select: { paper } }),
@@ -77,9 +87,10 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
         </label>
         <button className="btn-primary">Uygula</button>
         {(filtered || sort) && <Link href="/admin/yazilar" className="btn">Temizle</Link>}
-        <span className="ml-auto self-center text-stone-500">{`${posts.length} yazı`}</span>
+        <span className="ml-auto self-center text-stone-500">{`${total} yazı`}</span>
       </form>
       <p className="text-sm text-stone-500 mb-4">☆ ile yayındaki yazıyı ana sayfadaki Öne çıkanlara al (en fazla 10; yenisi eklenince en eskisi düşer). <span className="text-violet-700 dark:text-violet-300">Öneri</span> rozeti, yapay zekânın önem puanı {formatScore(featureScore)}/10 ve üstü olanlarda görünür (Ayarlar → Haberler).</p>
+      <Pager path="/admin/yazilar" params={params} page={page} pages={pages} />
       {posts.length === 0 ? (
         <p className="text-sm text-stone-500">{filtered ? 'Bu süzgece uyan yazı yok.' : <>Henüz yazı yok. Makaleler sayfasından bir makaleyi yazıya dönüştür ya da Genel&apos;den günlük işi çalıştır.</>}</p>
       ) : (
@@ -101,19 +112,21 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
               {post.status === 'published' && (
                 <form action={featurePostAction}>
                   <input type="hidden" name="id" value={post.id} />
-                  <input type="hidden" name="from" value="list" />
+                  <BackTo href={here} />
                   <button className={`text-lg leading-none ${post.featuredAt ? 'text-violet-600' : 'text-stone-400 hover:text-violet-600'}`} title={post.featuredAt ? 'Öne çıkanlardan kaldır' : 'Öne çıkar'} aria-label={post.featuredAt ? 'Öne çıkanlardan kaldır' : 'Öne çıkar'}>{post.featuredAt ? '★' : '☆'}</button>
                 </form>
               )}
               <span className="text-xs text-stone-500">{post.createdAt.toLocaleDateString('tr-TR')}</span>
               <form action={deletePostAction}>
                 <input type="hidden" name="id" value={post.id} />
+                <BackTo href={here} />
                 <ConfirmButton question={`"${post.title}" silinsin mi?`} className="text-stone-400 hover:text-red-600 text-lg leading-none"><span aria-hidden>×</span><span className="sr-only">Sil</span></ConfirmButton>
               </form>
             </li>
           ))}
         </ul>
       )}
+      <Pager path="/admin/yazilar" params={params} page={page} pages={pages} />
     </>
   )
 }

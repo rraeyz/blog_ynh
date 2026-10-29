@@ -4,16 +4,21 @@ import { formatScore } from '@/lib/text'
 import { addPaperAction, bulkPapersAction, deletePaperAction, skipPaperAction, writePaperAction } from '../../actions'
 import { Notice } from '../../Notice'
 import { ConfirmButton } from '../../ConfirmButton'
+import { BackTo, Pager, pageOf } from '../../Pager'
 
 const STATUS: Record<string, string> = { new: 'Bekliyor', failed: 'Hata', skipped: 'Atlandı', written: 'Yazıldı' }
+const PAGE = 100
 
-export default async function PapersPage({ searchParams }: { searchParams: { mesaj?: string; durum?: string } }) {
+export default async function PapersPage({ searchParams }: { searchParams: { mesaj?: string; durum?: string; sayfa?: string } }) {
   const status = STATUS[searchParams.durum ?? ''] ? searchParams.durum! : 'new'
-  const [papers, counts] = await Promise.all([
-    prisma.paper.findMany({ where: { status }, orderBy: [{ score: 'desc' }, { publishedAt: 'desc' }], take: 100, include: { post: { select: { id: true, title: true } } } }),
-    prisma.paper.groupBy({ by: ['status'], _count: true }),
-  ])
+  const counts = await prisma.paper.groupBy({ by: ['status'], _count: true })
   const count = (key: string) => counts.find((row) => row.status === key)?._count ?? 0
+  const pages = Math.max(1, Math.ceil(count(status) / PAGE))
+  const page = pageOf(searchParams.sayfa, pages)
+  const papers = await prisma.paper.findMany({ where: { status }, orderBy: [{ score: 'desc' }, { publishedAt: 'desc' }], skip: (page - 1) * PAGE, take: PAGE, include: { post: { select: { id: true, title: true } } } })
+  const params = { durum: status }
+  const here = `/admin/makaleler?durum=${status}&sayfa=${page}`
+  const pager = <Pager path="/admin/makaleler" params={params} page={page} pages={pages} />
   return (
     <>
       <Notice message={searchParams.mesaj} />
@@ -41,6 +46,7 @@ export default async function PapersPage({ searchParams }: { searchParams: { mes
           </ConfirmButton>
         </form>
       )}
+      {pager}
       {papers.length === 0 ? (
         <p className="text-sm text-stone-500">Bu listede makale yok.</p>
       ) : (
@@ -55,9 +61,9 @@ export default async function PapersPage({ searchParams }: { searchParams: { mes
                   <Link href={`/admin/yazilar/${paper.post.id}`} className="btn">Yazıya git: {paper.post.title.slice(0, 60)}</Link>
                 ) : (
                   <>
-                    <form action={writePaperAction}><input type="hidden" name="id" value={paper.id} /><button className="btn-primary">Yazıya dönüştür</button></form>
-                    {paper.status !== 'skipped' && <form action={skipPaperAction}><input type="hidden" name="id" value={paper.id} /><button className="btn">Atla</button></form>}
-                    <form action={deletePaperAction}><input type="hidden" name="id" value={paper.id} /><input type="hidden" name="status" value={paper.status} /><button className="btn">Sil</button></form>
+                    <form action={writePaperAction}><input type="hidden" name="id" value={paper.id} /><BackTo href={here} /><button className="btn-primary">Yazıya dönüştür</button></form>
+                    {paper.status !== 'skipped' && <form action={skipPaperAction}><input type="hidden" name="id" value={paper.id} /><BackTo href={here} /><button className="btn">Atla</button></form>}
+                    <form action={deletePaperAction}><input type="hidden" name="id" value={paper.id} /><input type="hidden" name="status" value={paper.status} /><BackTo href={here} /><button className="btn">Sil</button></form>
                   </>
                 )}
               </div>
@@ -65,6 +71,7 @@ export default async function PapersPage({ searchParams }: { searchParams: { mes
           ))}
         </ul>
       )}
+      {pager}
     </>
   )
 }
