@@ -16,7 +16,7 @@ const DAYS = ['pazar', 'pazartesi', 'salı', 'çarşamba', 'perşembe', 'cuma', 
 export default async function DashboardPage({ searchParams }: { searchParams: { mesaj?: string } }) {
   const lastMonth = new Date()
   lastMonth.setDate(0)
-  const [settings, usage, previous, log, drafts, published, newPapers, sources, digests] = await Promise.all([
+  const [settings, usage, previous, log, drafts, published, newPapers, sources, digests, lessons, series] = await Promise.all([
     getSettings(),
     getUsage(),
     getUsage(monthKey(lastMonth)),
@@ -26,6 +26,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
     prisma.paper.count({ where: { status: 'new' } }),
     prisma.source.count({ where: { enabled: true } }),
     prisma.digest.count({ where: { status: 'draft' } }),
+    prisma.lesson.count({ where: { status: 'published' } }),
+    prisma.series.count({ where: { lessons: { some: { status: 'published' } } } }),
   ])
   const ai = aiConfig(settings)
   const missing = [
@@ -89,6 +91,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
           Geçen ay: {dollars(Object.values(previous.kinds).reduce((sum, t) => sum + (t?.cost ?? 0), 0))}. Ücret OpenRouter&apos;ın her çağrıda bildirdiği tutardır; başka
           sağlayıcıda (ör. haber yazımı doğrudan Claude ya da Gemini ile) ücret bilinmez, &quot;—&quot; görünür, token sayılır. Kesin tutar OpenRouter hesabında.
         </p>
+      </section>
+
+      <section className="card mb-6 text-sm">
+        <h2 className="font-semibold mb-1">Arama motorları</h2>
+        <p className="text-zinc-500 mb-3">
+          Google gibi arama motorları siteyi bu iki dosyadan tanır; ikisi de kendiliğinden güncellenir, senin bir şey yapman gerekmez.
+          Site haritasında şu an {published + lessons + series + 4} adres var ({published} yazı, {lessons} ders, {series} seri, 4 ana sayfa).
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <a href="/sitemap.xml" target="_blank" rel="noopener" className="btn">Site haritasını aç</a>
+          <a href="/robots.txt" target="_blank" rel="noopener" className="btn">robots.txt&apos;yi aç</a>
+          <a href="https://search.google.com/search-console" target="_blank" rel="noopener noreferrer" className="btn">Google Search Console</a>
+        </div>
       </section>
 
       <section className="flex flex-wrap gap-2 mb-6">

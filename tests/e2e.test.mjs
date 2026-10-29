@@ -689,6 +689,7 @@ test('arama motorları: site haritası, robots, yapılandırılmış veri', asyn
   } finally {
     cookie = saved
   }
+  assert.match((await get('/admin')).html, /Arama motorları[\s\S]*Site haritasında şu an (<!-- -->)?\d+(<!-- -->)? adres[\s\S]*href="\/sitemap\.xml"[\s\S]*href="\/robots\.txt"/, 'panelden açılır')
 })
 
 test('gökyüzü takvimi', async () => {
