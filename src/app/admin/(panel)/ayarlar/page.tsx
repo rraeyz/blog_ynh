@@ -30,6 +30,18 @@ const Field = ({ label, id, hint, children }: { label: string; id?: string; hint
   </div>
 )
 
+// Bir sekmenin içindeki konu: başlık, ne işe yaradığını anlatan kısa yazı ve ayarları
+const Group = ({ title, hint, children }: { title: string; hint?: React.ReactNode; children: React.ReactNode }) => (
+  <fieldset className="space-y-4 border-t border-zinc-200 dark:border-ink-line pt-5 first:border-t-0 first:pt-0">
+    <legend className="sr-only">{title}</legend>
+    <div>
+      <h2 className="font-semibold">{title}</h2>
+      {hint && <p className="hint">{hint}</p>}
+    </div>
+    {children}
+  </fieldset>
+)
+
 const Check = ({ name, checked, children }: { name: string; checked: boolean; children: React.ReactNode }) => (
   <label className="flex items-start gap-2 text-sm"><input type="checkbox" name={name} defaultChecked={checked} className="mt-1" /> <span>{children}</span></label>
 )
@@ -65,7 +77,7 @@ function Section({ section, s }: { section: string; s: Settings }) {
           {Object.entries(PROVIDERS).map(([key, p]) => <option key={key} value={key}>{p.label}</option>)}
         </select>
       </Field>
-      <Field label="Model" id="aiModel" hint="Sağlayıcının model adı (ör. OpenRouter'da anthropic/claude-haiku-5.5, Gemini'de gemini-3.5-flash-lite).">
+      <Field label="Haberleri yazan model" id="aiModel" hint="Sağlayıcının model adı (ör. OpenRouter'da anthropic/claude-haiku-5.5, Gemini'de gemini-3.5-flash-lite).">
         <input id="aiModel" name="aiModel" defaultValue={s.aiModel} className="input" placeholder="boşsa: Claude → claude-opus-5-5, DeepSeek → deepseek-chat" />
       </Field>
       <Secret name="aiApiKey" label="API anahtarı" value={s.aiApiKey} placeholder="" />
@@ -73,89 +85,110 @@ function Section({ section, s }: { section: string; s: Settings }) {
         <input id="aiBaseUrl" name="aiBaseUrl" defaultValue={s.aiBaseUrl} className="input" placeholder="https://.../v1" />
       </Field>
       <Secret name="imageApiKey" label="OpenRouter API anahtarı (dersler, görseller, gökyüzü takvimi)" value={s.imageApiKey} placeholder="openrouter.ai → Keys; boşsa bunlar çalışmaz" />
-      <Field label="Aylık token sınırı" id="monthlyTokenLimit" hint="0 = sınırsız. Aşılınca otomatik yazı ve ders üretimi ay sonuna kadar durur. Görsel ve web araması ücretleri buna sayılmaz; harcama sınırını OpenRouter'daki anahtar ayarından koy.">
+      <Field label="Ayda en fazla kaç token harcansın?" id="monthlyTokenLimit" hint="0 = sınırsız. Aşılınca otomatik yazı ve ders üretimi ay sonuna kadar durur. Görsel ve web araması ücretleri buna sayılmaz; harcama sınırını OpenRouter'daki anahtar ayarından koy.">
         <input id="monthlyTokenLimit" name="monthlyTokenLimit" type="number" min={0} defaultValue={s.monthlyTokenLimit} className="input" />
       </Field>
     </>
   )
   if (section === 'haberler') return (
     <>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Field label="Günde en az kaç yazı" id="postsMinPerDay" hint="Eşiği geçen az olsa da en iyileriyle tamamlanır.">
-          <input id="postsMinPerDay" name="postsMinPerDay" type="number" min={0} max={15} defaultValue={s.postsMinPerDay} className="input" />
+      <Group title="Günde kaç yazı" hint="Her gün yeni haberlere 10 üzerinden bir ön puan verilir; bu puana göre hangilerinin yazılacağı seçilir.">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Her gün en az kaç yazı yazılsın?" id="postsMinPerDay" hint="Yeterince puan alan haber az olsa da en iyileriyle bu sayıya tamamlanır.">
+            <input id="postsMinPerDay" name="postsMinPerDay" type="number" min={0} max={15} defaultValue={s.postsMinPerDay} className="input" />
+          </Field>
+          <Field label="Her gün en fazla kaç yazı yazılsın?" id="postsPerDay" hint="0 = otomatik yazı yok.">
+            <input id="postsPerDay" name="postsPerDay" type="number" min={0} max={15} defaultValue={s.postsPerDay} className="input" />
+          </Field>
+          <Field label="Yazılması için gereken en düşük puan" id="scoreThreshold" hint="Ön puanı bu ve üstü olan haberler, günlük en fazla sayıya kadar yazılır.">
+            <input id="scoreThreshold" name="scoreThreshold" type="number" min={1} max={10} step={0.1} defaultValue={s.scoreThreshold / 10} className="input" />
+          </Field>
+          <Field label="Sınır dolsa bile yazılacak haberin puanı" id="scoreExceptional" hint={`Bu puan ve üstündeki haber, günlük en fazla sayı dolmuş olsa da yazılır (yine de günde en çok ${DAILY_HARD_MAX}).`}>
+            <input id="scoreExceptional" name="scoreExceptional" type="number" min={1} max={10} step={0.1} defaultValue={s.scoreExceptional / 10} className="input" />
+          </Field>
+        </div>
+      </Group>
+
+      <Group title="Uzay ve astronomi haberleri" hint="Günlük yazıların kaçının uzay ve astronomi haberi olacağı. Önce en az sayı tamamlanır, sonra normal sınır uygulanır; çok önemli uzay haberi normal sınırı aşabilir ama son sınırı aşamaz.">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Her gün en az kaç uzay haberi olsun?" id="spacePerDay" hint="O gün yeterince iyi uzay haberi yoksa yer diğer konulara kalır.">
+            <input id="spacePerDay" name="spacePerDay" type="number" min={0} max={15} defaultValue={s.spacePerDay} className="input" />
+          </Field>
+          <Field label="Normal bir günde en fazla kaç uzay haberi?" id="spaceNormalPerDay" hint="Diğer konular gölgede kalmasın diye konan sınır.">
+            <input id="spaceNormalPerDay" name="spaceNormalPerDay" type="number" min={0} max={15} defaultValue={s.spaceNormalPerDay} className="input" />
+          </Field>
+          <Field label="Normal sınırı aşabilecek uzay haberinin puanı" id="spaceImportantScore" hint="Ön puanı bu ve üstü olan uzay haberi, normal sınır dolmuş olsa da yazılır.">
+            <input id="spaceImportantScore" name="spaceImportantScore" type="number" min={1} max={10} step={0.1} defaultValue={s.spaceImportantScore / 10} className="input" />
+          </Field>
+          <Field label="Önemliler dahil günde en fazla kaç uzay haberi?" id="spaceMaxPerDay" hint="Çok önemli uzay haberi olan bir günde bile aşılmayan son sınır.">
+            <input id="spaceMaxPerDay" name="spaceMaxPerDay" type="number" min={0} max={15} defaultValue={s.spaceMaxPerDay} className="input" />
+          </Field>
+        </div>
+      </Group>
+
+      <Group title="Tam metin kontrolü" hint="Ön puan yalnızca başlık ve özetten verilir. Seçilen haber yazılmadan önce tam metni okunup yeniden puanlanır; özetin olduğundan iyi ya da kötü gösterdiği haberler böyle yakalanır.">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Tam metni zayıf çıkan haber yerine günde en fazla kaç yenisi seçilsin?" id="fullTextReplace" hint="Tam metin puanı eşiğin 0,5 altında kalan haber yazılmaz, yerine sıradaki girer. 0 = tam metin kontrolü yok.">
+            <input id="fullTextReplace" name="fullTextReplace" type="number" min={0} max={15} defaultValue={s.fullTextReplace} className="input" />
+          </Field>
+          <Field label="Yer kaldığında eşiğin hemen altındaki kaç haberin tam metnine bakılsın?" id="fullTextPromote" hint="Ön puanı eşiğin 1,0 altına kadar olanların tam metni okunur; eşiği geçen yazılır. 0 = kapalı.">
+            <input id="fullTextPromote" name="fullTextPromote" type="number" min={0} max={15} defaultValue={s.fullTextPromote} className="input" />
+          </Field>
+        </div>
+      </Group>
+
+      <Group title="Puanlama ve okuma" hint={<>Ön puan dört ölçütle verilir: yenilik, etki, kanıt gücü ve okur için anlam. Haberler birbiriyle kıyaslanmaz. Ön puanı {formatScore(MIN_PRESCORE)} ve altı olanlar ile son 7 günde yazılanların tekrarı hemen atlanır.</>}>
+        <Field label="Okurların ilgi alanları" id="interests" hint="Burada yazdığın konular yalnızca &quot;okur için anlam&quot; ölçütünü biraz artırır; puanı tek başına belirlemez.">
+          <textarea id="interests" name="interests" defaultValue={s.interests} rows={3} className="input" />
         </Field>
-        <Field label="Günde en fazla kaç yazı" id="postsPerDay" hint="0 = otomatik yazı yok.">
-          <input id="postsPerDay" name="postsPerDay" type="number" min={0} max={15} defaultValue={s.postsPerDay} className="input" />
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Haberin ne kadarı okunsun?" id="readMode">
+            <select id="readMode" name="readMode" defaultValue={s.readMode} className="input">
+              <option value="abstract">Yalnızca beslemedeki özet (ucuz)</option>
+              <option value="full">Tam metin (haber sayfası ya da arXiv HTML)</option>
+            </select>
+          </Field>
+          <Field label="Bir haberden en fazla kaç karakter okunsun?" id="maxInputChars" hint="Kabaca 4 karakter ≈ 1 token; önerilen 16000.">
+            <input id="maxInputChars" name="maxInputChars" type="number" min={500} defaultValue={s.maxInputChars} className="input" />
+          </Field>
+          <Field label="Günlük iş hangi saatte çalışsın?" id="dailyHour" hint="Türkiye saati. Haberler bu saatte taranır, puanlanır ve yazılır.">
+            <select id="dailyHour" name="dailyHour" defaultValue={s.dailyHour} className="input">
+              {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}
+            </select>
+          </Field>
+        </div>
+      </Group>
+
+      <Group title="Yayın ve öne çıkarma" hint="Yazarken tam metinden ayrıca bir önem puanı verilir; öne çıkarma ona göre yapılır.">
+        <Check name="autoPublish" checked={s.autoPublish}>Yazıları onaysız yayımla (kapalıyken taslak olarak bekler)</Check>
+        <Field label="Öne çıkarılacak yazının en düşük önem puanı" id="featureScore" hint="Bu ve üstü önem puanlı yazıda panelde Öneri rozeti çıkar; aşağıdaki seçenek açıksa yayımlanınca kendiliğinden öne çıkar.">
+          <input id="featureScore" name="featureScore" type="number" min={1} max={10} step={0.1} defaultValue={s.featureScore / 10} className="input max-w-32" />
         </Field>
-        <Field label="Yazılma eşiği (ön puan)" id="scoreThreshold" hint="Bu ve üstü ön puanlı haberler yazılır (en fazla sınırına kadar).">
-          <input id="scoreThreshold" name="scoreThreshold" type="number" min={1} max={10} step={0.1} defaultValue={s.scoreThreshold / 10} className="input" />
+        <Check name="autoFeature" checked={s.autoFeature}>Önem puanı {formatScore(s.featureScore)}/10 ve üstü olan yazıyı yayımlanınca kendiliğinden öne çıkar (öne çıkanlarda en fazla 10; en eskisi düşer)</Check>
+      </Group>
+
+      <Group title="Kapak görseli ve gökyüzü takvimi">
+        <Field label="Kapak görselini çizen model" id="imageModel" hint="Serbest lisanslı kaynak görseli olmayan yazılara OpenRouter'da temsili kapak çizer (görsel başına ~0,01 $). openrouter.ai/models?output_modalities=image">
+          <input id="imageModel" name="imageModel" defaultValue={s.imageModel} className="input" />
         </Field>
-        <Field label="İstisna eşiği" id="scoreExceptional" hint={`Bu ve üstü, en fazla sınırı dolsa da yazılır (günde en çok ${DAILY_HARD_MAX}).`}>
-          <input id="scoreExceptional" name="scoreExceptional" type="number" min={1} max={10} step={0.1} defaultValue={s.scoreExceptional / 10} className="input" />
-        </Field>
-        <Field label="En az kaçı astronomi/uzay" id="spacePerDay" hint="O gün yeterli uzay haberi yoksa diğer konulardan tamamlanır.">
-          <input id="spacePerDay" name="spacePerDay" type="number" min={0} max={15} defaultValue={s.spacePerDay} className="input" />
-        </Field>
-        <Field label="Normalde en fazla kaçı uzay" id="spaceNormalPerDay" hint="Diğer konular gölgede kalmasın.">
-          <input id="spaceNormalPerDay" name="spaceNormalPerDay" type="number" min={0} max={15} defaultValue={s.spaceNormalPerDay} className="input" />
-        </Field>
-        <Field label="Önemli uzay haberi eşiği" id="spaceImportantScore" hint="Bu ve üstü ön puanlı uzay haberi normal sınıra takılmaz.">
-          <input id="spaceImportantScore" name="spaceImportantScore" type="number" min={1} max={10} step={0.1} defaultValue={s.spaceImportantScore / 10} className="input" />
-        </Field>
-        <Field label="Önemlilerle en fazla kaçı uzay" id="spaceMaxPerDay" hint="Önemli uzay haberi çok olan günde bile.">
-          <input id="spaceMaxPerDay" name="spaceMaxPerDay" type="number" min={0} max={15} defaultValue={s.spaceMaxPerDay} className="input" />
-        </Field>
-        <Field label="Tam metni zayıf çıkanın yerine sıradaki (günde en fazla)" id="fullTextReplace" hint="Seçilen haber yazılmadan önce tam metinden puanlanır; eşiğin 0,5 altında kalırsa yazılmaz, yerine sıradaki girer. 0 = kontrol yok.">
-          <input id="fullTextReplace" name="fullTextReplace" type="number" min={0} max={15} defaultValue={s.fullTextReplace} className="input" />
-        </Field>
-        <Field label="Eşiğin altından tam metnine bakılan (günde en fazla)" id="fullTextPromote" hint="O gün yer kaldıysa ön puanı eşiğin 1,0 altına kadar olanların tam metnine bakılır; eşiği geçen yazılır. 0 = kapalı.">
-          <input id="fullTextPromote" name="fullTextPromote" type="number" min={0} max={15} defaultValue={s.fullTextPromote} className="input" />
-        </Field>
-        <Field label="Günlük iş saati" id="dailyHour" hint="Türkiye saati.">
-          <select id="dailyHour" name="dailyHour" defaultValue={s.dailyHour} className="input">
-            {Array.from({ length: 24 }, (_, hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}
-          </select>
-        </Field>
-      </div>
-      <Field label="İlgi alanları" id="interests" hint={<>Model her yeni habere başlık, tarih ve özetinden bir kez ön puan verir: yenilik, etki, kanıt gücü ve okur için anlam (1-5); toplam ağırlıklı, 1,0-10,0. Haberler birbiriyle kıyaslanmaz. Burada yazdığın konular yalnızca &quot;okur için anlam&quot;ı biraz artırır. Ön puanı {formatScore(MIN_PRESCORE)} ve altı olanlar ile son 7 günde yazılanların tekrarı hemen atlanır.</>}>
-        <textarea id="interests" name="interests" defaultValue={s.interests} rows={3} className="input" />
-      </Field>
-      <Check name="autoPublish" checked={s.autoPublish}>Yazıları onaysız yayımla (kapalıyken taslak olarak bekler)</Check>
-      <Field label="Öne çıkarma eşiği (önem puanı)" id="featureScore" hint="Yazarken tam metinden verilen önem puanı bu ve üstüyse panelde Öneri rozeti çıkar; aşağıdaki seçenek açıksa yayımlanınca kendiliğinden öne çıkar.">
-        <input id="featureScore" name="featureScore" type="number" min={1} max={10} step={0.1} defaultValue={s.featureScore / 10} className="input max-w-32" />
-      </Field>
-      <Check name="autoFeature" checked={s.autoFeature}>Önem puanı {formatScore(s.featureScore)}/10 ve üstü olan yazıyı yayımlanınca kendiliğinden öne çıkar (öne çıkanlarda en fazla 10; en eskisi düşer)</Check>
-      <Check name="skyEnabled" checked={s.skyEnabled}>Gökyüzü takvimi: her hafta önümüzdeki 5 haftanın Türkiye&apos;den gözlenebilir gökyüzü olayları araştırılır (aylık takvim /gokyuzu, ana sayfa, bülten). Yardımcı modelle haftada birkaç sent.</Check>
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Haberin ne kadarı okunsun?" id="readMode">
-          <select id="readMode" name="readMode" defaultValue={s.readMode} className="input">
-            <option value="abstract">Yalnızca beslemedeki özet (ucuz)</option>
-            <option value="full">Tam metin (haber sayfası ya da arXiv HTML)</option>
-          </select>
-        </Field>
-        <Field label="Haber başına en fazla karakter" id="maxInputChars" hint="Kabaca 4 karakter ≈ 1 token; önerilen 16000.">
-          <input id="maxInputChars" name="maxInputChars" type="number" min={500} defaultValue={s.maxInputChars} className="input" />
-        </Field>
-      </div>
-      <Field label="Görsel modeli" id="imageModel" hint="Serbest lisanslı kaynak görseli olmayan yazılara OpenRouter'da temsili kapak çizer (görsel başına ~0,01 $). openrouter.ai/models?output_modalities=image">
-        <input id="imageModel" name="imageModel" defaultValue={s.imageModel} className="input" />
-      </Field>
+        <Check name="skyEnabled" checked={s.skyEnabled}>Gökyüzü takvimi: her hafta önümüzdeki 5 haftanın Türkiye&apos;den gözlenebilir gökyüzü olayları araştırılır (aylık takvim /gokyuzu, ana sayfa, bülten). Yardımcı modelle haftada birkaç sent.</Check>
+      </Group>
     </>
   )
   if (section === 'egitim') return (
     <>
       <p className="hint">
         Seçili günlerde günlük işten sonra sıradaki ders üç aşamada hazırlanır: web&apos;de araştırma, notlardan ders yazımı, notlarla karşılaştırmalı
-        denetim. Ders başına yaklaşık 0,4-0,6 $ (yazım Sonnet, gerisi Haiku); hepsi Haiku ile 0,1-0,2 $. Müfredat ve istekler Eğitim sayfasında.
+        denetim. Gerçek harcama panel ana sayfasındaki harcama tablosunda. Müfredat ve istekler Eğitim sayfasında.
       </p>
-      <Field label="Yazım modeli" id="lessonModel" hint="Okurun gördüğü ders metnini yazar; kalite en çok buna bağlı (ör. anthropic/claude-sonnet-5.5; en ucuzu anthropic/claude-haiku-5.5).">
+      <Field label="Dersi yazan model" id="lessonModel" hint="Okurun gördüğü ders metnini yazar; kalite en çok buna bağlı (ör. anthropic/claude-sonnet-5.5; en ucuzu anthropic/claude-haiku-5.5).">
         <input id="lessonModel" name="lessonModel" defaultValue={s.lessonModel} className="input" />
       </Field>
-      <Field label="Yardımcı model" id="lessonHelperModel" hint="Web araştırması, ders planı, denetim ve gökyüzü takvimi. Maliyetin çoğu araştırmanın okuduğu sayfalardan geldiği için ucuz bir model (ör. anthropic/claude-haiku-5.5).">
+      <Field label="Araştıran, planlayan ve denetleyen model" id="lessonHelperModel" hint="Web araştırması, ders planı, denetim ve gökyüzü takvimi. Maliyetin çoğu araştırmanın okuduğu sayfalardan geldiği için ucuz bir model (ör. anthropic/claude-haiku-5.5).">
         <input id="lessonHelperModel" name="lessonHelperModel" defaultValue={s.lessonHelperModel} className="input" />
       </Field>
       <div>
-        <p className="label">Ders yazılan günler</p>
+        <p className="label">Hangi günler ders yazılsın?</p>
         <div className="flex flex-wrap gap-3 text-sm">
           {LESSON_DAYS.map(([value, label]) => (
             <label key={value} className="flex items-center gap-1.5"><input type="checkbox" name="lessonDay" value={value} defaultChecked={s.lessonWeekdays.split(',').includes(value)} /> {label}</label>
@@ -170,10 +203,10 @@ function Section({ section, s }: { section: string; s: Settings }) {
     <>
       <Field label="Künye adresi" id="kunyeUrl"><input id="kunyeUrl" name="kunyeUrl" defaultValue={s.kunyeUrl} placeholder="https://rraeyz.me" className="input" /></Field>
       <Secret name="kunyeToken" label="Künye API anahtarı" value={s.kunyeToken} placeholder="Künye → Ayarlar → Güvenlik → API anahtarı" />
-      <Field label="Abone etiketi" id="newsletterTag"><input id="newsletterTag" name="newsletterTag" defaultValue={s.newsletterTag} className="input" placeholder="boşsa tüm onaylı abonelere" /></Field>
+      <Field label="Bülten hangi etiketli abonelere gitsin?" id="newsletterTag" hint="Künye'deki abone etiketi; boşsa bütün onaylı abonelere."><input id="newsletterTag" name="newsletterTag" defaultValue={s.newsletterTag} className="input" placeholder="boşsa tüm onaylı abonelere" /></Field>
       <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Haftalık bülten günü" id="digestWeekday" hint="Son 7 günün en önemli 7 yazısı, haftanın dersleri ve gökyüzü takvimi."><DaySelect name="digestWeekday" value={s.digestWeekday} /></Field>
-        <Field label="Astronomi özeti günü" id="astroDigestWeekday" hint="Yalnızca uzay ve fizik yazıları, gökyüzü ve dersler; ör. pazartesi dersinden önce pazar."><DaySelect name="astroDigestWeekday" value={s.astroDigestWeekday} /></Field>
+        <Field label="Haftalık bülten hangi gün gitsin?" id="digestWeekday" hint="Son 7 günün en önemli 7 yazısı, haftanın dersleri ve gökyüzü takvimi."><DaySelect name="digestWeekday" value={s.digestWeekday} /></Field>
+        <Field label="Astronomi özeti hangi gün gitsin?" id="astroDigestWeekday" hint="Yalnızca uzay ve fizik yazıları, gökyüzü ve dersler; ör. pazartesi dersinden önce pazar."><DaySelect name="astroDigestWeekday" value={s.astroDigestWeekday} /></Field>
       </div>
       <Check name="autoNewsletter" checked={s.autoNewsletter}>Bültenleri onaysız gönder (kapalıyken taslak olarak Bültenler sayfasında bekler)</Check>
       <Check name="astroDigest" checked={s.astroDigest}>Haftanın astronomi özetini de hazırla (abonelere haftada bir e-posta daha gider)</Check>
