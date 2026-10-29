@@ -90,6 +90,8 @@ h1, h2, h3 { @apply font-display tracking-tight; }
 .btn { @apply inline-flex items-center justify-center rounded-xl border border-zinc-300 dark:border-ink-line px-3 py-1.5 text-sm hover:bg-zinc-100 dark:hover:bg-white/5 transition disabled:opacity-50; }
 .btn-primary { @apply inline-flex items-center justify-center rounded-xl bg-violet-600 text-white px-3 py-1.5 text-sm font-medium hover:bg-violet-500 transition disabled:opacity-50; }
 .btn-danger { @apply inline-flex items-center justify-center rounded-xl border border-rose-400/60 text-rose-600 dark:text-rose-400 px-3 py-1.5 text-sm hover:bg-rose-500/10 transition; }
+/* Liste satırlarındaki küçük düğmeler: btn, btn-primary ya da btn-danger ile birlikte (sonra tanımlı olduğu için onları ezer) */
+.btn-sm { @apply px-2.5 py-1 text-xs; }
 .card { @apply rounded-2xl border border-zinc-200 dark:border-ink-line bg-white dark:bg-ink-card p-4; }
 .label { @apply block text-sm font-medium mb-1; }
 .hint { @apply text-xs text-zinc-500 mt-1; }

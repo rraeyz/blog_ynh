@@ -478,7 +478,7 @@ test('eğitim: müfredat, araştırma → yazım → denetim, otomatik yayın', 
   const before = openRouterRequests.length
   const empty = (await get('/admin/egitim')).html
   assert.match(empty, /Sıradaki:<\/b> (<!-- -->)?Uygulama(<!-- -->)? · (<!-- -->)?Python ile Astronomi · Temel/, 'katalog eklenir, ilk ders uygulama hattından')
-  assert.match(empty, /Astronomi[\s\S]*Yıldızlar · Orta[\s\S]*önkoşul: (<!-- -->)?[^<]*isi\/orta/, 'önkoşulu bitmemiş blok bekliyor')
+  assert.match((await get('/admin/egitim?bolum=mufredat')).html, /Astronomi[\s\S]*Yıldızlar · Orta[\s\S]*önkoşul: (<!-- -->)?[^<]*isi\/orta/, 'önkoşulu bitmemiş blok bekliyor')
   assert.match(await submit('/admin/egitim', 'Sıradaki dersi şimdi yaz'), /araştırılıp yazılıyor/)
   await waitFor(async () => /Ders: (&quot;|")Kırınım ve Airy diski(&quot;|") yayımlandı \(denetim temiz\)/.test((await get('/admin')).html), 'ders yazımı')
   assert.match((await get('/admin')).html, /(&quot;|")Python ile Astronomi · Temel(&quot;|") 3 derse bölündü/)
@@ -493,7 +493,7 @@ test('eğitim: müfredat, araştırma → yazım → denetim, otomatik yayın', 
   assert.match(write, /BAĞLANTI LİSTESİ[\s\S]*kavram\/bessel — Bessel fonksiyonları[\s\S]*TERİM LİSTESİ: akı \(flux\)[\s\S]*GÖSTERİM KURALLARI/)
   assert.match(calls[3].body.messages[1].content, /TERİM LİSTESİ[\s\S]*DERS:\n## Bu dersten aklında kalacaklar/, 'denetim yazılan dersi ve terimleri görür')
 
-  const admin = (await get('/admin/egitim')).html
+  const admin = (await get('/admin/egitim?bolum=mufredat')).html
   assert.match(admin, /Python ile Astronomi · Temel[\s\S]{0,400}1\/3(<!-- -->)? · (<!-- -->)?Yürüyor/)
   const stageId = admin.match(/href="\/admin\/egitim\/blok\/(\d+)"[^>]*>Python ile Astronomi · Temel/)[1]
   const lessonId = (await get(`/admin/egitim/blok/${stageId}`)).html.match(/href="\/admin\/egitim\/ders\/(\d+)"/)[1]
@@ -528,14 +528,13 @@ test('eğitim: müfredat, araştırma → yazım → denetim, otomatik yayın', 
 })
 
 test('eğitim: haberden kavram önerisi onaylanınca sıraya girer', async () => {
-  const admin = (await get('/admin/egitim')).html
+  const admin = (await get('/admin/egitim?bolum=okurlar')).html
   assert.match(admin, /Haberlerden önerilen kavramlar[\s\S]*Kozmik anafor[\s\S]*Haberde geçti: Kediler haberi/)
   assert.match((await get('/admin')).html, /2 kavram önerildi/)
   const proposalId = admin.match(/Kozmik anafor[\s\S]*?name="id" value="(\d+)"/)[1]
-  assert.match(await submit('/admin/egitim', `value="${proposalId}"/><button class="btn-primary">Onayla`), /Kavram onaylandı/)
-  const after = (await get('/admin/egitim')).html
-  assert.doesNotMatch(after.split('Ders iste')[0], /Kozmik anafor/, 'öneri listesinden çıkar')
-  assert.match(after, /Kavramlar[\s\S]*Kozmik anafor[\s\S]*Uzaklık birimleri/, 'kavram sırasının başında')
+  assert.match(await submit('/admin/egitim?bolum=okurlar', `value="${proposalId}"/><button class="btn-primary">Onayla`), /Kavram onaylandı/)
+  assert.doesNotMatch((await get('/admin/egitim?bolum=okurlar')).html, /Kozmik anafor/, 'öneri listesinden çıkar')
+  assert.match((await get('/admin/egitim?bolum=mufredat')).html, /Kavramlar[\s\S]*Kozmik anafor[\s\S]*Uzaklık birimleri/, 'kavram sırasının başında')
 })
 
 test('eğitim: denetimde sorun çıkan ders taslak kalır, önkoşul kutusu', async () => {
@@ -588,11 +587,11 @@ test('eğitim: hatlar sırayla ilerler, öğretilenler sonraki derse geçer', as
   assert.match(writes[1].body.messages[1].content, /Hat: Uygulama\nBu dersin seviyesi: Temel[\s\S]*önceki derslerde öğrendikleri: kırınım, Airy diski/)
 
   // Elle blok: hattın sonuna girer, atlanabilir
-  const added = await submit('/admin/egitim', 'name="track"', { track: 'astronomi', title: 'Meteoroloji', level: 'temel', summary: '2 ders: bulutlar' })
+  const added = await submit('/admin/egitim?bolum=mufredat', 'name="track"', { track: 'astronomi', title: 'Meteoroloji', level: 'temel', summary: '2 ders: bulutlar' })
   assert.match(added, /\/admin\/egitim\/blok\/\d+\?mesaj=Blok hattın sonuna eklendi/)
   const stagePath = added.split('?')[0]
   assert.match(await submit(stagePath, 'Bu bloğu atla'), /Blok atlandı/)
-  assert.match((await get('/admin/egitim')).html, /Meteoroloji · Temel[\s\S]{0,300}Atlandı/)
+  assert.match((await get('/admin/egitim?bolum=mufredat')).html, /Meteoroloji · Temel[\s\S]{0,300}Atlandı/)
   assert.match(await submit(stagePath, '>Sil<'), /Blok silindi/)
 })
 
@@ -611,7 +610,7 @@ test('okur ders önerisi: kayıt, değerlendirme, onay', async () => {
   } finally {
     cookie = saved
   }
-  const admin = (await get('/admin/egitim')).html
+  const admin = (await get('/admin/egitim?bolum=okurlar')).html
   assert.match(admin, /Okur önerileri[\s\S]*Yemek tarifleri[\s\S]*Asteroitler/)
   assert.doesNotMatch(admin, /Bot konusu/, 'bot tuzağı')
   const path = `/admin/egitim/oneri/${admin.match(/href="\/admin\/egitim\/oneri\/(\d+)"[^>]*>Asteroitler/)[1]}`
@@ -624,10 +623,11 @@ test('okur ders önerisi: kayıt, değerlendirme, onay', async () => {
   assert.match(detail, /<option value="astronomi" selected="">[\s\S]*value="Asteroitler"[\s\S]*2 ders: yörünge, kökeni[\s\S]*value="hareket\/temel"/)
   const fields = { track: 'astronomi', title: 'Asteroitler', summary: 'Küçük cisimler', level0: 'temel', summary0: '2 ders: yörünge, kökeni', level1: 'orta', summary1: '2 ders: fotometri', level2: '', summary2: '', requires: 'hareket/temel' }
   assert.match(await submit(path, 'Seriyi hattın sonuna ekle', fields), /"Asteroitler" serisi 2 aşamayla Astronomi hattının sonuna eklendi/)
-  const after = (await get('/admin/egitim')).html
-  assert.doesNotMatch(after.split('Ders iste')[0], /Asteroitler|asteroit kuşağı/, 'öneri ve benzeri kapandı')
-  assert.match(after, /Asteroitler · Temel[\s\S]*Asteroitler · Orta/)
-  const stageId = after.match(/href="\/admin\/egitim\/blok\/(\d+)"[^>]*>Asteroitler · Temel/)[1]
+  const after = (await get('/admin/egitim?bolum=okurlar')).html
+  assert.doesNotMatch(after, /Asteroitler|asteroit kuşağı/, 'öneri ve benzeri kapandı')
+  const curriculum = (await get('/admin/egitim?bolum=mufredat')).html
+  assert.match(curriculum, /Asteroitler · Temel[\s\S]*Asteroitler · Orta/)
+  const stageId = curriculum.match(/href="\/admin\/egitim\/blok\/(\d+)"[^>]*>Asteroitler · Temel/)[1]
   assert.match((await get(`/admin/egitim/blok/${stageId}`)).html, /value="hareket\/temel"/, 'önkoşul aktarıldı')
 
   // Uygun olmayan öneri reddedilir
@@ -636,7 +636,7 @@ test('okur ders önerisi: kayıt, değerlendirme, onay', async () => {
   await waitFor(async () => /Uygun değil/.test((await get(other)).html), 'uygun değil')
   assert.doesNotMatch((await get(other)).html, /hattın sonuna ekle|sıranın önüne/, 'onay seçeneği yok')
   assert.match(await submit(other, 'Reddet'), /1 öneri reddedildi/)
-  assert.doesNotMatch((await get('/admin/egitim')).html, /Okur önerileri/)
+  assert.doesNotMatch((await get('/admin/egitim?bolum=okurlar')).html, /Okur önerileri/)
 })
 
 test('okur hata bildirimi yeniden yazıma girer; maliyet tablosu', async () => {
@@ -653,7 +653,7 @@ test('okur hata bildirimi yeniden yazıma girer; maliyet tablosu', async () => {
   } finally {
     cookie = saved
   }
-  const admin = (await get('/admin/egitim')).html
+  const admin = (await get('/admin/egitim?bolum=okurlar')).html
   assert.match(admin, /Okur bildirimi olan dersler[\s\S]*Kırınım ve Airy diski[\s\S]*1(<!-- -->)? bildirim/)
   const lessonAdmin = `/admin/egitim/ders/${admin.match(/href="\/admin\/egitim\/ders\/(\d+)"[^>]*>Kırınım ve Airy diski/)[1]}`
   assert.match((await get(lessonAdmin)).html, /Okur bildirimleri[\s\S]*1\.21 olmalı &lt;script&gt;/, 'kaçışlı')
@@ -720,7 +720,7 @@ test('gökyüzü takvimi', async () => {
 })
 
 test('haftanın astronomi özeti', async () => {
-  assert.match(await submit('/admin', 'Astronomi özetini şimdi hazırla'), /hazırlanıyor/)
+  assert.match(await submit('/admin', 'Astronomi özetini hazırla'), /hazırlanıyor/)
   await waitFor(async () => /Astronomi özeti \(elle\): taslak özet hazır/.test((await get('/admin')).html), 'astronomi özeti')
   const list = (await get('/admin/bultenler')).html
   const digestId = list.match(/href="\/admin\/bultenler\/(\d+)"[^>]*>Haftanın astronomi özeti/)?.[1]

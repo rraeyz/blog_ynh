@@ -9,7 +9,8 @@ export function Pager({ path, params, page, pages }: { path: string; params: Rec
       {page > 1 ? <Link href={href(page - 1)} className="btn whitespace-nowrap">← Önceki</Link> : <span className="btn whitespace-nowrap opacity-40">← Önceki</span>}
       <form action={path} className="flex items-center gap-1.5">
         {Object.entries(params).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
-        <input name="sayfa" type="number" min={1} max={pages} defaultValue={page} aria-label="Sayfa numarası" className="input w-16 py-1 text-center" />
+        {/* key: sayfa değişince kutu yeni numarayı göstersin (yoksa ilk açılıştaki değerde kalır) */}
+        <input key={page} name="sayfa" type="number" min={1} max={pages} defaultValue={page} aria-label="Sayfa numarası" className="input w-16 py-1 text-center" />
         <span className="whitespace-nowrap text-stone-500">/ {pages}</span>
         <button className="btn">Git</button>
       </form>

@@ -23,7 +23,7 @@ export default async function SuggestionAdminPage({ params, searchParams }: { pa
   return (
     <>
       <Notice message={searchParams.mesaj} />
-      <p className="text-sm mb-2"><Link href="/admin/egitim" className="hover:underline">← Eğitim</Link></p>
+      <p className="text-sm mb-2"><Link href="/admin/egitim?bolum=okurlar" className="hover:underline">← Okurlardan</Link></p>
       <h1 className="text-xl font-bold">Okur önerisi: {suggestion.title}</h1>
       <p className="text-sm text-zinc-500 mb-4">{suggestion.createdAt.toLocaleDateString('tr-TR')}</p>
       {suggestion.detail && <p className="card text-sm mb-4 whitespace-pre-line">{suggestion.detail}</p>}

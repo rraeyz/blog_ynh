@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { getSettings } from '@/lib/state'
 import { PROVIDERS } from '@/lib/ai'
 import { MIN_PRESCORE } from '@/lib/writer'
@@ -6,6 +5,7 @@ import { DAILY_HARD_MAX, formatScore } from '@/lib/text'
 import { changePasswordAction, saveSettingsAction } from '../../actions'
 import { Notice } from '../../Notice'
 import { ConfirmButton } from '../../ConfirmButton'
+import { Tabs } from '../../Tabs'
 
 const DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi']
 const LESSON_DAYS = [['1', 'Pzt'], ['2', 'Sal'], ['3', 'Çar'], ['4', 'Per'], ['5', 'Cum'], ['6', 'Cmt'], ['0', 'Paz']]
@@ -222,11 +222,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: { m
     <>
       <Notice message={searchParams.mesaj} />
       <h1 className="text-xl font-bold mb-4">Ayarlar</h1>
-      <nav aria-label="Ayar bölümleri" className="flex flex-wrap gap-2 mb-6 text-sm">
-        {SECTIONS.map(([key, label]) => (
-          <Link key={key} href={`/admin/ayarlar?bolum=${key}`} aria-current={key === section ? 'page' : undefined} className={key === section ? 'btn-primary' : 'btn'}>{label}</Link>
-        ))}
-      </nav>
+      <Tabs path="/admin/ayarlar" tabs={SECTIONS.map(([key, label]) => [key, label])} active={section} />
 
       {section !== 'guvenlik' ? (
         // key: sekme değişince form yeniden kurulsun; yoksa React aynı sıradaki kutuyu tutar ve önceki sekmenin değeri görünür (Kaydet'le yazılır)

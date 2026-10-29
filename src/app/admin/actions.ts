@@ -438,7 +438,7 @@ export async function saveSeriesAction(form: FormData) {
 export async function deleteSeriesAction(form: FormData) {
   await requireAdmin()
   await prisma.series.deleteMany({ where: { id: id(form) } })
-  back('/admin/egitim', 'Seri ve dersleri silindi')
+  back('/admin/egitim?bolum=mufredat', 'Seri ve dersleri silindi')
 }
 
 // Bloğa elle ders: bloğun sırası gelince ya da "Şimdi yaz" ile yazılır
@@ -457,8 +457,8 @@ export async function addStageAction(form: FormData) {
   const track = text(form, 'track')
   const title = text(form, 'title').slice(0, 200)
   const level = text(form, 'level')
-  if (!isTrack(track) || !title || (track !== 'kavram' && !['temel', 'orta', 'ileri'].includes(level))) back('/admin/egitim', 'Hat, ad ve aşama gir')
-  const stage = await addStage(track, title, isLevel(level) ? level : 'kapsamli', text(form, 'summary').slice(0, 1000)).catch((error: Error) => back('/admin/egitim', error.message))
+  if (!isTrack(track) || !title || (track !== 'kavram' && !['temel', 'orta', 'ileri'].includes(level))) back('/admin/egitim?bolum=mufredat', 'Hat, ad ve aşama gir')
+  const stage = await addStage(track, title, isLevel(level) ? level : 'kapsamli', text(form, 'summary').slice(0, 1000)).catch((error: Error) => back('/admin/egitim?bolum=mufredat', error.message))
   back(stagePath(stage.id), 'Blok hattın sonuna eklendi; sırasını buradan değiştirebilirsin')
 }
 
@@ -494,7 +494,7 @@ export async function approveStageAction(form: FormData) {
   await requireAdmin()
   const first = await prisma.stage.aggregate({ where: { track: 'kavram', approved: true, planned: false }, _min: { position: true } })
   await prisma.stage.update({ where: { id: id(form) }, data: { approved: true, position: (first._min.position ?? 10) - 1 } })
-  back('/admin/egitim', 'Kavram onaylandı; kavram sırasının başında')
+  back('/admin/egitim?bolum=okurlar', 'Kavram onaylandı; kavram sırasının başında')
 }
 
 export async function deleteStageAction(form: FormData) {
@@ -503,7 +503,7 @@ export async function deleteStageAction(form: FormData) {
   if (catalogStages().some((s) => s.key === stage.key)) back(stagePath(stage.id), 'Katalogdaki blok silinmez (yeniden eklenirdi); istemiyorsan atla')
   if (stage._count.lessons > 0) back(stagePath(stage.id), 'Önce bloğun derslerini sil')
   await prisma.stage.delete({ where: { id: stage.id } })
-  back('/admin/egitim', stage.approved ? 'Blok silindi' : 'Öneri silindi')
+  back(`/admin/egitim?bolum=${stage.approved ? 'mufredat' : 'okurlar'}`, stage.approved ? 'Blok silindi' : 'Öneri silindi')
 }
 
 export async function saveLessonAction(form: FormData) {
@@ -575,7 +575,7 @@ export async function analyzeSuggestionAction(form: FormData) {
 export async function rejectSuggestionAction(form: FormData) {
   await requireAdmin()
   const { count } = await closeSuggestions(form)
-  back('/admin/egitim', `${count} öneri reddedildi`)
+  back('/admin/egitim?bolum=okurlar', `${count} öneri reddedildi`)
 }
 
 export async function approveSuggestionAction(form: FormData) {
@@ -611,7 +611,7 @@ export async function approveSuggestionAction(form: FormData) {
     message = `"${title}" serisi ${stages.length} aşamayla ${TRACKS[track]} hattının sonuna eklendi`
   } else back(path, 'Bilinmeyen karar')
   await closeSuggestions(form)
-  back('/admin/egitim', message)
+  back('/admin/egitim?bolum=okurlar', message)
 }
 
 export async function deleteReportAction(form: FormData) {

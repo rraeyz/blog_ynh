@@ -48,16 +48,18 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
   return (
     <>
       <Notice message={searchParams.mesaj} />
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <h1 className="text-xl font-bold flex-1">Yazılar</h1>
         {coverless > 0 && (
-          <form action={coverMissingAction}><ConfirmButton question={`Kapağı olmayan ${coverless} yayındaki yazıya yapay zekâyla kapak çizilsin mi? (yazı başına ~0,01 $)`} className="btn">{`Eksik kapakları çiz (${coverless})`}</ConfirmButton></form>
+          <form action={coverMissingAction}><ConfirmButton question={`Kapağı olmayan ${coverless} yayındaki yazıya yapay zekâyla kapak çizilsin mi? (yazı başına ~0,01 $)`} className="btn btn-sm">{`Eksik kapakları çiz (${coverless})`}</ConfirmButton></form>
         )}
         {posts.some((post) => post.status === 'draft') && (
-          <form action={deleteDraftsAction}><ConfirmButton question="Bütün taslaklar silinsin mi? Yayındaki yazılara dokunulmaz." className="btn">Taslakları sil</ConfirmButton></form>
+          <form action={deleteDraftsAction}><ConfirmButton question="Bütün taslaklar silinsin mi? Yayındaki yazılara dokunulmaz." className="btn btn-sm">Taslakları sil</ConfirmButton></form>
         )}
       </div>
-      <form className="card mb-4 flex flex-wrap items-end gap-3 text-sm">
+      <details className="card mb-4 text-sm" open={filtered || !!sort}>
+        <summary className="cursor-pointer font-medium">Süzgeç ve sıralama <span className="font-normal text-zinc-500">· {`${total} yazı`}{(filtered || sort) && ' · süzülmüş'}</span></summary>
+      <form className="mt-3 grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">Durum
           <select name="durum" defaultValue={searchParams.durum ?? ''} className="input">
             <option value="">Hepsi</option><option value="yayinda">Yayında</option><option value="taslak">Taslak</option><option value="one">Öne çıkanlar</option>
@@ -87,41 +89,43 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
         </label>
         <button className="btn-primary">Uygula</button>
         {(filtered || sort) && <Link href="/admin/yazilar" className="btn">Temizle</Link>}
-        <span className="ml-auto self-center text-stone-500">{`${total} yazı`}</span>
       </form>
-      <p className="text-sm text-stone-500 mb-4">☆ ile yayındaki yazıyı ana sayfadaki Öne çıkanlara al (en fazla 10; yenisi eklenince en eskisi düşer). <span className="text-violet-700 dark:text-violet-300">Öneri</span> rozeti, yapay zekânın önem puanı {formatScore(featureScore)}/10 ve üstü olanlarda görünür (Ayarlar → Haberler).</p>
+      </details>
+      <p className="text-xs text-stone-500 mb-4">☆ ile yayındaki yazıyı ana sayfadaki Öne çıkanlara al (en fazla 10; yenisi eklenince en eskisi düşer). <span className="text-violet-700 dark:text-violet-300">Öneri</span> rozeti, yapay zekânın önem puanı {formatScore(featureScore)}/10 ve üstü olanlarda görünür (Ayarlar → Haberler).</p>
       <Pager path="/admin/yazilar" params={params} page={page} pages={pages} />
       {posts.length === 0 ? (
         <p className="text-sm text-stone-500">{filtered ? 'Bu süzgece uyan yazı yok.' : <>Henüz yazı yok. Makaleler sayfasından bir makaleyi yazıya dönüştür ya da Genel&apos;den günlük işi çalıştır.</>}</p>
       ) : (
         <ul className="space-y-2">
           {posts.map((post) => (
-            <li key={post.id} className="card flex items-center gap-3">
-              <span className={`text-xs rounded px-2 py-0.5 ${post.status === 'published' ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'}`}>
-                {post.status === 'published' ? 'Yayında' : 'Taslak'}
-              </span>
-              <Link href={`/admin/yazilar/${post.id}`} className="flex-1 min-w-0 hover:underline">
+            <li key={post.id} className="card py-3">
+              <div className="flex items-center gap-2 text-xs">
+                <span className={`rounded px-2 py-0.5 ${post.status === 'published' ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'}`}>
+                  {post.status === 'published' ? 'Yayında' : 'Taslak'}
+                </span>
+                {post.importance >= featureScore && !post.featuredAt && <span className="rounded px-2 py-0.5 bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">Öneri</span>}
+                <span className="flex-1 text-stone-500">{post.createdAt.toLocaleDateString('tr-TR')}</span>
+                {post.status === 'published' && (
+                  <form action={featurePostAction}>
+                    <input type="hidden" name="id" value={post.id} />
+                    <BackTo href={here} />
+                    <button className={`text-lg leading-none ${post.featuredAt ? 'text-violet-600' : 'text-stone-400 hover:text-violet-600'}`} title={post.featuredAt ? 'Öne çıkanlardan kaldır' : 'Öne çıkar'} aria-label={post.featuredAt ? 'Öne çıkanlardan kaldır' : 'Öne çıkar'}>{post.featuredAt ? '★' : '☆'}</button>
+                  </form>
+                )}
+                <form action={deletePostAction}>
+                  <input type="hidden" name="id" value={post.id} />
+                  <BackTo href={here} />
+                  <ConfirmButton question={`"${post.title}" silinsin mi?`} className="text-stone-400 hover:text-red-600 text-lg leading-none"><span aria-hidden>×</span><span className="sr-only">Sil</span></ConfirmButton>
+                </form>
+              </div>
+              <Link href={`/admin/yazilar/${post.id}`} className="mt-1.5 block text-sm font-medium leading-snug hover:underline">
                 {post.title}
-                <span className="block truncate text-xs text-zinc-500">
+                <span className="block truncate text-xs font-normal text-zinc-500">
                   {post.category ? topicLabel(post.category) : 'Konu yok'}
                   {post.importance > 0 && ` · önem ${formatScore(post.importance)}/10`}
                   {post.paper && ` · Kaynak: ${post.paper.title}`}
                 </span>
               </Link>
-              {post.importance >= featureScore && !post.featuredAt && <span className="text-xs rounded px-2 py-0.5 bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300">Öneri</span>}
-              {post.status === 'published' && (
-                <form action={featurePostAction}>
-                  <input type="hidden" name="id" value={post.id} />
-                  <BackTo href={here} />
-                  <button className={`text-lg leading-none ${post.featuredAt ? 'text-violet-600' : 'text-stone-400 hover:text-violet-600'}`} title={post.featuredAt ? 'Öne çıkanlardan kaldır' : 'Öne çıkar'} aria-label={post.featuredAt ? 'Öne çıkanlardan kaldır' : 'Öne çıkar'}>{post.featuredAt ? '★' : '☆'}</button>
-                </form>
-              )}
-              <span className="text-xs text-stone-500">{post.createdAt.toLocaleDateString('tr-TR')}</span>
-              <form action={deletePostAction}>
-                <input type="hidden" name="id" value={post.id} />
-                <BackTo href={here} />
-                <ConfirmButton question={`"${post.title}" silinsin mi?`} className="text-stone-400 hover:text-red-600 text-lg leading-none"><span aria-hidden>×</span><span className="sr-only">Sil</span></ConfirmButton>
-              </form>
             </li>
           ))}
         </ul>
