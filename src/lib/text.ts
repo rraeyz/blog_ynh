@@ -214,3 +214,39 @@ export function parseConcepts(text: string): Array<{ title: string; reason: stri
     .map(([, title, ...reason]) => ({ title: title.slice(0, 200), reason: reason.join(' | ').slice(0, 500) }))
     .slice(0, 3)
 }
+
+export type SuggestionPlan = {
+  decision: 'var' | 'tek' | 'seri' | 'uygun-degil'
+  reason: string
+  key: string
+  lesson: { title: string; scope: string } | null
+  series: { track: string; title: string; summary: string } | null
+  stages: Array<{ level: string; summary: string }>
+  requires: string[]
+  similar: number[]
+}
+
+// Okur önerisinin değerlendirmesi: "KARAR | ...", "GEREKCE | ...", "VAR | anahtar", "DERS | başlık | kapsam",
+// "SERI | hat | ad | kapsam", "ASAMA | seviye | dersler", "ONKOSUL | anahtarlar", "BENZER | numaralar". KARAR yoksa okunamadı
+export function parseSuggestion(text: string): SuggestionPlan | null {
+  const lines = fields(text)
+  const line = (name: string) => lines.find((parts) => parts[0].toUpperCase() === name)
+  const decision = line('KARAR')?.[1]?.toLowerCase().replace('ğ', 'g')
+  if (decision !== 'var' && decision !== 'tek' && decision !== 'seri' && decision !== 'uygun-degil') return null
+  const lesson = line('DERS')
+  const series = line('SERI')
+  const keys = (value = '') => value.match(/[a-z0-9-]+\/[a-z0-9-]+/g) ?? []
+  return {
+    decision,
+    reason: line('GEREKCE')?.slice(1).join(' | ').slice(0, 1000) ?? '',
+    key: keys(line('VAR')?.[1])[0] ?? '',
+    lesson: lesson?.[1] ? { title: lesson[1].slice(0, 200), scope: lesson.slice(2).join(' | ').slice(0, 1000) } : null,
+    series: series?.[2] ? { track: series[1].toLowerCase(), title: series[2].slice(0, 200), summary: series.slice(3).join(' | ').slice(0, 1000) } : null,
+    stages: lines
+      .filter((parts) => parts[0].toUpperCase() === 'ASAMA' && /^(temel|orta|ileri)$/i.test(parts[1] ?? ''))
+      .map(([, level, ...summary]) => ({ level: level.toLowerCase(), summary: summary.join(' | ').slice(0, 1000) }))
+      .slice(0, 3),
+    requires: keys(line('ONKOSUL')?.slice(1).join(',')),
+    similar: (line('BENZER')?.slice(1).join(',').match(/\d+/g) ?? []).map(Number),
+  }
+}

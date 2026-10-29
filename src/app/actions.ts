@@ -1,6 +1,7 @@
 'use server'
 
 import { clientIp } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { getSettings } from '@/lib/state'
 import { canSubscribe, subscribeToKunye } from '@/lib/newsletter'
 
@@ -26,4 +27,17 @@ export async function subscribeAction(_previous: SubscribeState, form: FormData)
   const settings = await getSettings()
   if (!canSubscribe(settings)) return { ok: false, message: 'Bülten şu an kapalı.' }
   return subscribeToKunye(email, name, settings)
+}
+
+// Okur ders önerisi: yalnızca kaydedilir (yapay zekâ çalışmaz); panelde değerlendirilir
+const MAX_PENDING = 500 // bot seli veritabanını doldurmasın
+export async function suggestAction(_previous: SubscribeState, form: FormData): Promise<SubscribeState> {
+  if (String(form.get('website') ?? '')) return { ok: true, message: 'Teşekkürler!' }
+  const title = String(form.get('title') ?? '').trim().slice(0, 200)
+  const detail = String(form.get('detail') ?? '').trim().slice(0, 1000)
+  if (title.length < 3) return { ok: false, message: 'Hangi konuyu öğrenmek istediğini yaz.' }
+  if (limited(clientIp())) return { ok: false, message: 'Çok fazla deneme; biraz sonra tekrar dene.' }
+  if ((await prisma.suggestion.count()) >= MAX_PENDING) return { ok: false, message: 'Şu an öneri alınamıyor; daha sonra tekrar dene.' }
+  await prisma.suggestion.create({ data: { title, detail } })
+  return { ok: true, message: 'Önerin alındı, teşekkürler! Değerlendirip müfredata uygunsa ekleyeceğiz.' }
 }

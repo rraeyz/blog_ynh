@@ -95,6 +95,12 @@ const fake = http.createServer((req, res) => {
         content = series.startsWith('Python')
           ? 'Araştırdım.\n1. DERS | Kırınım ve Airy diski | "Airy diski" ve kırınım\n2. DERS | Seeing | Atmosfer\n3. DERS | Zernike polinomları | Dalga cephesi'
           : `DERS | ${series} 1 | Giriş\nDERS | ${series} 2 | Devam`
+      } else if (system.includes('müfredat editörüsün')) {
+        // Aynı konudaki öteki öneriler BENZER olarak döner
+        const similar = [...user.matchAll(/^(\d+) — .*asteroit/gim)].map((m) => m[1]).join(', ')
+        content = user.includes('Konu: Asteroitler')
+          ? `KARAR | seri\nGEREKCE | Geniş konu\nSERI | astronomi | Asteroitler | Küçük cisimler\nASAMA | temel | 2 ders: yörünge, kökeni\nASAMA | orta | 2 ders: fotometri\nONKOSUL | hareket/temel, yok\nBENZER | ${similar}`
+          : 'KARAR | uygun-degil\nGEREKCE | Astronomi dışı'
       } else if (system.includes('eğitim sitesinin editörüsün')) {
         content = 'KAVRAM | Kozmik anafor | Kediler haberi\nKAVRAM | Seeing ve görüş | x'
       } else if (system.includes('araştırma asistanısın')) {
@@ -333,7 +339,7 @@ test('makale → taslak yazı → yayın', async () => {
   assert.match(page.html, /<blockquote>Büyük bulgu<\/blockquote>/)
   assert.match(page.html, /Kısaca[\s\S]*Uyku enerji saklar[\s\S]*Avcılık için gerekli/)
   const home = (await get('/')).html
-  assert.match(home, /Yeni gelişmeler[\s\S]*Kediler Neden Çok Uyur\?[\s\S]*Kediler günde 15 saat uyuyor\.[\s\S]*Detaylar/)
+  assert.match(home, /Yeni gelişmeler[\s\S]*<a [^>]*href="\/yazi\/[^"]+"[^>]*>Kediler Neden Çok Uyur\?<\/a>[\s\S]*Kediler günde 15 saat uyuyor\.[\s\S]*Detaylar/, 'başlık yazıya bağlı')
   assert.match(home, /aria-label="Konular"[\s\S]*?href="\/konu\/uzay"[\s\S]*?Uzay</, 'konusu olan yazı üst menüde konu bağlantısı açar')
   assert.doesNotMatch(home, /href="\/konu\/saglik"/, 'yazısı olmayan konu menüde görünmez')
   const topic = (await get('/konu/uzay')).html
@@ -588,6 +594,49 @@ test('eğitim: hatlar sırayla ilerler, öğretilenler sonraki derse geçer', as
   assert.match(await submit(stagePath, 'Bu bloğu atla'), /Blok atlandı/)
   assert.match((await get('/admin/egitim')).html, /Meteoroloji · Temel[\s\S]{0,300}Atlandı/)
   assert.match(await submit(stagePath, '>Sil<'), /Blok silindi/)
+})
+
+test('okur ders önerisi: kayıt, değerlendirme, onay', async () => {
+  const saved = cookie
+  cookie = ''
+  try {
+    const page = (await get('/egitim')).html
+    assert.match(page, /id="oner"[\s\S]*Ders öner/)
+    const suggest = async (fields) => (await (await post('/egitim', 'oner-konu', fields)).text())
+    assert.match(await suggest({ title: 'ab' }), /Hangi konuyu/)
+    assert.match(await suggest({ title: 'Bot konusu', website: 'spam' }), /Teşekkürler/)
+    assert.match(await suggest({ title: 'Asteroitler', detail: '<b>yörüngeleri</b>' }), /Önerin alındı/)
+    assert.match(await suggest({ title: 'asteroit kuşağı' }), /Önerin alındı/)
+    assert.match(await suggest({ title: 'Yemek tarifleri' }), /Önerin alındı/)
+  } finally {
+    cookie = saved
+  }
+  const admin = (await get('/admin/egitim')).html
+  assert.match(admin, /Okur önerileri[\s\S]*Yemek tarifleri[\s\S]*Asteroitler/)
+  assert.doesNotMatch(admin, /Bot konusu/, 'bot tuzağı')
+  const path = `/admin/egitim/oneri/${admin.match(/href="\/admin\/egitim\/oneri\/(\d+)"[^>]*>Asteroitler/)[1]}`
+  assert.match((await get(path)).html, /&lt;b&gt;yörüngeleri/, 'öneri metni kaçışlı')
+  assert.match(await submit(path, 'Analiz et'), /değerlendiriliyor/)
+  await waitFor(async () => /Okur önerisi: (&quot;|")Asteroitler(&quot;|") değerlendirildi: seri/.test((await get('/admin')).html), 'öneri analizi')
+  const detail = (await get(path)).html
+  assert.match(detail, /Yeni seri[\s\S]*Aynı konuyu isteyen öteki öneriler[^<]*asteroit kuşağı/)
+  // Yapay zekânın önerisi formda hazır gelir; sen düzeltip onaylarsın (yardımcı yalnızca gizli alanları yollar, gerisini tarayıcı gibi veriyoruz)
+  assert.match(detail, /<option value="astronomi" selected="">[\s\S]*value="Asteroitler"[\s\S]*2 ders: yörünge, kökeni[\s\S]*value="hareket\/temel"/)
+  const fields = { track: 'astronomi', title: 'Asteroitler', summary: 'Küçük cisimler', level0: 'temel', summary0: '2 ders: yörünge, kökeni', level1: 'orta', summary1: '2 ders: fotometri', level2: '', summary2: '', requires: 'hareket/temel' }
+  assert.match(await submit(path, 'Seriyi hattın sonuna ekle', fields), /"Asteroitler" serisi 2 aşamayla Astronomi hattının sonuna eklendi/)
+  const after = (await get('/admin/egitim')).html
+  assert.doesNotMatch(after.split('Ders iste')[0], /Asteroitler|asteroit kuşağı/, 'öneri ve benzeri kapandı')
+  assert.match(after, /Asteroitler · Temel[\s\S]*Asteroitler · Orta/)
+  const stageId = after.match(/href="\/admin\/egitim\/blok\/(\d+)"[^>]*>Asteroitler · Temel/)[1]
+  assert.match((await get(`/admin/egitim/blok/${stageId}`)).html, /value="hareket\/temel"/, 'önkoşul aktarıldı')
+
+  // Uygun olmayan öneri reddedilir
+  const other = `/admin/egitim/oneri/${after.match(/href="\/admin\/egitim\/oneri\/(\d+)"[^>]*>Yemek tarifleri/)[1]}`
+  assert.match(await submit(other, 'Analiz et'), /değerlendiriliyor/)
+  await waitFor(async () => /Uygun değil/.test((await get(other)).html), 'uygun değil')
+  assert.doesNotMatch((await get(other)).html, /hattın sonuna ekle|sıranın önüne/, 'onay seçeneği yok')
+  assert.match(await submit(other, 'Reddet'), /1 öneri reddedildi/)
+  assert.doesNotMatch((await get('/admin/egitim')).html, /Okur önerileri/)
 })
 
 test('gökyüzü takvimi', async () => {

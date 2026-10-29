@@ -13,9 +13,9 @@ import { autoFeature, featurePost, writePost } from '@/lib/writer'
 import { coverMissing, generateCover, removeImage } from '@/lib/images'
 import { createWeeklyDigest, digestBody, sendDigest } from '@/lib/newsletter'
 import { CATEGORIES } from '@/lib/topics'
-import { isLevel } from '@/lib/levels'
-import { addLesson, addStage, lessonTask, planStage, requestLesson, writeLesson } from '@/lib/lessons'
-import { catalogStages, isTrack } from '@/lib/curriculum'
+import { isLevel, type Level } from '@/lib/levels'
+import { addLesson, addStage, analyzeSuggestion, lessonTask, planStage, requestLesson, writeLesson } from '@/lib/lessons'
+import { catalogStages, isTrack, TRACKS } from '@/lib/curriculum'
 import { astroDigestTask, dailyTask, isJobRunning, runExclusive, weeklyTask } from '@/lib/jobs'
 import { skyTask } from '@/lib/sky'
 import { PROVIDERS } from '@/lib/ai'
@@ -555,4 +555,61 @@ export async function deleteLessonAction(form: FormData) {
   const lesson = await prisma.lesson.findUnique({ where: { id: id(form) }, select: { seriesId: true } })
   await prisma.lesson.deleteMany({ where: { id: id(form) } })
   back(lesson ? seriesPath(lesson.seriesId) : '/admin/egitim', 'Ders silindi')
+}
+
+// --- Okur önerileri ---
+
+const suggestionPath = (suggestionId: number) => `/admin/egitim/oneri/${suggestionId}`
+// Onay ya da ret öneriyi ve yapay zekânın aynı konuda bulduğu öteki önerileri kapatır
+const closeSuggestions = (form: FormData) =>
+  prisma.suggestion.deleteMany({ where: { id: { in: [id(form), ...text(form, 'similar').split(',').map(Number).filter(Boolean)] } } })
+
+export async function analyzeSuggestionAction(form: FormData) {
+  await requireAdmin()
+  const suggestionId = id(form)
+  const settings = await getSettings()
+  if (!settings.imageApiKey.trim()) back(suggestionPath(suggestionId), 'Önce Ayarlar → Yapay zekâ bölümüne OpenRouter anahtarını gir')
+  inBackground(suggestionPath(suggestionId), 'Okur önerisi', () => analyzeSuggestion(suggestionId, settings), 'Öneri değerlendiriliyor; bir dakika sonra yenile')
+}
+
+export async function rejectSuggestionAction(form: FormData) {
+  await requireAdmin()
+  const { count } = await closeSuggestions(form)
+  back('/admin/egitim', `${count} öneri reddedildi`)
+}
+
+export async function approveSuggestionAction(form: FormData) {
+  await requireAdmin()
+  const path = suggestionPath(id(form))
+  const kind = text(form, 'kind')
+  let message = ''
+  if (kind === 'var') {
+    const stage = await prisma.stage.findUnique({ where: { key: text(form, 'key') } })
+    if (!stage) back(path, 'Bu anahtarda blok yok')
+    if (stage.planned) back(path, 'Bu blok zaten derslere bölünmüş; öne alınacak bir şey yok')
+    const first = await prisma.stage.aggregate({ where: { track: stage.track, approved: true, planned: false }, _min: { position: true } })
+    await prisma.stage.update({ where: { id: stage.id }, data: { position: Math.min(stage.position, (first._min.position ?? 10) - 1) } })
+    message = `"${stage.title}" hattının başına alındı`
+  } else if (kind === 'tek') {
+    const title = text(form, 'title').slice(0, 200)
+    if (!title) back(path, 'Ders başlığı gir')
+    await requestLesson(title, text(form, 'scope').slice(0, 1000), '')
+    message = 'Ders sıranın en önüne eklendi'
+  } else if (kind === 'seri') {
+    const track = text(form, 'track')
+    const title = text(form, 'title').slice(0, 200)
+    const stages = [0, 1, 2].map((i) => ({ level: text(form, `level${i}`), summary: text(form, `summary${i}`).slice(0, 1000) })).filter((s) => isLevel(s.level) && s.level !== 'kapsamli' && s.summary)
+    if (!isTrack(track) || track === 'kavram' || !title || stages.length === 0) back(path, 'Hat, seri adı ve en az bir aşama gir')
+    for (const [i, s] of stages.entries()) {
+      const stage = await addStage(track, title, s.level as Level, s.summary).catch((error: Error) => back(path, error.message))
+      if (i === 0) {
+        const requires = text(form, 'requires').split(/[\s,]+/).filter((k) => /^[a-z0-9-]+\/[a-z0-9-]+$/.test(k)).join(',')
+        await prisma.stage.update({ where: { id: stage.id }, data: { requires } })
+        await prisma.series.update({ where: { id: stage.seriesId }, data: { summary: text(form, 'summary').slice(0, 1000) || undefined } })
+      }
+    }
+    message = `"${title}" serisi ${stages.length} aşamayla ${TRACKS[track]} hattının sonuna eklendi`
+  } else back(path, 'Bilinmeyen karar')
+  await closeSuggestions(form)
+  back('/admin/egitim', message)
 }

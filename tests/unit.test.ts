@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apiUrl, decodeEntities, feedImage, htmlToText, parseAtom, parseFeed, parseSourceUrl } from '../src/lib/arxiv.ts'
 import { headings, inline, renderMarkdown } from '../src/lib/markdown.ts'
-import { addDays, mondayOf, extractJson, markdownLinks, parseIssues, parseConcepts, parseLesson, parsePlan, parseScores, parseSkyEvents, pickDaily, weightedScore, cleanSummary, formatScore, DAILY_HARD_MAX, foldText, ftsQuery, slugify, unlink } from '../src/lib/text.ts'
+import { addDays, mondayOf, extractJson, markdownLinks, parseIssues, parseConcepts, parseSuggestion, parseLesson, parsePlan, parseScores, parseSkyEvents, pickDaily, weightedScore, cleanSummary, formatScore, DAILY_HARD_MAX, foldText, ftsQuery, slugify, unlink } from '../src/lib/text.ts'
 import { isPrivateIp, safeFetch } from '../src/lib/net.ts'
 import { levelRange } from '../src/lib/levels.ts'
 import { catalogStages, FIRST_ROUND, nextTracks, pickStage, requirementsOf, stageDone, type StageState } from '../src/lib/curriculum.ts'
@@ -364,6 +364,18 @@ test('ders aşamalarının satır yanıtları', () => {
     { title: 'Kozmik ışın', reason: '' },
   ])
   assert.deepEqual(parseConcepts('YOK'), [])
+})
+
+test('okur önerisinin değerlendirmesi', () => {
+  assert.deepEqual(parseSuggestion('Baktım.\nKARAR | seri\nGEREKCE | Geniş konu | iki aşama\nSERI | Astronomi | Asteroitler | küçük cisimler\nASAMA | temel | 2 ders: yörünge\n- ASAMA | **orta** | 3 ders: fotometri\nASAMA | uzman | x\nONKOSUL | hareket/orta, yok\nBENZER | 3, 5'), {
+    decision: 'seri', reason: 'Geniş konu | iki aşama', key: '', lesson: null,
+    series: { track: 'astronomi', title: 'Asteroitler', summary: 'küçük cisimler' },
+    stages: [{ level: 'temel', summary: '2 ders: yörünge' }, { level: 'orta', summary: '3 ders: fotometri' }],
+    requires: ['hareket/orta'], similar: [3, 5],
+  })
+  assert.equal(parseSuggestion('KARAR | var\nVAR | [[fotometri/orta]]')?.key, 'fotometri/orta')
+  assert.deepEqual(parseSuggestion('KARAR | tek\nDERS | Koronagraf | DAG\'da')?.lesson, { title: 'Koronagraf', scope: "DAG'da" })
+  assert.equal(parseSuggestion('Bilmiyorum'), null, 'kararsız yanıt okunamadı sayılır')
 })
 
 test('ders seviyeleri: aralık', () => {

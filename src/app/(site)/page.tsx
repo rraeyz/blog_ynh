@@ -68,7 +68,7 @@ export default async function HomePage({ searchParams }: { searchParams: { sayfa
                     <span aria-hidden className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-white dark:ring-ink-card" style={{ background: `hsl(${topicHue(topicOf(post))} 80% 60%)` }} />
                     <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500"><TopicChip topic={topicOf(post)} />{postDate(post)}</div>
                     <p className="mt-2 leading-relaxed text-zinc-800 dark:text-zinc-200">
-                      <strong className="font-semibold text-zinc-900 dark:text-white">{post.title}</strong>
+                      <Link href={`/yazi/${post.slug}`} className="font-semibold text-zinc-900 dark:text-white hover:text-violet-600 dark:hover:text-violet-300 hover:underline">{post.title}</Link>
                       {post.excerpt && <span className="text-zinc-600 dark:text-zinc-400"> — {post.excerpt}</span>}
                     </p>
                     <Link href={`/yazi/${post.slug}`} className="mt-1.5 inline-flex text-sm font-medium text-violet-600 dark:text-violet-300 hover:underline">Detaylar →</Link>

@@ -26,6 +26,7 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 - Modeller: yazım `lessonModel` (Sonnet), araştırma, plan, denetim, kavram önerisi ve gökyüzü `lessonHelperModel` (Haiku); maliyetin çoğu araştırmanın okuduğu sayfalardan gelir.
 - Ders üç aşama (`writeLesson`): araştırma (OpenRouter `openrouter:web_search`; en az 3 doğrulanmış kaynak şart) → yalnızca notlardan yazım → notlarla karşılaştırmalı denetim. Model yanıtları (plan, denetim, kavram önerisi, gökyüzü) JSON değil "|" ile ayrılmış satırlar (`parsePlan` "DERS |", `parseIssues`, `parseConcepts` "KAVRAM |", `parseSkyEvents`): bir tırnak bütün yanıtı bozmasın; okunamayan denetim yayımlatmaz. Ciddi bulgu yoksa ve `lessonAutoPublish` açıksa yayımlanır, yoksa taslak + `review`. Açılmayan linkler metne döner.
 - "Haberin arkasındaki bilim": haftada bir (ders gününde) önemli uzay/fizik haberlerinde geçen, listede olmayan kavramlar onaysız blok olarak önerilir (`approved` false); panelde onaylanınca kavram sırasının başına geçer.
+- Okur ders önerisi: `/egitim#oner` formu (`suggestAction`; yalnızca kaydedilir, bot tuzağı, IP başına sınır, en fazla 500 bekleyen; e-posta alınmaz) → `Suggestion`. Panelde "Analiz et" (`analyzeSuggestion`, Haiku; öneri güvenilmez veri) katalogla karşılaştırır: var (bloğu hattın başına al) / tek (istek) / seri (hat, 1-3 aşama, önkoşul) / uygun değil; `parseSuggestion` satırları. Öneri formda düzenlenip onaylanır; onay ya da ret öneriyi ve BENZER önerileri siler.
 - Site: `/egitim` hatlara göre seriler, Kavramlar A–Z (`/egitim/kavramlar`), istenen dersler; seri sayfası aşamalara göre, bölünmemiş aşama yol haritası olarak.
 
 ## Diğer
@@ -41,3 +42,7 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 ## Yapılacaklar (kullanıcı onayladı, sonraya)
 - Next.js 16'ya geçiş (iki repo): Next 14'teki DoS açıkları ancak böyle kapanır; büyük kırıcı değişiklikler (async params/cookies, middleware → proxy), ayrı dalda ve tam testle.
 - Ders görselleri/diyagramlar: maliyetli; ör. matplotlib/SVG üretimi ya da görsel modeli, derslerde şekil.
+
+## Düşünülenler (karar bekliyor)
+- Seriye abonelik: okur e-postasıyla bir seriye abone olur, yeni ders yayımlanınca Künye etiketiyle e-posta (üyelik sistemi olmadan).
+- Okuma ilerlemesi: bitirilen dersler ve seri ilerleme çubuğu (yeşil). Öneri: önce tarayıcıda (localStorage, kişisel veri yok); cihazlar arası eşitleme gerekirse sonra e-postayla giriş bağlantısı.

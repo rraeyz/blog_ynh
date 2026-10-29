@@ -88,6 +88,7 @@ export default async function LessonPage({ params }: { params: { seri: string; d
             {previous ? <Link href={`/egitim/${lesson.series.slug}/${previous.slug}`} className="card hover:border-violet-500">← Önceki ders<span className="block font-semibold mt-1">{previous.title}</span></Link> : <span />}
             {next && <Link href={`/egitim/${lesson.series.slug}/${next.slug}`} className="card hover:border-violet-500 sm:text-right">Sonraki ders →<span className="block font-semibold mt-1">{next.title}</span></Link>}
           </nav>
+          <p className="mt-6 text-sm text-zinc-500">Başka bir konuyu öğrenmek ister misin? <Link href="/egitim#oner" className="text-violet-600 dark:text-violet-300 hover:underline">Ders öner →</Link></p>
         </div>
         {toc.length > 1 && (
           <nav aria-label="Bu derste" className="hidden lg:block">

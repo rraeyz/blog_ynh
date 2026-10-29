@@ -205,3 +205,12 @@ model AppState {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+// Okurların ders önerileri (/egitim formu). Yalnızca kaydedilir; panelde analiz edilip onaylanınca müfredata girer, ret ya da onayla silinir
+model Suggestion {
+  id        Int      @id @default(autoincrement())
+  title     String
+  detail    String   @default("")
+  analysis  String   @default("") // yapay zekâ değerlendirmesi, satır satır (lib/text.ts parseSuggestion)
+  createdAt DateTime @default(now())
+}
