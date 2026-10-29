@@ -41,3 +41,8 @@ Kardeş proje: `rraeyz/kunye_ynh` (link sayfası + abone listesi + SMTP). Bu uyg
 ## Yapılacaklar (kullanıcı onayladı, sonraya)
 - Next.js 16'ya geçiş (iki repo): Next 14'teki DoS açıkları ancak böyle kapanır; büyük kırıcı değişiklikler (async params/cookies, middleware → proxy), ayrı dalda ve tam testle.
 - Ders görselleri/diyagramlar: maliyetli; ör. matplotlib/SVG üretimi ya da görsel modeli, derslerde şekil.
+- Okur ders önerisi (onaylandı, yapılacak): eğitim sayfasının altında ve ders sonlarında "Ders öner" formu (yapay zekâ çalışmaz, yalnızca kaydedilir; bot tuzağı, IP başına sınır, uzunluk sınırı; e-posta alınmaz). Panelde "Okur önerileri": "Analiz et" (Haiku, öneri metni güvenilmez veri) önce katalogda var mı bakar → zaten var (bloğu öne al) / tek ders (istek) / yeni seri (hat, aşamalar, önerilen dersler, önkoşul) / uygun değil; benzer öneriler sayılır. Onay tek tıkla ekler, düzenlenebilir; ret eler.
+
+## Düşünülenler (karar bekliyor)
+- Seriye abonelik: okur e-postasıyla bir seriye abone olur, yeni ders yayımlanınca Künye etiketiyle e-posta (üyelik sistemi olmadan).
+- Okuma ilerlemesi: bitirilen dersler ve seri ilerleme çubuğu (yeşil). Öneri: önce tarayıcıda (localStorage, kişisel veri yok); cihazlar arası eşitleme gerekirse sonra e-postayla giriş bağlantısı.
