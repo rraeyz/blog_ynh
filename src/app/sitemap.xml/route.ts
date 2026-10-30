@@ -20,6 +20,7 @@ export async function GET(request: Request) {
     ['/egitim', undefined],
     ['/gokyuzu', undefined],
     ['/astronomi-ozeti', undefined],
+    ['/gizlilik', undefined],
     ...posts.map((p) => [`/yazi/${p.slug}`, p.updatedAt] as [string, Date]),
     ...Array.from(series, ([slug, date]) => [`/egitim/${slug}`, date] as [string, Date]),
     ...lessons.map((l) => [`/egitim/${l.series.slug}/${l.slug}`, l.updatedAt] as [string, Date]),
