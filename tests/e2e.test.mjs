@@ -724,7 +724,7 @@ test('gökyüzü takvimi', async () => {
     assert.match(page, /href="#gun-\d{4}-\d{2}-\d{2}"[^>]*aria-label="[^"]*Orionid[\s\S]*Meteor yağmuru/)
     assert.match(page, /id="gun-[\s\S]*Orionid &lt;b&gt;tepe&lt;\/b&gt;[\s\S]*Gece yarısından sonra/)
     assert.match(page, /kaynakları[\s\S]*kaynak1/)
-    assert.match(page, /aria-label="Bu ayın öne çıkanları"[\s\S]*Kaçırma[\s\S]*Parçalı Ay tutulması[\s\S]*Öne çıkan[\s\S]*Orionid/, 'önemli olaylar takvimin üstünde, önem sırasıyla')
+    assert.match(page, /aria-label="Aylar"[\s\S]*grid-cols-7[\s\S]*Bu ayın öne çıkanları<\/h2>[\s\S]*Kaçırma[\s\S]*Parçalı Ay tutulması[\s\S]*Öne çıkan[\s\S]*Orionid/, 'önce takvim, sonra önemli olaylar önem sırasıyla')
     assert.match(page, /border-amber-400[^"]*"[^>]*>[\s\S]{0,400}Ay tutulması/, 'tutulma günü belirgin')
     const next = page.match(/href="\/gokyuzu\?ay=(\d{4}-\d{2})"[^>]*>[^<]*→/)[1]
     assert.equal((await get(`/gokyuzu?ay=${next}`)).status, 200, 'sonraki aya geçilir')
