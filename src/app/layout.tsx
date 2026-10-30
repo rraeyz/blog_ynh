@@ -14,6 +14,7 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: { types: { 'application/rss+xml': '/rss.xml' } },
     openGraph: { siteName: settings.siteTitle, locale: 'tr_TR', type: 'website', title: settings.siteTitle, description: settings.siteDescription },
     twitter: { card: 'summary_large_image' },
+    appleWebApp: { capable: true, title: settings.siteTitle, statusBarStyle: 'black-translucent' },
   }
 }
 

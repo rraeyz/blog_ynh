@@ -37,6 +37,8 @@ RUN apk add --no-cache dumb-init tzdata
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+# Uygulama simgeleri, service worker, çevrimdışı sayfa (standalone çıktısı public'i kendisi kopyalamaz)
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/generated ./generated
 COPY --from=builder /app/template.db ./template.db
 

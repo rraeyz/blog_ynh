@@ -694,6 +694,22 @@ test('arama motorları: site haritası, robots, yapılandırılmış veri', asyn
   assert.match((await get('/admin')).html, /Arama motorları[\s\S]*Site haritasında şu an (<!-- -->)?\d+(<!-- -->)? adres[\s\S]*href="\/sitemap\.xml"[\s\S]*href="\/robots\.txt"/, 'panelden açılır')
 })
 
+test('telefona kurulum (PWA) ve gizlilik sayfası', async () => {
+  const home = await (await fetch(`${B}/`)).text()
+  assert.match(home, /<link rel="manifest" href="\/manifest\.webmanifest"/)
+  assert.match(home, /serviceWorker\.register\('\/sw\.js'\)/)
+  const manifest = await (await fetch(`${B}/manifest.webmanifest`)).json()
+  assert.equal(manifest.display, 'standalone')
+  assert.ok(manifest.name)
+  for (const icon of manifest.icons) assert.equal((await fetch(`${B}${icon.src}`)).headers.get('content-type'), 'image/png', icon.src)
+  assert.match(await (await fetch(`${B}/sw.js`)).text(), /cevrimdisi\.html/)
+  assert.match(await (await fetch(`${B}/cevrimdisi.html`)).text(), /İnternet bağlantısı yok/)
+  const privacy = await (await fetch(`${B}/gizlilik`)).text()
+  assert.match(privacy, /Bülten aboneliği[\s\S]*Tarayıcında saklananlar/)
+  assert.match(home, /href="\/gizlilik"/, 'alt bilgide bağlantı')
+  assert.match(await (await fetch(`${B}/sitemap.xml`)).text(), /\/gizlilik<\/loc>/)
+})
+
 test('gökyüzü takvimi', async () => {
   assert.match(await submit('/admin', 'Gökyüzü takvimini güncelle'), /araştırılıyor/)
   await waitFor(async () => /Gökyüzü takvimi \(elle\): .* 3(<!-- -->)? olay/.test((await get('/admin')).html), 'gökyüzü')

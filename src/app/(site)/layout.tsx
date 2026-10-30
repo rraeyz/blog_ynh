@@ -40,12 +40,15 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         </HideOn>
       )}
       <main className="flex-1">{children}</main>
+      {/* Uygulama olarak kurulunca bağlantı yokken boş ekran yerine çevrimdışı sayfası (public/sw.js) */}
+      <script dangerouslySetInnerHTML={{ __html: "if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js')" }} />
       <footer className="border-t border-zinc-200/70 dark:border-ink-line mt-20">
         <div className="mx-auto max-w-5xl px-4 py-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-500">
           {/* Telif sahibi site adından bağımsız: site adı değişse de alt bilgide marka kalır */}
           <span>© {new Date().getFullYear()} Raeyz Labs</span>
           <Link href="/astronomi-ozeti" className="hover:text-violet-500">Haftanın astronomi özeti</Link>
           <a href="/rss.xml" className="hover:text-violet-500" title="Feedly, Inoreader gibi bir besleme okuyucuya bu adresi ekleyerek yeni yazıları takip edebilirsin">RSS beslemesi</a>
+          <Link href="/gizlilik" className="hover:text-violet-500">Gizlilik</Link>
           {settings.kunyeUrl && <a href={settings.kunyeUrl} className="hover:text-violet-500">{settings.kunyeUrl.replace(/^https?:\/\//, '')}</a>}
           <span className="ml-auto">Yazılar yapay zekâ yardımıyla hazırlanır; kaynağı her yazının sonunda.</span>
         </div>
