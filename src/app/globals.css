@@ -10,6 +10,10 @@ body { @apply bg-paper text-zinc-900 dark:bg-ink dark:text-zinc-100 antialiased 
 h1, h2, h3 { @apply font-display tracking-tight; }
 ::selection { @apply bg-violet-500/30; }
 
+/* Kurulu uygulamada iki parmakla yakınlaştırma kapalı (tutarken yanlışlıkla büyüyordu); tarayıcıda açık kalır, yazı telefonun yazı boyutu ayarıyla büyür.
+   viewport etiketini betikle değiştirmek telefonda işlemedi */
+@media (display-mode: standalone) { html { touch-action: pan-x pan-y; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
