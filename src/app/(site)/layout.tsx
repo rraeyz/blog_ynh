@@ -42,8 +42,9 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       )}
       <main className="flex-1">{children}</main>
       <BottomNav sky={settings.skyEnabled} />
-      {/* Uygulama olarak kurulunca bağlantı yokken boş ekran yerine çevrimdışı sayfası (public/sw.js) */}
-      <script dangerouslySetInnerHTML={{ __html: "if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js')" }} />
+      {/* Uygulama olarak kurulunca bağlantı yokken boş ekran yerine çevrimdışı sayfası (public/sw.js).
+          Kurulu uygulamada iki parmakla yakınlaştırma kapalı (tutarken yanlışlıkla büyüyordu); tarayıcıda açık kalır, yazı boyutu telefonun ayarıyla da büyür */}
+      <script dangerouslySetInnerHTML={{ __html: "if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');if(matchMedia('(display-mode: standalone)').matches){var v=document.querySelector('meta[name=viewport]');if(v)v.content+=',maximum-scale=1,user-scalable=no'}" }} />
       <footer className="border-t border-zinc-200/70 dark:border-ink-line mt-20">
         <div className="mx-auto max-w-5xl px-4 py-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-zinc-500">
           {/* Telif sahibi site adından bağımsız: site adı değişse de alt bilgide marka kalır */}
