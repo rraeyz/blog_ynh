@@ -27,7 +27,7 @@ const monthKey = (y: number, m: number) => {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
 }
 
-// Aylık takvim (?ay=2026-11): günlerde olay simgeleri, altında o ayın olaylarının ayrıntısı. JavaScript gerekmez
+// Aylık takvim (?ay=2026-11): önce takvim (günlerde olay simgeleri), sonra ayın öne çıkanları ve olayların ayrıntısı. JavaScript gerekmez
 export default async function SkyPage({ searchParams }: { searchParams: { ay?: string } }) {
   const settings = await getSettings()
   if (!settings.skyEnabled) notFound()
@@ -56,21 +56,6 @@ export default async function SkyPage({ searchParams }: { searchParams: { ay?: s
         <h2 className="text-xl font-semibold capitalize">{monthLabel(y, m)}</h2>
         <Link href={`/gokyuzu?ay=${monthKey(y, m + 1)}`} className="rounded-full px-3 py-1.5 text-sm hover:bg-zinc-200/60 dark:hover:bg-white/5">{`${monthLabel(y, m + 1, 'short')} →`}</Link>
       </nav>
-
-      {highlights.length > 0 && (
-        <section aria-label="Bu ayın öne çıkanları" className="mt-6 grid gap-3 sm:grid-cols-2">
-          {highlights.map((e) => (
-            <a key={e.id} href={`#gun-${e.date}`} className={`flex items-center gap-4 rounded-2xl border p-4 ${CELL[e.rank]}`}>
-              <span className="text-4xl leading-none"><SkyIcon kind={e.kind} /></span>
-              <span className="min-w-0">
-                <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${BADGE[e.rank]}`}>{RANK_LABELS[e.rank]}</span>
-                <span className="mt-1 block font-semibold leading-snug">{e.title}</span>
-                <span className="block text-sm text-zinc-600 dark:text-zinc-400">{skyDay(e.date)}{e.time && ` · ${e.time}`}</span>
-              </span>
-            </a>
-          ))}
-        </section>
-      )}
 
       <div className="mt-6 grid grid-cols-7 gap-1 text-center text-xs text-zinc-500">{WEEKDAYS.map((d) => <span key={d}>{d}</span>)}</div>
       <div className="mt-1 grid grid-cols-7 gap-1">
@@ -101,6 +86,24 @@ export default async function SkyPage({ searchParams }: { searchParams: { ay?: s
         <ul aria-label="Simgeler" className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
           {Object.entries(SKY_KINDS).filter(([key]) => kinds.includes(key)).map(([key, k]) => <li key={key}>{k.icon} {k.label}</li>)}
         </ul>
+      )}
+
+      {highlights.length > 0 && (
+        <section aria-labelledby="one-cikanlar" className="mt-10">
+          <h2 id="one-cikanlar" className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">Bu ayın öne çıkanları</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {highlights.map((e) => (
+            <a key={e.id} href={`#gun-${e.date}`} className={`flex items-center gap-4 rounded-2xl border p-4 ${CELL[e.rank]}`}>
+              <span className="text-4xl leading-none"><SkyIcon kind={e.kind} /></span>
+              <span className="min-w-0">
+                <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${BADGE[e.rank]}`}>{RANK_LABELS[e.rank]}</span>
+                <span className="mt-1 block font-semibold leading-snug">{e.title}</span>
+                <span className="block text-sm text-zinc-600 dark:text-zinc-400">{skyDay(e.date)}{e.time && ` · ${e.time}`}</span>
+              </span>
+            </a>
+          ))}
+          </div>
+        </section>
       )}
 
       {events.length === 0 ? (
