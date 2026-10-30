@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   return {
     title: post.title,
     description: post.excerpt,
-    openGraph: { type: 'article', title: post.title, description: post.excerpt, publishedTime: post.publishedAt?.toISOString(), ...(image ? { images: [image.src] } : {}) },
+    openGraph: { type: 'article', title: post.title, description: post.excerpt, publishedTime: post.publishedAt?.toISOString(), images: [image?.src ?? '/opengraph-image.png'] },
   }
 }
 

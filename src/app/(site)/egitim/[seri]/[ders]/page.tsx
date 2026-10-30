@@ -25,7 +25,7 @@ async function findLesson(seri: string, ders: string) {
 
 export async function generateMetadata({ params }: { params: { seri: string; ders: string } }): Promise<Metadata> {
   const lesson = await findLesson(params.seri, params.ders)
-  return lesson ? { title: lesson.title, description: lesson.excerpt, openGraph: { type: 'article', title: lesson.title, description: lesson.excerpt } } : {}
+  return lesson ? { title: lesson.title, description: lesson.excerpt, openGraph: { type: 'article', title: lesson.title, description: lesson.excerpt, images: ['/opengraph-image.png'] } } : {}
 }
 
 export default async function LessonPage({ params }: { params: { seri: string; ders: string } }) {
