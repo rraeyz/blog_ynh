@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { getSettings } from '@/lib/state'
 import '@fontsource-variable/sora'
 import './globals.css'
@@ -14,9 +14,12 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: { types: { 'application/rss+xml': '/rss.xml' } },
     openGraph: { siteName: settings.siteTitle, locale: 'tr_TR', type: 'website', title: settings.siteTitle, description: settings.siteDescription },
     twitter: { card: 'summary_large_image' },
-    appleWebApp: { capable: true, title: settings.siteTitle, statusBarStyle: 'black-translucent' },
+    appleWebApp: { capable: true, title: settings.siteTitle, statusBarStyle: 'default' },
   }
 }
+
+// iPhone'da alt menü ana ekran çizgisinin üstünde dursun (env(safe-area-inset-bottom) bununla çalışır)
+export const viewport: Viewport = { viewportFit: 'cover' }
 
 // Okurun seçtiği tema boyanmadan önce uygulanır (yoksa sayfa bir an cihazın temasıyla görünür); ThemeToggle.tsx
 const THEME_SCRIPT = `try{var t=localStorage.getItem('tema');if(t==='light'||t==='dark')document.documentElement.classList.add(t)}catch(e){}`

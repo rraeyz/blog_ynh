@@ -5,11 +5,12 @@ import { activeTopics, TopicLink } from './parts'
 import { HideOn } from './HideOn'
 import { SearchBox } from './SearchBox'
 import { ThemeToggle } from '../ThemeToggle'
+import { BottomNav } from './BottomNav'
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const [settings, topics] = await Promise.all([getSettings(), activeTopics()])
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
       <header className="sticky top-0 z-30 border-b border-zinc-200/70 dark:border-ink-line bg-paper/80 dark:bg-ink/75 backdrop-blur-xl">
         <div className="mx-auto max-w-5xl px-4 h-16 flex items-center gap-2 sm:gap-4">
           {/* Telefonda menü dar: ad sığmazsa "…" ile kısalır */}
@@ -19,10 +20,10 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
             <span className="truncate">{settings.siteTitle}</span>
           </Link>
           <nav className="ml-auto flex items-center gap-0.5 sm:gap-1 text-sm">
-            <Link href="/#yazilar" className="hidden sm:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Yazılar</Link>
-            <Link href="/egitim" className="rounded-full px-2 sm:px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Eğitim</Link>
+            <Link href="/#yazilar" className="hidden md:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Yazılar</Link>
+            <Link href="/egitim" className="hidden md:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Eğitim</Link>
             <Link href="/astronomi-ozeti" className="hidden md:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Haftalık özet</Link>
-            {settings.skyEnabled && <Link href="/gokyuzu" className="hidden sm:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Gökyüzü</Link>}
+            {settings.skyEnabled && <Link href="/gokyuzu" className="hidden md:inline rounded-full px-3 py-1.5 hover:bg-zinc-200/60 dark:hover:bg-white/5">Gökyüzü</Link>}
             <SearchBox />
             <ThemeToggle />
             {canSubscribe(settings) && <Link href="#abone" className="whitespace-nowrap rounded-full bg-violet-600 text-white px-3 sm:px-4 py-1.5 font-medium hover:bg-violet-500 transition">Abone ol</Link>}
@@ -40,6 +41,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
         </HideOn>
       )}
       <main className="flex-1">{children}</main>
+      <BottomNav sky={settings.skyEnabled} />
       {/* Uygulama olarak kurulunca bağlantı yokken boş ekran yerine çevrimdışı sayfası (public/sw.js) */}
       <script dangerouslySetInnerHTML={{ __html: "if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js')" }} />
       <footer className="border-t border-zinc-200/70 dark:border-ink-line mt-20">
