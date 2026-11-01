@@ -21,6 +21,8 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
     eski: [{ createdAt: 'asc' }],
     onem: [{ importance: 'desc' }, { createdAt: 'desc' }],
     'onem-az': [{ importance: 'asc' }, { createdAt: 'desc' }],
+    begeni: [{ upvotes: 'desc' }, { createdAt: 'desc' }],
+    begenmeyen: [{ downvotes: 'desc' }, { createdAt: 'desc' }],
   } as const
   const sort = searchParams.sira && Object.hasOwn(SORTS, searchParams.sira) ? (searchParams.sira as keyof typeof SORTS) : null
   const paper = { select: { title: true, url: true, imageUrl: true } }
@@ -85,6 +87,8 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
             <option value="eski">En eski önce</option>
             <option value="onem">Önem puanı: yüksekten düşüğe</option>
             <option value="onem-az">Önem puanı: düşükten yükseğe</option>
+            <option value="begeni">Okur oyu: en çok 👍</option>
+            <option value="begenmeyen">Okur oyu: en çok 👎 (gözden geçir)</option>
           </select>
         </label>
         <button className="btn-primary">Uygula</button>
@@ -123,6 +127,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Filter
                 <span className="block truncate text-xs font-normal text-zinc-500">
                   {post.category ? topicLabel(post.category) : 'Konu yok'}
                   {post.importance > 0 && ` · önem ${formatScore(post.importance)}/10`}
+                  {(post.upvotes > 0 || post.downvotes > 0) && ` · 👍 ${post.upvotes} 👎 ${post.downvotes}`}
                   {post.paper && ` · Kaynak: ${post.paper.title}`}
                 </span>
               </Link>

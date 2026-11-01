@@ -13,7 +13,7 @@ export default async function PrivacyPage() {
   return (
     <div className="mx-auto max-w-3xl px-4">
       <header className="py-10 md:py-14">
-        <p className="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-700 dark:text-violet-300">Son güncelleme: 30 Ekim 2026</p>
+        <p className="inline-flex items-center gap-2 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs font-medium text-violet-700 dark:text-violet-300">Son güncelleme: 1 Kasım 2026</p>
         <h1 className="mt-5 text-4xl md:text-5xl font-semibold leading-[1.08]">Gizlilik</h1>
         <p className="mt-4 text-lg text-zinc-600 dark:text-zinc-400">
           {settings.siteTitle} okumak için hesap açmanı istemez. Reklam, izleme çerezi ya da ziyaretçi analizi kullanmaz. Aşağıda, yalnızca senin gönderdiğin bilgilerin nereye gittiği yazıyor.
@@ -33,6 +33,12 @@ export default async function PrivacyPage() {
           </p>
         </section>
         <section>
+          <h2>&quot;Faydalı mıydı?&quot; oyları</h2>
+          <p>
+            Yazının sonundaki oy yalnızca o yazının sayacını bir artırır; kimin oy verdiği kaydedilmez. Oylar yazıların sırasını ve önem puanını değiştirmez; ana sayfadaki &quot;Okurların beğendikleri&quot; bölümünde ve yazıların gözden geçirilmesinde kullanılır.
+          </p>
+        </section>
+        <section>
           <h2>IP adresi</h2>
           <p>
             Formların kötüye kullanılmasını önlemek için IP adresin en fazla bir saat sunucunun belleğinde tutulur, veritabanına yazılmaz. Sitenin çalıştığı sunucu, her web sunucusu gibi güvenlik ve hata ayıklama için teknik erişim kayıtları (IP adresi, tarih, açılan sayfa) tutabilir.
@@ -42,6 +48,7 @@ export default async function PrivacyPage() {
           <h2>Tarayıcında saklananlar</h2>
           <ul>
             <li><strong>Tema seçimin</strong> (açık, koyu, otomatik).</li>
+            <li><strong>Oy verdiğin yazılar:</strong> aynı yazı için yeniden sorulmasın diye.</li>
             <li><strong>Okuduğun dersler:</strong> ders ilerleme çubuğu için. Yalnızca senin tarayıcında durur, sunucuya gönderilmez; tarayıcı verilerini silince kaybolur.</li>
           </ul>
           <p className="mt-2">Okurlar için çerez kullanılmaz; tek çerez, site yöneticisinin panel oturumudur.</p>

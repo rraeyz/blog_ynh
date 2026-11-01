@@ -95,6 +95,8 @@ model Post {
   importance   Int       @default(0) // Modelin tam metinden önem puanı, onda bir (74 = 7,4/10): bülten seçimi ve öne çıkarma
   image        String    @default("") // Yapay zekâ kapağının dosya adı (lib/images.ts)
   featuredAt   DateTime? // Öne çıkanlarda (en fazla 10; yenisi eklenince en eskisi düşer)
+  upvotes      Int       @default(0) // Okurun "Faydalı mıydı?" oyu: sıralamayı ve önem puanını değiştirmez (panel, "Okurların beğendikleri")
+  downvotes    Int       @default(0)
   body         String // Markdown (lib/markdown.ts)
   status       String    @default("draft") // draft | published
   publishedAt  DateTime?
