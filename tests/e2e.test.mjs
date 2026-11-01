@@ -694,6 +694,28 @@ test('arama motorları: site haritası, robots, yapılandırılmış veri', asyn
   assert.match((await get('/admin')).html, /Arama motorları[\s\S]*Site haritasında şu an (<!-- -->)?\d+(<!-- -->)? adres[\s\S]*href="\/sitemap\.xml"[\s\S]*href="\/robots\.txt"/, 'panelden açılır')
 })
 
+test('okur oyu: "Faydalı mıydı?", panelde sayılar, okurların beğendikleri', async () => {
+  const path = '/yazi/kediler-neden-cok-uyur'
+  const lastmod = async () => (await (await fetch(`${B}/sitemap.xml`)).text()).match(/kediler-neden-cok-uyur<\/loc><lastmod>([^<]+)/)[1]
+  const before = await lastmod()
+  const saved = cookie
+  cookie = ''
+  try {
+    assert.match((await get(path)).html, /Bu yazı faydalı mıydı\?/)
+    assert.doesNotMatch((await get('/')).html, /Okurların beğendikleri/, 'oy yokken bölüm görünmez')
+    const vote = async (value) => (await (await post(path, `value="${value}"`)).text())
+    for (const value of ['evet', 'evet', 'hayir', 'evet', 'evet']) assert.match(await vote(value), /oyun alındı/)
+    assert.match(await vote('evet'), /Çok fazla deneme/, 'aynı yazıya aynı yerden sınırsız oy verilemez')
+    const missing = await post(path, 'value="evet"', { postId: '999999' })
+    assert.match(await missing.text(), /Yazı bulunamadı/)
+    assert.match((await get('/')).html, /Okurların beğendikleri[\s\S]*Kediler Neden Çok Uyur\?/)
+  } finally {
+    cookie = saved
+  }
+  assert.equal(await lastmod(), before, 'oy yazının güncellenme tarihini değiştirmez (site haritası, arama dizini)')
+  assert.match((await get('/admin/yazilar?sira=begenmeyen')).html, /Kediler Neden Çok Uyur\?[\s\S]{0,400}👍 (<!-- -->)?4(<!-- -->)? 👎 (<!-- -->)?1/)
+})
+
 test('telefona kurulum (PWA) ve gizlilik sayfası', async () => {
   const home = await (await fetch(`${B}/`)).text()
   assert.match(home, /<link rel="manifest" href="\/manifest\.webmanifest"/)

@@ -42,6 +42,17 @@ export async function suggestAction(_previous: SubscribeState, form: FormData): 
   return { ok: true, message: 'Önerin alındı, teşekkürler! Değerlendirip müfredata uygunsa ekleyeceğiz.' }
 }
 
+// Yazının sonundaki "Faydalı mıydı?" oyu: yalnızca sayı artar.
+// Ham SQL: Prisma güncellemesi updatedAt'i değiştirir; o da site haritasını ve arama dizinini her oyda yeniletirdi
+export async function voteAction(_previous: SubscribeState, form: FormData): Promise<SubscribeState> {
+  const postId = Number(form.get('postId')) || 0
+  if (limited(`oy:${clientIp()}:${postId}`)) return { ok: false, message: 'Çok fazla deneme; biraz sonra tekrar dene.' }
+  const count = form.get('oy') === 'evet'
+    ? await prisma.$executeRaw`UPDATE "Post" SET "upvotes" = "upvotes" + 1 WHERE "id" = ${postId} AND "status" = 'published'`
+    : await prisma.$executeRaw`UPDATE "Post" SET "downvotes" = "downvotes" + 1 WHERE "id" = ${postId} AND "status" = 'published'`
+  return count ? { ok: true, message: 'Teşekkürler, oyun alındı.' } : { ok: false, message: 'Yazı bulunamadı.' }
+}
+
 // Okurun derste bildirdiği hata: yalnızca kaydedilir; panelde dersin yanında görünür
 const MAX_REPORTS = 1000
 export async function reportAction(_previous: SubscribeState, form: FormData): Promise<SubscribeState> {

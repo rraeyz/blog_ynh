@@ -10,7 +10,7 @@ export default async function HomePage({ searchParams }: { searchParams: { sayfa
   const page = Math.max(1, Number(searchParams.sayfa) || 1)
   const published = { status: 'published' }
   const include = { paper: PAPER_FIELDS }
-  const [settings, posts, latest, picked, topics, weekCount, sky] = await Promise.all([
+  const [settings, posts, latest, picked, topics, weekCount, sky, liked] = await Promise.all([
     getSettings(),
     prisma.post.findMany({
       where: published,
@@ -24,8 +24,11 @@ export default async function HomePage({ searchParams }: { searchParams: { sayfa
     activeTopics(),
     prisma.post.count({ where: { ...published, publishedAt: { gte: new Date(Date.now() - 7 * 86_400_000) } } }),
     upcomingSky(4),
+    // Okurların beğendikleri: son 30 günün en çok 👍 alanları. Öne çıkanlardan ve önem puanından ayrı
+    prisma.post.findMany({ where: { ...published, upvotes: { gt: 0 }, publishedAt: { gte: new Date(Date.now() - 30 * 86_400_000) } }, orderBy: [{ upvotes: 'desc' }, { publishedAt: 'desc' }], take: 6, include }),
   ])
   const first = page === 1
+  const favorites = first ? liked.filter((post) => post.upvotes > post.downvotes).slice(0, 3) : []
   // Yeni gelişmeler hep en yeni 5 yazı: eskiler buradan düşer, arşivde ve sekmelerde kalır
   const news: PostItem[] = first ? latest : []
   // Öne çıkanlar elle seçilir; hiç yoksa en yeni üç yazı "Okuma köşesi" olur
@@ -94,6 +97,14 @@ export default async function HomePage({ searchParams }: { searchParams: { sayfa
               ))}
             </div>
           )}
+        </section>
+      )}
+
+      {favorites.length > 0 && (
+        <section className="mt-12">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">Okurların beğendikleri</h2>
+          <p className="mt-1 text-sm text-zinc-500">Son 30 günde en çok &quot;faydalı&quot; bulunan yazılar</p>
+          <div className="mt-5 grid gap-6 md:grid-cols-3">{favorites.map((post) => <CardPost key={post.id} post={post} />)}</div>
         </section>
       )}
 

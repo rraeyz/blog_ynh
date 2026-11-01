@@ -8,6 +8,7 @@ import { headings, inline, renderMarkdown } from '@/lib/markdown'
 import { coverOf, readingMinutes, topicHue } from '@/lib/topics'
 import { CardPost, CoverImage, coverStyle, JsonLd, PAPER_FIELDS, postDate, SubscribeBox, TopicChip, topicOf } from '../../parts'
 import { ReadingProgress } from './ReadingProgress'
+import { VoteBox } from './VoteBox'
 
 // Taslak yazıyı yalnızca giriş yapmış yönetici görebilir (önizleme)
 async function findPost(slug: string) {
@@ -97,6 +98,7 @@ export default async function PostPage({ params }: { params: { slug: string } })
             <p className="text-xs text-zinc-500 mt-3">Bu yazı yapay zekâ yardımıyla hazırlandı; ayrıntılar ve kesin sonuçlar için kaynağa bakın.</p>
           </aside>
         )}
+        <VoteBox postId={post.id} />
       </div>
       {toc.length > 1 && (
         <nav aria-label="Bu yazıda" className="hidden lg:block">

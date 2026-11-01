@@ -16,7 +16,7 @@ const FIELDS = {
   settings: ['siteTitle', 'siteDescription', 'siteUrl', 'aiProvider', 'aiModel', 'aiApiKey', 'aiBaseUrl', 'readMode', 'maxInputChars', 'postsPerDay', 'postsMinPerDay', 'scoreThreshold', 'scoreExceptional', 'spacePerDay', 'spaceNormalPerDay', 'spaceImportantScore', 'spaceMaxPerDay', 'fullTextReplace', 'fullTextPromote', 'dailyHour', 'interests', 'monthlyTokenLimit', 'autoPublish', 'autoNewsletter', 'digestWeekday', 'kunyeUrl', 'kunyeToken', 'newsletterTag', 'imageApiKey', 'imageModel', 'lessonModel', 'lessonHelperModel', 'lessonWeekdays', 'lessonAutoPublish', 'autoFeature', 'featureScore', 'skyEnabled', 'astroDigest', 'astroDigestWeekday'],
   sources: ['id', 'url', 'enabled', 'lastFetchedAt', 'lastError', 'createdAt'],
   papers: ['id', 'externalId', 'title', 'authors', 'abstract', 'score', 'space', 'imageUrl', 'topic', 'url', 'publishedAt', 'status', 'error', 'createdAt'],
-  posts: ['id', 'slug', 'title', 'excerpt', 'highlights', 'category', 'importance', 'image', 'featuredAt', 'body', 'status', 'publishedAt', 'paperId', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
+  posts: ['id', 'slug', 'title', 'excerpt', 'highlights', 'category', 'importance', 'image', 'featuredAt', 'upvotes', 'downvotes', 'body', 'status', 'publishedAt', 'paperId', 'inputTokens', 'outputTokens', 'createdAt', 'updatedAt'],
   digests: ['id', 'createdAt', 'subject', 'body', 'status', 'sentAt', 'result'],
   series: ['id', 'slug', 'title', 'summary', 'track', 'level', 'position', 'planned', 'createdAt'],
   stages: ['id', 'key', 'seriesId', 'track', 'level', 'title', 'summary', 'position', 'requires', 'approved', 'planned', 'createdAt'],
