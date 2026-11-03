@@ -1,7 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { navStep } from '@/lib/scroll'
 
 // Simgeler tek çizgi yolu (24×24): bağımlılık eklememek için
 const ITEMS = [
@@ -15,18 +16,20 @@ const ITEMS = [
 export function BottomNav({ sky }: { sky: boolean }) {
   const path = usePathname()
   const [hidden, setHidden] = useState(false)
+  const state = useRef<[boolean, number]>([false, 0])
   useEffect(() => {
-    let last = window.scrollY
+    state.current = [false, window.scrollY]
     const update = () => {
-      const y = window.scrollY
-      if (Math.abs(y - last) < 8) return
-      setHidden(y > last && y > 80)
-      last = y
+      state.current = navStep(...state.current, window.scrollY)
+      setHidden(state.current[0])
     }
     window.addEventListener('scroll', update, { passive: true })
     return () => window.removeEventListener('scroll', update)
   }, [])
-  useEffect(() => setHidden(false), [path])
+  useEffect(() => {
+    state.current = [false, window.scrollY]
+    setHidden(false)
+  }, [path])
   return (
     <nav aria-label="Alt menü" className={`md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-zinc-200/70 dark:border-ink-line bg-paper/95 dark:bg-ink/95 backdrop-blur-xl pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 transition-transform duration-300 ${hidden ? 'translate-y-full' : ''}`}>
       <div className="mx-auto flex max-w-md items-stretch justify-around">

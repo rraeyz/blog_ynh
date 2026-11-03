@@ -439,3 +439,18 @@ test('safeFetch: iç ağ engellenir, yönlendirmeler denetlenir', async () => {
     server.close()
   }
 })
+
+test('navStep: alt menü azıcık yukarı kaydırınca gelir', async () => {
+  const { navStep } = await import('../src/lib/scroll.ts')
+  let s: [boolean, number] = [false, 0]
+  for (const y of [100, 105, 110]) s = navStep(...s, y)
+  assert.equal(s[0], true) // 8 px aşağı: gizli
+  for (const y of [500, 498]) s = navStep(...s, y)
+  assert.equal(s[0], true) // 2 px yukarı: hâlâ gizli
+  s = navStep(...s, 497)
+  assert.equal(s[0], false) // dipten 3 px yukarı: görünür
+  s = navStep(...s, 503)
+  assert.equal(s[0], false) // 6 px aşağı: görünür kalır
+  s = navStep(...s, 40)
+  assert.deepEqual(s, [false, 40])
+})
